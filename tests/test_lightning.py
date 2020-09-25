@@ -6,12 +6,14 @@ import lightning
 
 class TestAdaptiveAE(unittest.TestCase):
     def setUp(self):
+        self.trade_off = 0.5
         self.net = lightning.AdaptiveAE(in_channels=14,
                                         seq_len=30,
                                         num_layers=4,
                                         kernel_size=3,
                                         base_filters=16,
-                                        latent_dim=64)
+                                        latent_dim=64,
+                                        recon_trade_off=self.trade_off)
 
     def test_encoder(self):
         inputs = torch.randn(16, 14, 30)
@@ -27,6 +29,11 @@ class TestAdaptiveAE(unittest.TestCase):
         inputs = torch.randn(16, 64)
         outputs = self.net.classifier(inputs)
         self.assertEqual(torch.Size((16, 1)), outputs.shape)
+
+    def test_trade_off(self):
+        inputs = (torch.randn(16, 14, 30), torch.randn(16))
+        loss = self.net.training_step(inputs, 0)
+        self.assertEqual(loss['train/loss'], loss['train/regression_loss'] + self.trade_off * loss['train/recon_loss'])
 
     def test_batch_independence(self):
         inputs = torch.randn(16, 14, 30)

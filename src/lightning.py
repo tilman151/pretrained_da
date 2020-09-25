@@ -15,7 +15,7 @@ class DeFlatten(nn.Module):
 
 
 class AdaptiveAE(pl.LightningModule):
-    def __init__(self, in_channels, seq_len, num_layers, kernel_size, base_filters, latent_dim):
+    def __init__(self, in_channels, seq_len, num_layers, kernel_size, base_filters, latent_dim, recon_trade_off):
         super().__init__()
 
         self.in_channels = in_channels
@@ -24,6 +24,7 @@ class AdaptiveAE(pl.LightningModule):
         self.kernel_size = kernel_size
         self.base_filters = base_filters
         self.latent_dim = latent_dim
+        self.recon_trade_off = recon_trade_off
 
         self.encoder = self._build_encoder()
         self.decoder = self._build_decoder()
@@ -122,5 +123,5 @@ class AdaptiveAE(pl.LightningModule):
         reconstruction, prediction, latent_code = self(features)
         recon_loss = self.criterion_recon(features, reconstruction)
         regression_loss = self.criterion_regression(prediction.squeeze(), targets)
-        loss = regression_loss  # + recon_loss
+        loss = regression_loss + self.recon_trade_off * recon_loss
         return loss, recon_loss, regression_loss
