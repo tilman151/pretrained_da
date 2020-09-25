@@ -69,3 +69,54 @@ class TestCMAPSS(unittest.TestCase):
                 self.assertGreaterEqual(torch.min(truncated_dataset.data['dev'][0]).item(), -1.)
                 self.assertTrue(torch.all(truncated_dataset.data['test'][0] == full_dataset.data['test'][0]))
                 self.assertTrue(torch.all(truncated_dataset.data['val'][0] == full_dataset.data['val'][0]))
+
+
+class TestCMAPSSAdaption(unittest.TestCase):
+    def setUp(self):
+        self.dataset = datasets.DomainAdaptionDataModule(3, 1, batch_size=16, window_size=30)
+        self.dataset.prepare_data()
+        self.dataset.setup()
+
+    def test_train_length_equal(self):
+        train_loader = self.dataset.train_dataloader()
+        source_length = len(self.dataset.source.train_dataloader())
+        target_length = len(self.dataset.target.train_dataloader())
+        self.assertEqual(max(source_length, target_length), len(train_loader))
+
+    def test_val_length_equal(self):
+        val_loader = self.dataset.val_dataloader()
+        source_length = len(self.dataset.source.val_dataloader())
+        target_length = len(self.dataset.target.val_dataloader())
+        self.assertEqual(max(source_length, target_length), len(val_loader))
+
+    def test_test_length_equal(self):
+        test_loader = self.dataset.test_dataloader()
+        source_length = len(self.dataset.source.test_dataloader())
+        target_length = len(self.dataset.target.test_dataloader())
+        self.assertEqual(max(source_length, target_length), len(test_loader))
+
+    def test_train_batch_structure(self):
+        train_loader = self.dataset.train_dataloader()
+        batch = next(iter(train_loader))
+        self.assertEqual(3, len(batch))
+        source, source_labels, target = batch
+        self.assertEqual(torch.Size((16, 14, 30)), source.shape)
+        self.assertEqual(torch.Size((16, 14, 30)), target.shape)
+        self.assertEqual(torch.Size((16,)), source_labels.shape)
+
+    def test_val_batch_structure(self):
+        val_loader = self.dataset.val_dataloader()
+        self._assert_val_test_batch_structure(val_loader)
+
+    def test_test_batch_structure(self):
+        test_loader = self.dataset.test_dataloader()
+        self._assert_val_test_batch_structure(test_loader)
+
+    def _assert_val_test_batch_structure(self, loader):
+        batch = next(iter(loader))
+        self.assertEqual(4, len(batch))
+        source, source_labels, target, target_labels = batch
+        self.assertEqual(torch.Size((16, 14, 30)), source.shape)
+        self.assertEqual(torch.Size((16, 14, 30)), target.shape)
+        self.assertEqual(torch.Size((16,)), source_labels.shape)
+        self.assertEqual(torch.Size((16,)), target_labels.shape)

@@ -221,5 +221,70 @@ class CMAPSSDataModule(pl.LightningDataModule):
     def _to_dataset(self, features, targets):
         return TensorDataset(features, targets)
 
-    def transfer_batch_to_device(self, batch: Any, device: torch.device) -> Any:
-        return tuple(b.to(device) for b in batch)
+
+class DomainAdaptionDataModule(pl.LightningDataModule):
+    def __init__(self,
+                 fd_source,
+                 fd_target,
+                 batch_size,
+                 max_rul=125,
+                 window_size=30,
+                 percent_fail_runs=None,
+                 percent_broken=None,
+                 normalization=None,
+                 feature_select=None):
+        super().__init__()
+
+        self.batch_size = batch_size
+
+        self.source = CMAPSSDataModule(fd_source, batch_size, max_rul, window_size,
+                                       None, None, normalization, feature_select)
+        self.target = CMAPSSDataModule(fd_target, batch_size, max_rul, window_size,
+                                       percent_fail_runs, percent_broken, normalization, feature_select)
+
+    def prepare_data(self, *args, **kwargs):
+        self.source.prepare_data(*args, **kwargs)
+        self.target.prepare_data(*args, **kwargs)
+
+    def setup(self, stage: Optional[str] = None):
+        self.source.setup(stage)
+        self.target.setup(stage)
+
+    def train_dataloader(self, *args, **kwargs) -> DataLoader:
+        return DataLoader(self._to_dataset('dev', use_target_labels=False),
+                          batch_size=self.batch_size,
+                          shuffle=True,
+                          pin_memory=True)
+
+    def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
+        return DataLoader(self._to_dataset('val', use_target_labels=True),
+                          batch_size=self.batch_size,
+                          shuffle=False,
+                          pin_memory=True)
+
+    def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
+        return DataLoader(self._to_dataset('test', use_target_labels=True),
+                          batch_size=self.batch_size,
+                          shuffle=False,
+                          pin_memory=True)
+
+    def _to_dataset(self, split, use_target_labels):
+        source, source_labels = self.source.data[split]
+        target, target_labels = self.target.data[split]
+
+        # Make source and target data the same length
+        num_source = source.shape[0]
+        num_target = target.shape[0]
+        if num_source > num_target:
+            target = target.repeat(num_source // num_target + 1, 1, 1)[:num_source]
+            target_labels = target_labels.repeat(num_source // num_target + 1)[:num_source]
+        elif num_source < num_target:
+            source = source.repeat(num_target // num_source + 1, 1, 1)[:num_target]
+            source_labels = source_labels.repeat(num_target // num_source + 1)[:num_target]
+
+        if use_target_labels:
+            dataset = TensorDataset(source, source_labels, target, target_labels)
+        else:
+            dataset = TensorDataset(source, source_labels, target)
+
+        return dataset
