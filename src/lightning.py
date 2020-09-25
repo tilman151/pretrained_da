@@ -28,9 +28,10 @@ class AdaptiveAE(pl.LightningModule):
         self.encoder = self._build_encoder()
         self.decoder = self._build_decoder()
         # self.domain_disc = self._build_domain_disc()
-        # self.classifier = self._build_classifier()
+        self.classifier = self._build_classifier()
 
         self.criterion_recon = nn.MSELoss()
+        self.criterion_regression = nn.MSELoss()
 
         self.save_hyperparameters()
 
@@ -50,9 +51,7 @@ class AdaptiveAE(pl.LightningModule):
         cut_off = self.num_layers * (self.kernel_size - (self.kernel_size % 2))
         flat_dim = (self.seq_len - cut_off) * self.num_layers * self.base_filters
         layers.extend([nn.Flatten(),
-                       nn.Linear(flat_dim, self.latent_dim),
-                       nn.BatchNorm1d(self.latent_dim),
-                       nn.ReLU(True)])
+                       nn.Linear(flat_dim, self.latent_dim)])
 
         return nn.Sequential(*layers)
 
@@ -76,36 +75,52 @@ class AdaptiveAE(pl.LightningModule):
 
         return nn.Sequential(*layers)
 
+    def _build_classifier(self):
+        classifier = nn.Sequential(nn.BatchNorm1d(self.latent_dim),
+                                   nn.ReLU(True),
+                                   nn.Linear(self.latent_dim, 1))
+
+        return classifier
+
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=0.01)
 
     def forward(self, inputs, targets=None):
         latent_code = self.encoder(inputs)
-        outputs = self.decoder(latent_code)
+        reconstruction = self.decoder(latent_code)
+        prediction = self.classifier(latent_code)
 
-        return outputs, latent_code
+        return reconstruction, prediction, latent_code
 
     def training_step(self, batch, batch_idx):
-        features, targets = batch
-        reconstruction, latent_code = self(features)
-        loss = self.criterion_recon(features, reconstruction)
+        loss, recon_loss, regression_loss = self._calc_loss(batch)
 
-        return pl.TrainResult(loss)
+        result = pl.TrainResult(loss)
+        result.log('train/loss', loss)
+        result.log('train/recon_loss', recon_loss)
+        result.log('train/regression_loss', regression_loss)
+
+        return result
 
     def validation_step(self, batch, batch_idx):
-        features, targets = batch
-        reconstruction, latent_code = self(features)
-        loss = self.criterion_recon(features, reconstruction)
-        result = pl.EvalResult(checkpoint_on=loss)
-        result.log('val/recon_loss', loss)
-
-        return result
+        return self._evaluate(batch, 'val')
 
     def test_step(self, batch, batch_idx):
-        features, targets = batch
-        reconstruction, latent_code = self(features)
-        loss = self.criterion_recon(features, reconstruction)
-        result = pl.EvalResult(loss)
-        result.log('test/recon_loss', loss)
+        return self._evaluate(batch, 'test')
+
+    def _evaluate(self, batch, prefix):
+        loss, recon_loss, regression_loss = self._calc_loss(batch)
+        result = pl.EvalResult(checkpoint_on=regression_loss)
+        result.log(f'{prefix}/loss', loss)
+        result.log(f'{prefix}/recon_loss', recon_loss)
+        result.log(f'{prefix}/regression_loss', torch.sqrt(regression_loss))
 
         return result
+
+    def _calc_loss(self, batch):
+        features, targets = batch
+        reconstruction, prediction, latent_code = self(features)
+        recon_loss = self.criterion_recon(features, reconstruction)
+        regression_loss = self.criterion_regression(prediction.squeeze(), targets)
+        loss = regression_loss  # + recon_loss
+        return loss, recon_loss, regression_loss
