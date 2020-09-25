@@ -15,7 +15,8 @@ def run():
                                  kernel_size=3,
                                  base_filters=16,
                                  latent_dim=64,
-                                 recon_trade_off=1.)
+                                 recon_trade_off=1.,
+                                 lr=0.01)
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
 

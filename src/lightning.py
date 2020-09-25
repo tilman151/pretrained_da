@@ -15,7 +15,7 @@ class DeFlatten(nn.Module):
 
 
 class AdaptiveAE(pl.LightningModule):
-    def __init__(self, in_channels, seq_len, num_layers, kernel_size, base_filters, latent_dim, recon_trade_off):
+    def __init__(self, in_channels, seq_len, num_layers, kernel_size, base_filters, latent_dim, recon_trade_off, lr):
         super().__init__()
 
         self.in_channels = in_channels
@@ -25,6 +25,7 @@ class AdaptiveAE(pl.LightningModule):
         self.base_filters = base_filters
         self.latent_dim = latent_dim
         self.recon_trade_off = recon_trade_off
+        self.lr = lr
 
         self.encoder = self._build_encoder()
         self.decoder = self._build_decoder()
@@ -84,7 +85,7 @@ class AdaptiveAE(pl.LightningModule):
         return classifier
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=0.01)
+        return torch.optim.Adam(self.parameters(), lr=self.lr)
 
     def forward(self, inputs, targets=None):
         latent_code = self.encoder(inputs)
