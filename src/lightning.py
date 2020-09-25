@@ -14,8 +14,46 @@ class DeFlatten(nn.Module):
         return inputs.view(-1, self.num_channels, self.seq_len)
 
 
+class _GradientReverse(torch.autograd.Function):
+    """Gradient reversal forward and backward definitions."""
+
+    @staticmethod
+    def forward(ctx, inputs, **kwargs):
+        """Forward pass as identity mapping."""
+        return inputs
+
+    @staticmethod
+    def backward(ctx, grad):
+        """Backward pass as negative of gradient."""
+        return -grad
+
+
+def gradient_reversal(x):
+    """Perform gradient reversal on input."""
+    return _GradientReverse.apply(x)
+
+
+class GradientReversalLayer(nn.Module):
+    """Module for gradient reversal."""
+
+    def forward(self, inputs):
+        """Perform forward pass of gradient reversal."""
+        return gradient_reversal(inputs)
+
+
 class AdaptiveAE(pl.LightningModule):
-    def __init__(self, in_channels, seq_len, num_layers, kernel_size, base_filters, latent_dim, recon_trade_off, lr):
+    def __init__(self,
+                 in_channels,
+                 seq_len,
+                 num_layers,
+                 kernel_size,
+                 base_filters,
+                 latent_dim,
+                 recon_trade_off,
+                 domain_trade_off,
+                 domain_disc_dim,
+                 num_disc_layers,
+                 lr):
         super().__init__()
 
         self.in_channels = in_channels
@@ -25,21 +63,27 @@ class AdaptiveAE(pl.LightningModule):
         self.base_filters = base_filters
         self.latent_dim = latent_dim
         self.recon_trade_off = recon_trade_off
+        self.domain_trade_off = domain_trade_off
+        self.domain_disc_dim = domain_disc_dim
+        self.num_disc_layers = num_disc_layers
         self.lr = lr
 
         self.encoder = self._build_encoder()
         self.decoder = self._build_decoder()
-        # self.domain_disc = self._build_domain_disc()
+        self.domain_disc = self._build_domain_disc()
         self.classifier = self._build_classifier()
 
         self.criterion_recon = nn.MSELoss()
         self.criterion_regression = nn.MSELoss()
+        self.criterion_domain = nn.BCEWithLogitsLoss()
 
         self.save_hyperparameters()
 
     @property
     def example_input_array(self):
-        return torch.randn(16, self.in_channels, self.seq_len), torch.zeros(16)
+        common = torch.randn(32, self.in_channels, self.seq_len)
+
+        return common
 
     def _build_encoder(self):
         layers = [nn.Conv1d(self.in_channels, self.base_filters, self.kernel_size),
@@ -84,23 +128,41 @@ class AdaptiveAE(pl.LightningModule):
 
         return classifier
 
+    def _build_domain_disc(self):
+        layers = [GradientReversalLayer(),
+                  nn.Linear(self.latent_dim, self.domain_disc_dim),
+                  nn.BatchNorm1d(self.domain_disc_dim),
+                  nn.ReLU(True)]
+        for i in range(self.num_disc_layers - 1):
+            layers.extend([nn.Linear(self.domain_disc_dim, self.domain_disc_dim),
+                           nn.BatchNorm1d(self.domain_disc_dim),
+                           nn.ReLU()])
+
+        layers.append(nn.Linear(self.domain_disc_dim, 1))
+
+        return nn.Sequential(*layers)
+
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
 
-    def forward(self, inputs, targets=None):
-        latent_code = self.encoder(inputs)
-        reconstruction = self.decoder(latent_code)
-        prediction = self.classifier(latent_code)
+    def forward(self, common):
+        batch_size = common.shape[0] // 2
 
-        return reconstruction, prediction, latent_code
+        latent_code = self.encoder(common)
+        reconstruction = self.decoder(latent_code)
+        prediction = self.classifier(latent_code[:batch_size])
+        domain_prediction = self.domain_disc(latent_code)
+
+        return reconstruction, prediction, domain_prediction
 
     def training_step(self, batch, batch_idx):
-        loss, recon_loss, regression_loss = self._calc_loss(batch)
+        loss, recon_loss, regression_loss, domain_loss = self._calc_loss(batch)
 
         result = pl.TrainResult(loss)
         result.log('train/loss', loss)
         result.log('train/recon_loss', recon_loss)
         result.log('train/regression_loss', regression_loss)
+        result.log('train/domain_loss', domain_loss)
 
         return result
 
@@ -111,18 +173,26 @@ class AdaptiveAE(pl.LightningModule):
         return self._evaluate(batch, 'test')
 
     def _evaluate(self, batch, prefix):
-        loss, recon_loss, regression_loss = self._calc_loss(batch)
+        loss, recon_loss, regression_loss, domain_loss = self._calc_loss(batch)
         result = pl.EvalResult(checkpoint_on=regression_loss)
         result.log(f'{prefix}/loss', loss)
         result.log(f'{prefix}/recon_loss', recon_loss)
         result.log(f'{prefix}/regression_loss', torch.sqrt(regression_loss))
+        result.log(f'{prefix}/domain_loss', domain_loss)
 
         return result
 
     def _calc_loss(self, batch):
-        features, targets = batch
-        reconstruction, prediction, latent_code = self(features)
-        recon_loss = self.criterion_recon(features, reconstruction)
-        regression_loss = self.criterion_regression(prediction.squeeze(), targets)
-        loss = regression_loss + self.recon_trade_off * recon_loss
-        return loss, recon_loss, regression_loss
+        source, source_labels, target = batch
+        common = torch.cat([source, target])
+        batch_size = source.shape[0]
+        reconstruction, prediction, domain_prediction = self(common)
+
+        recon_loss = self.criterion_recon(common, reconstruction)
+        regression_loss = self.criterion_regression(prediction.squeeze(), source_labels)
+        domain_targets = torch.cat([torch.ones(batch_size, device=self.device),
+                                    torch.zeros(batch_size, device=self.device)])
+        domain_loss = self.criterion_domain(domain_prediction.squeeze(), domain_targets)
+        loss = regression_loss + self.recon_trade_off * recon_loss + self.domain_trade_off * domain_loss
+
+        return loss, recon_loss, regression_loss, domain_loss

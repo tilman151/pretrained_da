@@ -13,7 +13,11 @@ class TestAdaptiveAE(unittest.TestCase):
                                         kernel_size=3,
                                         base_filters=16,
                                         latent_dim=64,
-                                        recon_trade_off=self.trade_off)
+                                        recon_trade_off=self.trade_off,
+                                        domain_trade_off=self.trade_off,
+                                        domain_disc_dim=32,
+                                        num_disc_layers=2,
+                                        lr=0.01)
 
     def test_encoder(self):
         inputs = torch.randn(16, 14, 30)
@@ -30,10 +34,18 @@ class TestAdaptiveAE(unittest.TestCase):
         outputs = self.net.classifier(inputs)
         self.assertEqual(torch.Size((16, 1)), outputs.shape)
 
+    def test_domain_disc(self):
+        inputs = torch.randn(16, 64)
+        outputs = self.net.domain_disc(inputs)
+        self.assertEqual(torch.Size((16, 1)), outputs.shape)
+
     def test_trade_off(self):
-        inputs = (torch.randn(16, 14, 30), torch.randn(16))
+        inputs = (torch.randn(16, 14, 30), torch.randn(16), torch.randn(16, 14, 30))
         loss = self.net.training_step(inputs, 0)
-        self.assertEqual(loss['train/loss'], loss['train/regression_loss'] + self.trade_off * loss['train/recon_loss'])
+        combined_loss = (loss['train/regression_loss'] +
+                         self.trade_off * loss['train/recon_loss'] +
+                         self.trade_off * loss['train/domain_loss'])
+        self.assertEqual(loss['train/loss'], combined_loss)
 
     def test_batch_independence(self):
         inputs = torch.randn(16, 14, 30)
@@ -44,10 +56,10 @@ class TestAdaptiveAE(unittest.TestCase):
         outputs = self.net(inputs)
         self.net.train()
 
-        for i, output in enumerate(outputs):
-            with self.subTest(n_output=i):
+        for n, output in enumerate(outputs):
+            with self.subTest(n_output=n):
                 # Mask loss for certain samples in batch
-                batch_size = inputs[0].shape[0]
+                batch_size = output.shape[0]
                 mask_idx = torch.randint(0, batch_size, ())
                 mask = torch.ones_like(output)
                 mask[mask_idx] = 0
@@ -58,7 +70,7 @@ class TestAdaptiveAE(unittest.TestCase):
                 loss.backward(retain_graph=True)
 
                 # Check if gradient exists and is zero for masked samples
-                for i, grad in enumerate(inputs.grad):
+                for i, grad in enumerate(inputs.grad[:batch_size]):
                     if i == mask_idx:
                         self.assertTrue(torch.all(grad == 0).item())
                     else:

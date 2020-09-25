@@ -16,6 +16,9 @@ def run():
                                  base_filters=16,
                                  latent_dim=64,
                                  recon_trade_off=1.,
+                                 domain_trade_off=1.,
+                                 domain_disc_dim=64,
+                                 num_disc_layers=2,
                                  lr=0.01)
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
