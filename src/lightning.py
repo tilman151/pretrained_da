@@ -114,7 +114,8 @@ class AdaptiveAE(pl.LightningModule):
 
         latent_code = self.encoder(common)
         reconstruction = self.decoder(latent_code)
-        prediction = self.classifier(latent_code[:batch_size])
+        classification_code, _ = torch.split(latent_code, batch_size)
+        prediction = self.classifier(classification_code)
         domain_prediction = self.domain_disc(latent_code)
 
         return reconstruction, prediction, domain_prediction
