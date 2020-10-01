@@ -53,8 +53,8 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Run domain adaption experiment')
     parser.add_argument('-b', '--broken', nargs='*', type=float, help='percent broken to use')
-    parser.add_argument('--domain_trade_off', type=float, help='tradeoff for domain classification')
-    parser.add_argument('--recon_trade_off', type=float, help='tradeoff for reconstruction')
+    parser.add_argument('--domain_tradeoff', nargs='*', type=float, help='tradeoff for domain classification')
+    parser.add_argument('--recon_tradeoff', nargs='*', type=float, help='tradeoff for reconstruction')
     parser.add_argument('-r', '--replications', type=int, default=3, help='replications for each run')
     opt = parser.parse_args()
 
