@@ -2,43 +2,7 @@ import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 
-
-class DeFlatten(nn.Module):
-    def __init__(self, seq_len, num_channels):
-        super().__init__()
-
-        self.seq_len = seq_len
-        self.num_channels = num_channels
-
-    def forward(self, inputs):
-        return inputs.view(-1, self.num_channels, self.seq_len)
-
-
-class _GradientReverse(torch.autograd.Function):
-    """Gradient reversal forward and backward definitions."""
-
-    @staticmethod
-    def forward(ctx, inputs, **kwargs):
-        """Forward pass as identity mapping."""
-        return inputs
-
-    @staticmethod
-    def backward(ctx, grad):
-        """Backward pass as negative of gradient."""
-        return -grad
-
-
-def gradient_reversal(x):
-    """Perform gradient reversal on input."""
-    return _GradientReverse.apply(x)
-
-
-class GradientReversalLayer(nn.Module):
-    """Module for gradient reversal."""
-
-    def forward(self, inputs):
-        """Perform forward pass of gradient reversal."""
-        return gradient_reversal(inputs)
+import layers
 
 
 class AdaptiveAE(pl.LightningModule):
@@ -86,20 +50,20 @@ class AdaptiveAE(pl.LightningModule):
         return common
 
     def _build_encoder(self):
-        layers = [nn.Conv1d(self.in_channels, self.base_filters, self.kernel_size),
-                  nn.BatchNorm1d(self.base_filters),
-                  nn.ReLU(True)]
+        sequence = [nn.Conv1d(self.in_channels, self.base_filters, self.kernel_size),
+                    nn.BatchNorm1d(self.base_filters),
+                    nn.ReLU(True)]
         for i in range(1, self.num_layers):
-            layers.extend([nn.Conv1d(i * self.base_filters, (i + 1) * self.base_filters, self.kernel_size),
-                           nn.BatchNorm1d((i + 1) * self.base_filters),
-                           nn.ReLU(True)])
+            sequence.extend([nn.Conv1d(i * self.base_filters, (i + 1) * self.base_filters, self.kernel_size),
+                             nn.BatchNorm1d((i + 1) * self.base_filters),
+                             nn.ReLU(True)])
 
         cut_off = self.num_layers * (self.kernel_size - (self.kernel_size % 2))
         flat_dim = (self.seq_len - cut_off) * self.num_layers * self.base_filters
-        layers.extend([nn.Flatten(),
-                       nn.Linear(flat_dim, self.latent_dim)])
+        sequence.extend([nn.Flatten(),
+                         nn.Linear(flat_dim, self.latent_dim)])
 
-        return nn.Sequential(*layers)
+        return nn.Sequential(*sequence)
 
     def _build_decoder(self):
         cut_off = self.num_layers * (self.kernel_size - (self.kernel_size % 2))
@@ -107,19 +71,19 @@ class AdaptiveAE(pl.LightningModule):
         reduced_seq_len = self.seq_len - cut_off
         flat_dim = reduced_seq_len * max_filters
 
-        layers = [nn.Linear(self.latent_dim, flat_dim),
-                  nn.BatchNorm1d(flat_dim),
-                  nn.ReLU(True),
-                  DeFlatten(reduced_seq_len, max_filters)]
+        sequence = [nn.Linear(self.latent_dim, flat_dim),
+                    nn.BatchNorm1d(flat_dim),
+                    nn.ReLU(True),
+                    layers.DeFlatten(reduced_seq_len, max_filters)]
         for i in range(self.num_layers - 1, 0, -1):
-            layers.extend([nn.ConvTranspose1d((i + 1) * self.base_filters, i * self.base_filters, self.kernel_size),
-                           nn.BatchNorm1d(i * self.base_filters),
-                           nn.ReLU(True)])
+            sequence.extend([nn.ConvTranspose1d((i + 1) * self.base_filters, i * self.base_filters, self.kernel_size),
+                             nn.BatchNorm1d(i * self.base_filters),
+                             nn.ReLU(True)])
 
-        layers.extend([nn.ConvTranspose1d(self.base_filters, self.in_channels, self.kernel_size),
-                       nn.Tanh()])
+        sequence.extend([nn.ConvTranspose1d(self.base_filters, self.in_channels, self.kernel_size),
+                         nn.Tanh()])
 
-        return nn.Sequential(*layers)
+        return nn.Sequential(*sequence)
 
     def _build_classifier(self):
         classifier = nn.Sequential(nn.BatchNorm1d(self.latent_dim),
@@ -129,18 +93,18 @@ class AdaptiveAE(pl.LightningModule):
         return classifier
 
     def _build_domain_disc(self):
-        layers = [GradientReversalLayer(),
-                  nn.Linear(self.latent_dim, self.domain_disc_dim),
-                  nn.BatchNorm1d(self.domain_disc_dim),
-                  nn.ReLU(True)]
+        sequence = [layers.GradientReversalLayer(),
+                    nn.Linear(self.latent_dim, self.domain_disc_dim),
+                    nn.BatchNorm1d(self.domain_disc_dim),
+                    nn.ReLU(True)]
         for i in range(self.num_disc_layers - 1):
-            layers.extend([nn.Linear(self.domain_disc_dim, self.domain_disc_dim),
-                           nn.BatchNorm1d(self.domain_disc_dim),
-                           nn.ReLU()])
+            sequence.extend([nn.Linear(self.domain_disc_dim, self.domain_disc_dim),
+                             nn.BatchNorm1d(self.domain_disc_dim),
+                             nn.ReLU()])
 
-        layers.append(nn.Linear(self.domain_disc_dim, 1))
+        sequence.append(nn.Linear(self.domain_disc_dim, 1))
 
-        return nn.Sequential(*layers)
+        return nn.Sequential(*sequence)
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
