@@ -43,8 +43,9 @@ class TestCMAPSS(unittest.TestCase):
         dataset.setup()
         self.assertGreater(len(full_dataset.data['dev'][0]), len(dataset.data['dev'][0]))
         self.assertAlmostEqual(0.2, len(dataset.data['dev'][0]) / len(full_dataset.data['dev'][0]), delta=0.01)
-        self.assertEqual(len(full_dataset.data['test'][0]), len(dataset.data['test'][0]))
-        self.assertFalse(torch.any(dataset.data['dev'][1] == 1))
+        self.assertEqual(len(full_dataset.data['test'][0]), len(dataset.data['test'][0]))  # Test data not truncated
+        self.assertFalse(torch.any(dataset.data['dev'][1] == 1))  # No failure data in truncated data
+        self.assertEqual(full_dataset.data['dev'][1][0], dataset.data['dev'][1][0])  # First target has to be equal
 
     def test_precent_broken_truncation(self):
         full_dataset = datasets.CMAPSSDataModule(fd=1, window_size=30, batch_size=4)

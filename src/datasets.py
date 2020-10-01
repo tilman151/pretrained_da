@@ -126,7 +126,7 @@ class CMAPSSDataModule(pl.LightningDataModule):
         if self.percent_broken is not None and self.percent_broken < 1:
             for i, run in enumerate(features):
                 num_cycles = int(self.percent_broken * len(run))
-                run[:, 1] += num_cycles
+                run[:, 1] += len(run) - num_cycles - 1  # Adjust targets to truncated length
                 features[i] = run[:num_cycles]
 
         return features
