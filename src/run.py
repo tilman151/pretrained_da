@@ -22,7 +22,7 @@ def run(percent_broken, seed):
                                  kernel_size=3,
                                  base_filters=16,
                                  latent_dim=64,
-                                 recon_trade_off=0.,
+                                 recon_trade_off=1.,
                                  domain_trade_off=1.,
                                  domain_disc_dim=64,
                                  num_disc_layers=2,
@@ -32,10 +32,10 @@ def run(percent_broken, seed):
     trainer.test(datamodule=data)
 
 
-def run_multiple(broken):
+def run_multiple(broken, replications):
     broken = broken if opt.broken is not None else [1.0]
     random.seed(42)
-    seeds = [random.randint(0, 9999999) for _ in broken]
+    seeds = [random.randint(0, 9999999) for _ in range(replications)]
     for b in broken:
         for s in seeds:
             run(b, s)
@@ -45,6 +45,7 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Run domain adaption experiment')
     parser.add_argument('-b', '--broken', nargs='*', type=float, help='percent broken to use')
+    parser.add_argument('-r', '--replications', type=int, default=3, help='replications for each run')
     opt = parser.parse_args()
 
-    run_multiple(opt.broken)
+    run_multiple(opt.broken, opt.replications)
