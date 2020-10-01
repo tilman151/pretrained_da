@@ -96,10 +96,11 @@ class TestAdaptiveAE(unittest.TestCase):
         target = torch.zeros(16, 14, 30)
         source = torch.zeros(16, 14, 30)
         target_labels = torch.ones(16)
-        source_labels = torch.zeros(16)
+        domain_labels = torch.cat([torch.zeros_like(target_labels),
+                                   torch.ones_like(target_labels)])
 
         expected_prediction = self.net.classifier(self.net.encoder(target))
         expected_loss = criterion(expected_prediction.squeeze(), target_labels)
-        _, _, actual_loss, _ = self.net._calc_metrics((source, source_labels, target, target_labels))
+        _, _, actual_loss, _ = self.net._calc_loss(target, target_labels, source, domain_labels)
 
         self.assertEqual(expected_loss, actual_loss)

@@ -156,7 +156,10 @@ class AdaptiveAE(pl.LightningModule):
         return reconstruction, prediction, domain_prediction
 
     def training_step(self, batch, batch_idx):
-        loss, recon_loss, regression_loss, domain_loss = self._calc_loss(batch)
+        source, source_labels, target = batch
+        domain_labels = torch.cat([torch.ones_like(source_labels),
+                                   torch.zeros_like(source_labels)])
+        loss, recon_loss, regression_loss, domain_loss = self._calc_loss(source, source_labels, target, domain_labels)
 
         result = pl.TrainResult(minimize=loss)
         result.log('train/loss', loss)
@@ -166,21 +169,6 @@ class AdaptiveAE(pl.LightningModule):
 
         return result
 
-    def _calc_loss(self, batch):
-        source, source_labels, target = batch
-        common = torch.cat([source, target])
-        batch_size = source.shape[0]
-        reconstruction, prediction, domain_prediction = self(common)
-
-        recon_loss = self.criterion_recon(common, reconstruction)
-        regression_loss = self.criterion_regression(prediction.squeeze(), source_labels)
-        domain_targets = torch.cat([torch.ones(batch_size, device=self.device),
-                                    torch.zeros(batch_size, device=self.device)])
-        domain_loss = self.criterion_domain(domain_prediction.squeeze(), domain_targets)
-        loss = regression_loss + self.recon_trade_off * recon_loss + self.domain_trade_off * domain_loss
-
-        return loss, recon_loss, regression_loss, domain_loss
-
     def validation_step(self, batch, batch_idx):
         return self._evaluate(batch, 'val')
 
@@ -188,7 +176,10 @@ class AdaptiveAE(pl.LightningModule):
         return self._evaluate(batch, 'test')
 
     def _evaluate(self, batch, prefix):
-        loss, recon_loss, regression_loss, domain_loss = self._calc_metrics(batch)
+        source, source_labels, target, target_labels = batch
+        domain_labels = torch.cat([torch.zeros_like(source_labels),
+                                   torch.ones_like(source_labels)])
+        loss, recon_loss, regression_loss, domain_loss = self._calc_loss(target, target_labels, source, domain_labels)
         result = pl.EvalResult(checkpoint_on=regression_loss)
         result.log(f'{prefix}/loss', loss)
         result.log(f'{prefix}/recon_loss', recon_loss)
@@ -197,17 +188,13 @@ class AdaptiveAE(pl.LightningModule):
 
         return result
 
-    def _calc_metrics(self, batch):
-        source, source_labels, target, target_labels = batch
-        common = torch.cat([target, source])
-        batch_size = source.shape[0]
+    def _calc_loss(self, classifier_features, classifier_labels, auxiliary_features, domain_labels):
+        common = torch.cat([classifier_features, auxiliary_features])
         reconstruction, prediction, domain_prediction = self(common)
 
         recon_loss = self.criterion_recon(common, reconstruction)
-        regression_loss = self.criterion_regression(prediction.squeeze(), target_labels)
-        domain_targets = torch.cat([torch.zeros(batch_size, device=self.device),
-                                    torch.ones(batch_size, device=self.device)])
-        domain_loss = self.criterion_domain(domain_prediction.squeeze(), domain_targets)
+        regression_loss = self.criterion_regression(prediction.squeeze(), classifier_labels)
+        domain_loss = self.criterion_domain(domain_prediction.squeeze(), domain_labels)
         loss = regression_loss + self.recon_trade_off * recon_loss + self.domain_trade_off * domain_loss
 
         return loss, recon_loss, regression_loss, domain_loss
