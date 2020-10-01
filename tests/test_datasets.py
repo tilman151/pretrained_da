@@ -42,8 +42,26 @@ class TestCMAPSS(unittest.TestCase):
         dataset.prepare_data()
         dataset.setup()
         self.assertGreater(len(full_dataset.data['dev'][0]), len(dataset.data['dev'][0]))
+        self.assertAlmostEqual(0.2, len(dataset.data['dev'][0]) / len(full_dataset.data['dev'][0]), delta=0.01)
         self.assertEqual(len(full_dataset.data['test'][0]), len(dataset.data['test'][0]))
         self.assertFalse(torch.any(dataset.data['dev'][1] == 1))
+
+    def test_precent_broken_truncation(self):
+        full_dataset = datasets.CMAPSSDataModule(fd=1, window_size=30, batch_size=4)
+        full_dataset.prepare_data()
+        full_dataset.setup()
+
+        truncated_dataset = datasets.CMAPSSDataModule(fd=1, window_size=30, batch_size=4, percent_broken=0.8)
+        truncated_dataset.prepare_data()
+        truncated_dataset.setup()
+
+        features = [torch.randn(n, 30) for n in torch.randint(50, 200, (100,))]
+        truncated_features = truncated_dataset._truncate_features(features.copy())  # pass copy to get a new list
+
+        for n, (full_feat, trunc_feat) in enumerate(zip(features, truncated_features)):
+            with self.subTest(n=n):
+                last_idx = trunc_feat.shape[0]
+                self.assertTrue(torch.all(full_feat[:last_idx] == trunc_feat))
 
     def test_normalization_min_max(self):
         for i in range(1, 5):

@@ -123,11 +123,11 @@ class CMAPSSDataModule(pl.LightningDataModule):
             features = features[:num_runs]
 
         # Truncate the number of samples per run, starting at failure
-        if self.percent_broken is not None and self.percent_broken > 0:
+        if self.percent_broken is not None and self.percent_broken < 1:
             for i, run in enumerate(features):
                 num_cycles = int(self.percent_broken * len(run))
                 run[:, 1] += num_cycles
-                features[i] = run[:-num_cycles]
+                features[i] = run[:num_cycles]
 
         return features
 
