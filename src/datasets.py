@@ -17,7 +17,6 @@ class CMAPSSDataModule(pl.LightningDataModule):
                  window_size=30,
                  percent_fail_runs=None,
                  percent_broken=None,
-                 normalization=None,
                  feature_select=None):
         super().__init__()
         self.DATA_ROOT = os.path.join(os.path.dirname(__file__), '..', 'data', 'CMAPSS')
@@ -32,8 +31,14 @@ class CMAPSSDataModule(pl.LightningDataModule):
         self.max_rul = max_rul
         self.percent_broken = percent_broken
         self.percent_fail_runs = percent_fail_runs
-        self.normalization = normalization
         self.feature_select = feature_select
+
+        self.hparams = {'fd': self.fd,
+                        'batch_size': self.batch_size,
+                        'window_size': self.window_size,
+                        'max_rul': self.max_rul,
+                        'percent_broken': self.percent_broken,
+                        'percent_fail_runs': self.percent_fail_runs}
 
         self.data = {}
 
@@ -231,16 +236,30 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
                  window_size=30,
                  percent_fail_runs=None,
                  percent_broken=None,
-                 normalization=None,
                  feature_select=None):
         super().__init__()
 
+        self.fd_source = fd_source
+        self.fd_target = fd_target
         self.batch_size = batch_size
+        self.window_size = window_size
+        self.max_rul = max_rul
+        self.percent_broken = percent_broken
+        self.percent_fail_runs = percent_fail_runs
+        self.feature_select = feature_select
+
+        self.hparams = {'fd_source': self.fd_source,
+                        'fd_target': self.fd_target,
+                        'batch_size': self.batch_size,
+                        'window_size': self.window_size,
+                        'max_rul': self.max_rul,
+                        'percent_broken': self.percent_broken,
+                        'percent_fail_runs': self.percent_fail_runs}
 
         self.source = CMAPSSDataModule(fd_source, batch_size, max_rul, window_size,
-                                       None, None, normalization, feature_select)
+                                       None, None, feature_select)
         self.target = CMAPSSDataModule(fd_target, batch_size, max_rul, window_size,
-                                       percent_fail_runs, percent_broken, normalization, feature_select)
+                                       percent_fail_runs, percent_broken, feature_select)
 
     def prepare_data(self, *args, **kwargs):
         self.source.prepare_data(*args, **kwargs)

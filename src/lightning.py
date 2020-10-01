@@ -43,6 +43,9 @@ class AdaptiveAE(pl.LightningModule):
 
         self.save_hyperparameters()
 
+    def add_data_hparams(self, data):
+        self.hparams.update(data.hparams)
+
     @property
     def example_input_array(self):
         common = torch.randn(32, self.in_channels, self.seq_len)
