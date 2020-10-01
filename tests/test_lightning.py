@@ -90,3 +90,16 @@ class TestAdaptiveAE(unittest.TestCase):
                 with self.subTest(name=param_name):
                     self.assertIsNotNone(param.grad)
                     self.assertNotEqual(0., torch.sum(param.grad ** 2))
+
+    def test_eval_metrics(self):
+        criterion = torch.nn.MSELoss()
+        target = torch.zeros(16, 14, 30)
+        source = torch.zeros(16, 14, 30)
+        target_labels = torch.ones(16)
+        source_labels = torch.zeros(16)
+
+        expected_prediction = self.net.classifier(self.net.encoder(target))
+        expected_loss = criterion(expected_prediction.squeeze(), target_labels)
+        _, _, actual_loss, _ = self.net._calc_metrics((source, source_labels, target, target_labels))
+
+        self.assertEqual(expected_loss, actual_loss)

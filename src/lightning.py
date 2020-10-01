@@ -158,27 +158,11 @@ class AdaptiveAE(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         loss, recon_loss, regression_loss, domain_loss = self._calc_loss(batch)
 
-        result = pl.TrainResult(loss)
+        result = pl.TrainResult(minimize=loss)
         result.log('train/loss', loss)
         result.log('train/recon_loss', recon_loss)
         result.log('train/regression_loss', regression_loss)
         result.log('train/domain_loss', domain_loss)
-
-        return result
-
-    def validation_step(self, batch, batch_idx):
-        return self._evaluate(batch, 'val')
-
-    def test_step(self, batch, batch_idx):
-        return self._evaluate(batch, 'test')
-
-    def _evaluate(self, batch, prefix):
-        loss, recon_loss, regression_loss, domain_loss = self._calc_loss(batch)
-        result = pl.EvalResult(checkpoint_on=regression_loss)
-        result.log(f'{prefix}/loss', loss)
-        result.log(f'{prefix}/recon_loss', recon_loss)
-        result.log(f'{prefix}/regression_loss', torch.sqrt(regression_loss))
-        result.log(f'{prefix}/domain_loss', domain_loss)
 
         return result
 
@@ -192,6 +176,37 @@ class AdaptiveAE(pl.LightningModule):
         regression_loss = self.criterion_regression(prediction.squeeze(), source_labels)
         domain_targets = torch.cat([torch.ones(batch_size, device=self.device),
                                     torch.zeros(batch_size, device=self.device)])
+        domain_loss = self.criterion_domain(domain_prediction.squeeze(), domain_targets)
+        loss = regression_loss + self.recon_trade_off * recon_loss + self.domain_trade_off * domain_loss
+
+        return loss, recon_loss, regression_loss, domain_loss
+
+    def validation_step(self, batch, batch_idx):
+        return self._evaluate(batch, 'val')
+
+    def test_step(self, batch, batch_idx):
+        return self._evaluate(batch, 'test')
+
+    def _evaluate(self, batch, prefix):
+        loss, recon_loss, regression_loss, domain_loss = self._calc_metrics(batch)
+        result = pl.EvalResult(checkpoint_on=regression_loss)
+        result.log(f'{prefix}/loss', loss)
+        result.log(f'{prefix}/recon_loss', recon_loss)
+        result.log(f'{prefix}/regression_loss', torch.sqrt(regression_loss))
+        result.log(f'{prefix}/domain_loss', domain_loss)
+
+        return result
+
+    def _calc_metrics(self, batch):
+        source, source_labels, target, target_labels = batch
+        common = torch.cat([target, source])
+        batch_size = source.shape[0]
+        reconstruction, prediction, domain_prediction = self(common)
+
+        recon_loss = self.criterion_recon(common, reconstruction)
+        regression_loss = self.criterion_regression(prediction.squeeze(), target_labels)
+        domain_targets = torch.cat([torch.zeros(batch_size, device=self.device),
+                                    torch.ones(batch_size, device=self.device)])
         domain_loss = self.criterion_domain(domain_prediction.squeeze(), domain_targets)
         loss = regression_loss + self.recon_trade_off * recon_loss + self.domain_trade_off * domain_loss
 

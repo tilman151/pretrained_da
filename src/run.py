@@ -7,8 +7,8 @@ import datasets
 
 def run():
     pl.trainer.seed_everything(42)
-    trainer = pl.Trainer(gpus=1, max_epochs=100, logger=loggers.TensorBoardLogger('./results'), deterministic=True)
-    data = datasets.CMAPSSDataModule(fd=3, batch_size=512, window_size=30)
+    trainer = pl.Trainer(gpus=1, max_epochs=200, logger=loggers.TensorBoardLogger('./results'), deterministic=True)
+    data = datasets.DomainAdaptionDataModule(fd_source=3, fd_target=1, batch_size=512, window_size=30)
     model = lightning.AdaptiveAE(in_channels=14,
                                  seq_len=30,
                                  num_layers=4,
