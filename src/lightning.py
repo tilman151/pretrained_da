@@ -1,6 +1,6 @@
+import pytorch_lightning as pl
 import torch
 import torch.nn as nn
-import pytorch_lightning as pl
 
 import layers
 
@@ -166,3 +166,84 @@ class AdaptiveAE(pl.LightningModule):
         loss = regression_loss + self.recon_trade_off * recon_loss + self.domain_trade_off * domain_loss
 
         return loss, recon_loss, regression_loss, domain_loss
+
+
+class AdverserialAdaptiveAE(AdaptiveAE):
+    def _build_domain_disc(self):
+        sequence = [nn.Linear(self.latent_dim, self.domain_disc_dim),
+                    nn.BatchNorm1d(self.domain_disc_dim),
+                    nn.ReLU(True)]
+        for i in range(self.num_disc_layers - 1):
+            sequence.extend([nn.Linear(self.domain_disc_dim, self.domain_disc_dim),
+                             nn.BatchNorm1d(self.domain_disc_dim),
+                             nn.ReLU()])
+
+        sequence.append(nn.Linear(self.domain_disc_dim, 1))
+
+        return nn.Sequential(*sequence)
+
+    def configure_optimizers(self):
+        gen_parameters = list(self.encoder.parameters()) + \
+                         list(self.decoder.parameters()) + \
+                         list(self.classifier.parameters())
+        gen_optim = torch.optim.Adam(gen_parameters, lr=self.lr)
+        disc_optim = torch.optim.Adam(self.domain_disc.parameters(), lr=3*self.lr)  # TTUR with higher disc lr
+
+        return [gen_optim, disc_optim], []
+
+    def training_step(self, batch, batch_idx, optimizer_idx):
+        source, source_labels, target = batch
+
+        if optimizer_idx == 0:
+            result = self._generator_step(source, source_labels, target)
+        else:
+            result = self._discriminator_step(source, source_labels, target)
+
+        return result
+
+    def _generator_step(self, source, source_labels, target):
+        loss, recon_loss, regression_loss, domain_loss = self._generator_loss(source, source_labels, target)
+        result = pl.TrainResult(minimize=loss)
+        result.log('train/recon_loss', recon_loss)
+        result.log('train/regression_loss', regression_loss)
+        result.log('train/domain_loss', loss)
+
+        return result
+
+    def _generator_loss(self, source, source_labels, target):
+        batch_size = source.shape[0]
+
+        common = torch.cat([source, target])
+        latent_code = self.encoder(common)
+        reconstruction = self.decoder(latent_code)
+        source_code, target_code = torch.split(latent_code, batch_size)
+        prediction = self.classifier(source_code)
+        domain_prediction = self.domain_disc(target_code)
+        domain_labels = torch.ones_like(source_labels)
+
+        recon_loss = self.criterion_recon(common, reconstruction)
+        regression_loss = self.criterion_regression(prediction.squeeze(), source_labels)
+        domain_loss = self.criterion_domain(domain_prediction.squeeze(), domain_labels)
+        loss = regression_loss + self.recon_trade_off * recon_loss + self.domain_trade_off * domain_loss
+
+        return loss, recon_loss, regression_loss, domain_loss
+
+    def _discriminator_step(self, source, source_labels, target):
+        loss = self._discriminator_loss(source, source_labels, target)
+        result = pl.TrainResult(minimize=loss)
+
+        return result
+
+    def _discriminator_loss(self, source, source_labels, target):
+        batch_size = source.shape[0]
+        common = torch.cat([source, target])
+        latent_code = self.encoder(common)
+        pred = self.domain_disc(latent_code.detach())
+        source_pred, target_pred = torch.split(pred, batch_size)
+
+        source_loss = self.criterion_domain(source_pred.squeeze(), torch.ones_like(source_labels))
+        target_loss = self.criterion_domain(target_pred.squeeze(), torch.zeros_like(source_labels))
+
+        loss = source_loss + target_loss
+
+        return loss
