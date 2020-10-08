@@ -206,7 +206,7 @@ class AdverserialAdaptiveAE(AdaptiveAE):
         result = pl.TrainResult(minimize=loss)
         result.log('train/recon_loss', recon_loss)
         result.log('train/regression_loss', regression_loss)
-        result.log('train/domain_loss', loss)
+        result.log('train/domain_loss', domain_loss)
 
         return result
 
@@ -218,12 +218,19 @@ class AdverserialAdaptiveAE(AdaptiveAE):
         reconstruction = self.decoder(latent_code)
         source_code, target_code = torch.split(latent_code, batch_size)
         prediction = self.classifier(source_code)
-        domain_prediction = self.domain_disc(target_code)
-        domain_labels = torch.ones_like(source_labels)
+        domain_prediction_src = self.domain_disc(source_code)
+        domain_prediction_trg = self.domain_disc(target_code)
+        domain_labels_src = torch.ones_like(source_labels)
+        domain_labels_trg = torch.zeros_like(source_labels)
 
         recon_loss = self.criterion_recon(common, reconstruction)
         regression_loss = self.criterion_regression(prediction.squeeze(), source_labels)
-        domain_loss = self.criterion_domain(domain_prediction.squeeze(), domain_labels)
+
+        domain_loss = 0.25 * self.criterion_domain(domain_prediction_src.squeeze(), domain_labels_src) + \
+                        self.criterion_domain(domain_prediction_src.squeeze(), domain_labels_trg) + \
+                        self.criterion_domain(domain_prediction_trg.squeeze(), domain_labels_trg) + \
+                        self.criterion_domain(domain_prediction_trg.squeeze(), domain_labels_src)
+
         loss = regression_loss + self.recon_trade_off * recon_loss + self.domain_trade_off * domain_loss
 
         return loss, recon_loss, regression_loss, domain_loss
@@ -231,6 +238,7 @@ class AdverserialAdaptiveAE(AdaptiveAE):
     def _discriminator_step(self, source, source_labels, target):
         loss = self._discriminator_loss(source, source_labels, target)
         result = pl.TrainResult(minimize=loss)
+        result.log('train/disc_loss', loss)
 
         return result
 
@@ -244,6 +252,6 @@ class AdverserialAdaptiveAE(AdaptiveAE):
         source_loss = self.criterion_domain(source_pred.squeeze(), torch.ones_like(source_labels))
         target_loss = self.criterion_domain(target_pred.squeeze(), torch.zeros_like(source_labels))
 
-        loss = source_loss + target_loss
+        loss = 0.5 * (source_loss + target_loss)
 
         return loss
