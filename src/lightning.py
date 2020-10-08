@@ -110,7 +110,7 @@ class AdaptiveAE(pl.LightningModule):
         return nn.Sequential(*sequence)
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
+        return torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9, weight_decay=0.0005)
 
     def forward(self, common):
         batch_size = common.shape[0] // 2
@@ -186,8 +186,8 @@ class AdverserialAdaptiveAE(AdaptiveAE):
         gen_parameters = list(self.encoder.parameters()) + \
                          list(self.decoder.parameters()) + \
                          list(self.classifier.parameters())
-        gen_optim = torch.optim.Adam(gen_parameters, lr=self.lr)
-        disc_optim = torch.optim.Adam(self.domain_disc.parameters(), lr=3*self.lr)  # TTUR with higher disc lr
+        gen_optim = torch.optim.SGD(gen_parameters, lr=self.lr, momentum=0.9, weight_decay=0.001)
+        disc_optim = torch.optim.SGD(self.domain_disc.parameters(), lr=self.lr, momentum=0.9, weight_decay=0.001)
 
         return [gen_optim, disc_optim], []
 
