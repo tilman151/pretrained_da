@@ -200,7 +200,8 @@ class AdaptiveAE(pl.LightningModule):
 
         if record_embeddings:
             latent_code = self.encoder(torch.cat([source, target]))
-            self.embedding_metric.update(latent_code, domain_labels)
+            ruls = torch.cat([source_labels, target_labels])
+            self.embedding_metric.update(latent_code, domain_labels, ruls)
 
         _, recon_loss, regression_loss, domain_loss = self._calc_loss(target, target_labels, source, domain_labels)
 

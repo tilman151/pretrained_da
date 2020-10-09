@@ -29,7 +29,8 @@ def run(percent_broken, domain_tradeoff, recon_tradeoff, seed):
                                  domain_disc_dim=64,
                                  num_disc_layers=2,
                                  optim_type='adam',
-                                 lr=0.01)
+                                 lr=0.01,
+                                 record_embeddings=True)
     model.add_data_hparams(data)
     model.hparams.update({'seed': seed})
     trainer.fit(model, datamodule=data)
