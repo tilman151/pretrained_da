@@ -27,6 +27,7 @@ class AdaptiveAE(pl.LightningModule):
                  domain_trade_off,
                  domain_disc_dim,
                  num_disc_layers,
+                 optim_type,
                  lr):
         super().__init__()
 
@@ -40,6 +41,7 @@ class AdaptiveAE(pl.LightningModule):
         self.domain_trade_off = domain_trade_off
         self.domain_disc_dim = domain_disc_dim
         self.num_disc_layers = num_disc_layers
+        self.optim_type = optim_type
         self.lr = lr
 
         self.encoder = self._build_encoder()
@@ -120,7 +122,10 @@ class AdaptiveAE(pl.LightningModule):
         return nn.Sequential(*sequence)
 
     def configure_optimizers(self):
-        return torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9, weight_decay=0.0005)
+        if self.optim_type == 'adam':
+            return torch.optim.Adam(self.parameters(), lr=self.lr)
+        else:
+            return torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9, weight_decay=0.01)
 
     def forward(self, common):
         batch_size = common.shape[0] // 2
