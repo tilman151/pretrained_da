@@ -122,10 +122,14 @@ class AdaptiveAE(pl.LightningModule):
         return nn.Sequential(*sequence)
 
     def configure_optimizers(self):
+        param_groups = [{'params': self.encoder.parameters()},
+                        {'params': self.decoder.parameters()},
+                        {'params': self.classifier.parameters()},
+                        {'params': self.domain_disc.parameters()}]
         if self.optim_type == 'adam':
-            return torch.optim.Adam(self.parameters(), lr=self.lr)
+            return torch.optim.Adam(param_groups, lr=self.lr)
         else:
-            return torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9, weight_decay=0.01)
+            return torch.optim.SGD(param_groups, lr=self.lr, momentum=0.9, weight_decay=0.01)
 
     def forward(self, common):
         batch_size = common.shape[0] // 2
