@@ -5,6 +5,16 @@ import torch.nn as nn
 import layers
 
 
+class RMSELoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.mse = nn.MSELoss()
+
+    def forward(self, inputs, targets):
+        return torch.sqrt(self.mse(inputs, targets))
+
+
 class AdaptiveAE(pl.LightningModule):
     def __init__(self,
                  in_channels,
@@ -38,7 +48,7 @@ class AdaptiveAE(pl.LightningModule):
         self.classifier = self._build_classifier()
 
         self.criterion_recon = nn.MSELoss()
-        self.criterion_regression = nn.MSELoss()
+        self.criterion_regression = RMSELoss()
         self.criterion_domain = nn.BCEWithLogitsLoss()
 
         self.save_hyperparameters()
@@ -151,7 +161,7 @@ class AdaptiveAE(pl.LightningModule):
         result = pl.EvalResult(checkpoint_on=regression_loss)
         result.log(f'{prefix}/loss', loss)
         result.log(f'{prefix}/recon_loss', recon_loss)
-        result.log(f'{prefix}/regression_loss', torch.sqrt(regression_loss))
+        result.log(f'{prefix}/regression_loss', regression_loss)
         result.log(f'{prefix}/domain_loss', domain_loss)
 
         return result
