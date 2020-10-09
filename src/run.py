@@ -1,18 +1,18 @@
 import random
 
-import sklearn.model_selection
 import pytorch_lightning as pl
+import sklearn.model_selection
 from pytorch_lightning import loggers
 
-import lightning
 import datasets
+import lightning
 
 
 def run(percent_broken, domain_tradeoff, recon_tradeoff, seed):
     pl.trainer.seed_everything(seed)
-    tf_logger = loggers.TensorBoardLogger('./tradeoffs',
+    tf_logger = loggers.TensorBoardLogger('./embeddings',
                                           name=f'{percent_broken:.0%}pb_{domain_tradeoff:.1f}dt_{recon_tradeoff:.1f}rt')
-    trainer = pl.Trainer(gpus=1, max_epochs=200, logger=tf_logger, deterministic=True)
+    trainer = pl.Trainer(gpus=[0], max_epochs=200, logger=tf_logger, deterministic=True, log_every_n_steps=10)
     data = datasets.DomainAdaptionDataModule(fd_source=3,
                                              fd_target=1,
                                              batch_size=512,
@@ -23,11 +23,12 @@ def run(percent_broken, domain_tradeoff, recon_tradeoff, seed):
                                  num_layers=4,
                                  kernel_size=3,
                                  base_filters=16,
-                                 latent_dim=64,
+                                 latent_dim=128,
                                  recon_trade_off=recon_tradeoff,
                                  domain_trade_off=domain_tradeoff,
                                  domain_disc_dim=64,
                                  num_disc_layers=2,
+                                 optim_type='adam',
                                  lr=0.01)
     model.add_data_hparams(data)
     model.hparams.update({'seed': seed})

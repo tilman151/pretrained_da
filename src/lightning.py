@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 
 import layers
+import metrics
 
 
 class RMSELoss(nn.Module):
@@ -28,7 +29,8 @@ class AdaptiveAE(pl.LightningModule):
                  domain_disc_dim,
                  num_disc_layers,
                  optim_type,
-                 lr):
+                 lr,
+                 record_embeddings=False):
         super().__init__()
 
         self.in_channels = in_channels
@@ -43,6 +45,7 @@ class AdaptiveAE(pl.LightningModule):
         self.num_disc_layers = num_disc_layers
         self.optim_type = optim_type
         self.lr = lr
+        self.record_embeddings = record_embeddings
 
         self.encoder = self._build_encoder()
         self.decoder = self._build_decoder()
@@ -52,6 +55,8 @@ class AdaptiveAE(pl.LightningModule):
         self.criterion_recon = nn.MSELoss()
         self.criterion_regression = RMSELoss()
         self.criterion_domain = nn.BCEWithLogitsLoss()
+
+        self.embedding_metric = metrics.EmbeddingViz(20000, self.latent_dim)
 
         self.save_hyperparameters()
 
@@ -148,32 +153,58 @@ class AdaptiveAE(pl.LightningModule):
                                    torch.zeros_like(source_labels)])
         loss, recon_loss, regression_loss, domain_loss = self._calc_loss(source, source_labels, target, domain_labels)
 
-        result = pl.TrainResult(minimize=loss)
-        result.log('train/loss', loss)
-        result.log('train/recon_loss', recon_loss)
-        result.log('train/regression_loss', regression_loss)
-        result.log('train/domain_loss', domain_loss)
+        self.log('train/loss', loss)
+        self.log('train/recon_loss', recon_loss)
+        self.log('train/regression_loss', regression_loss)
+        self.log('train/domain_loss', domain_loss)
 
-        return result
+        return loss
 
     def validation_step(self, batch, batch_idx):
-        return self._evaluate(batch, 'val')
+        return self._evaluate(batch, record_embeddings=self.record_embeddings)
 
     def test_step(self, batch, batch_idx):
-        return self._evaluate(batch, 'test')
+        return self._evaluate(batch)
 
-    def _evaluate(self, batch, prefix):
+    def validation_epoch_end(self, outputs):
+        if self.record_embeddings:
+            self.logger.experiment.add_figure('val/embeddings', self.embedding_metric.compute(), self.global_step)
+            self.embedding_metric.reset()
+
+        recon_loss, regression_loss, domain_loss = self._reduce_metrics(outputs)
+        self.log(f'val/recon_loss', recon_loss)
+        self.log(f'val/regression_loss', regression_loss)
+        self.log(f'val/domain_loss', domain_loss)
+        self.log('checkpoint_on', regression_loss, logger=False)
+
+    def test_epoch_end(self, outputs):
+        recon_loss, regression_loss, domain_loss = self._reduce_metrics(outputs)
+        self.log(f'test/recon_loss', recon_loss)
+        self.log(f'test/regression_loss', regression_loss)
+        self.log(f'test/domain_loss', domain_loss)
+
+    def _reduce_metrics(self, outputs):
+        recon_loss, regression_loss, domain_loss, batch_size = zip(*outputs)
+        num_samples = sum(batch_size)
+        recon_loss = sum(b * loss for b, loss in zip(batch_size, recon_loss)) / num_samples
+        regression_loss = torch.sqrt(sum(b * (loss ** 2) for b, loss in zip(batch_size, regression_loss)) / num_samples)
+        domain_loss = sum(b * loss for b, loss in zip(batch_size, domain_loss)) / num_samples
+
+        return recon_loss, regression_loss, domain_loss
+
+    def _evaluate(self, batch, record_embeddings=False):
         source, source_labels, target, target_labels = batch
+        batch_size = source.shape[0]
         domain_labels = torch.cat([torch.zeros_like(source_labels),
                                    torch.ones_like(source_labels)])
-        loss, recon_loss, regression_loss, domain_loss = self._calc_loss(target, target_labels, source, domain_labels)
-        result = pl.EvalResult(checkpoint_on=regression_loss)
-        result.log(f'{prefix}/loss', loss)
-        result.log(f'{prefix}/recon_loss', recon_loss)
-        result.log(f'{prefix}/regression_loss', regression_loss)
-        result.log(f'{prefix}/domain_loss', domain_loss)
 
-        return result
+        if record_embeddings:
+            latent_code = self.encoder(torch.cat([source, target]))
+            self.embedding_metric.update(latent_code, domain_labels)
+
+        _, recon_loss, regression_loss, domain_loss = self._calc_loss(target, target_labels, source, domain_labels)
+
+        return recon_loss, regression_loss, domain_loss, batch_size
 
     def _calc_loss(self, classifier_features, classifier_labels, auxiliary_features, domain_labels):
         common = torch.cat([classifier_features, auxiliary_features])
