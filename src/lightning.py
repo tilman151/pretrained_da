@@ -28,6 +28,7 @@ class AdaptiveAE(pl.LightningModule):
                  domain_trade_off,
                  domain_disc_dim,
                  num_disc_layers,
+                 source_rul_cap,
                  optim_type,
                  lr,
                  record_embeddings=False):
@@ -43,6 +44,7 @@ class AdaptiveAE(pl.LightningModule):
         self.domain_trade_off = domain_trade_off
         self.domain_disc_dim = domain_disc_dim
         self.num_disc_layers = num_disc_layers
+        self.source_rul_cap = source_rul_cap
         self.optim_type = optim_type
         self.lr = lr
         self.record_embeddings = record_embeddings
@@ -151,7 +153,8 @@ class AdaptiveAE(pl.LightningModule):
         source, source_labels, target = batch
         domain_labels = torch.cat([torch.ones_like(source_labels),
                                    torch.zeros_like(source_labels)])
-        loss, recon_loss, regression_loss, domain_loss = self._calc_loss(source, source_labels, target, domain_labels)
+        loss, recon_loss, regression_loss, domain_loss = self._calc_loss(source, source_labels, target, domain_labels,
+                                                                         cap=True)
 
         self.log('train/loss', loss)
         self.log('train/recon_loss', recon_loss)
@@ -207,16 +210,25 @@ class AdaptiveAE(pl.LightningModule):
 
         return recon_loss, regression_loss, domain_loss, batch_size
 
-    def _calc_loss(self, classifier_features, classifier_labels, auxiliary_features, domain_labels):
+    def _calc_loss(self, classifier_features, classifier_labels, auxiliary_features, domain_labels, cap=False):
         common = torch.cat([classifier_features, auxiliary_features])
         reconstruction, prediction, domain_prediction = self(common)
+        rul_mask = self._get_rul_mask(classifier_labels, cap)
 
         recon_loss = self.criterion_recon(common, reconstruction)
         regression_loss = self.criterion_regression(prediction.squeeze(), classifier_labels)
-        domain_loss = self.criterion_domain(domain_prediction.squeeze(), domain_labels)
+        domain_loss = self.criterion_domain(domain_prediction.squeeze()[rul_mask], domain_labels[rul_mask])
         loss = regression_loss + self.recon_trade_off * recon_loss + self.domain_trade_off * domain_loss
 
         return loss, recon_loss, regression_loss, domain_loss
+
+    def _get_rul_mask(self, classifier_labels, cap):
+        if cap:
+            rul_mask = (classifier_labels > self.source_rul_cap)
+        else:
+            rul_mask = torch.ones_like(classifier_labels, dtype=torch.bool)
+
+        return rul_mask.repeat(2)
 
 
 class AdverserialAdaptiveAE(AdaptiveAE):

@@ -1,4 +1,5 @@
 import unittest
+
 import torch
 
 import lightning
@@ -17,6 +18,8 @@ class TestAdaptiveAE(unittest.TestCase):
                                         domain_trade_off=self.trade_off,
                                         domain_disc_dim=32,
                                         num_disc_layers=2,
+                                        source_rul_cap=50,
+                                        optim_type='adam',
                                         lr=0.01)
 
     def test_encoder(self):
@@ -104,3 +107,21 @@ class TestAdaptiveAE(unittest.TestCase):
         _, _, actual_loss, _ = self.net._calc_loss(target, target_labels, source, domain_labels)
 
         self.assertEqual(expected_loss, actual_loss)
+
+    def test_get_rul_mask(self):
+        labels = torch.arange(0, 125)
+        features = torch.randn(250, 20)
+        capped_rul_mask = self.net._get_rul_mask(labels, cap=True)
+        uncapped_rul_mask = self.net._get_rul_mask(labels, cap=False)
+
+        self.assertEqual(250, capped_rul_mask.shape[0])  # mask has double batch size
+        self.assertFalse(capped_rul_mask[:51].all().item())  # mask is False for <= 50 RUL
+        self.assertTrue(capped_rul_mask[51:125].all().item())  # mask is True for > 50
+        self.assertFalse(capped_rul_mask[125:176].all().item())  # mask is repeated two times
+        self.assertTrue(capped_rul_mask[176:].all().item())
+        self.assertEqual(148, features[capped_rul_mask].shape[0])  # mask indexes correct number of samples
+
+        self.assertEqual(250, uncapped_rul_mask.shape[0])  # mask has double batch size
+        self.assertTrue(uncapped_rul_mask.all().item())  # all samples are True
+        self.assertEqual(250, features[uncapped_rul_mask].shape[0])  # all samples are indexed
+
