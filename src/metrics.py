@@ -41,7 +41,7 @@ class EmbeddingViz(pl.metrics.Metric):
         logged_embeddings = self.embeddings[:self.sample_counter].detach().cpu().numpy()
         logged_labels = self.labels[:self.sample_counter].detach().cpu().int()
         logged_ruls = self.ruls[:self.sample_counter].detach().cpu()
-        viz_embeddings = umap.UMAP().fit_transform(logged_embeddings)
+        viz_embeddings = umap.UMAP(random_state=42).fit_transform(logged_embeddings)
 
         fig, (ax_class, ax_rul) = plt.subplots(1, 2, sharex='all', sharey='all', figsize=(20, 10))
 
