@@ -4,6 +4,7 @@ import torch.nn as nn
 
 import layers
 import metrics
+import models
 
 
 class RMSELoss(nn.Module):
@@ -49,7 +50,8 @@ class AdaptiveAE(pl.LightningModule):
         self.lr = lr
         self.record_embeddings = record_embeddings
 
-        self.encoder = self._build_encoder()
+        self.encoder = models.Encoder(self.in_channels, self.base_filters, self.kernel_size,
+                                      self.num_layers, self.latent_dim, self.seq_len)
         self.decoder = self._build_decoder()
         self.domain_disc = self._build_domain_disc()
         self.classifier = self._build_classifier()
@@ -70,22 +72,6 @@ class AdaptiveAE(pl.LightningModule):
         common = torch.randn(32, self.in_channels, self.seq_len)
 
         return common
-
-    def _build_encoder(self):
-        sequence = [nn.Conv1d(self.in_channels, self.base_filters, self.kernel_size),
-                    nn.BatchNorm1d(self.base_filters),
-                    nn.ReLU(True)]
-        for i in range(1, self.num_layers):
-            sequence.extend([nn.Conv1d(i * self.base_filters, (i + 1) * self.base_filters, self.kernel_size),
-                             nn.BatchNorm1d((i + 1) * self.base_filters),
-                             nn.ReLU(True)])
-
-        cut_off = self.num_layers * (self.kernel_size - (self.kernel_size % 2))
-        flat_dim = (self.seq_len - cut_off) * self.num_layers * self.base_filters
-        sequence.extend([nn.Flatten(),
-                         nn.Linear(flat_dim, self.latent_dim)])
-
-        return nn.Sequential(*sequence)
 
     def _build_decoder(self):
         cut_off = self.num_layers * (self.kernel_size - (self.kernel_size % 2))
