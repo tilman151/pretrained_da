@@ -1,4 +1,5 @@
 import unittest
+
 import torch
 import torch.utils.data
 
@@ -141,3 +142,51 @@ class TestCMAPSSAdaption(unittest.TestCase):
         self.assertEqual(torch.Size((16, 14, 30)), target.shape)
         self.assertEqual(torch.Size((16,)), source_labels.shape)
         self.assertEqual(torch.Size((16,)), target_labels.shape)
+
+
+class TestCMAPSSBaseline(unittest.TestCase):
+    def setUp(self):
+        self.dataset = datasets.BaselineDataModule(3, 1, batch_size=16, window_size=30)
+        self.dataset.prepare_data()
+        self.dataset.setup()
+
+    def test_train_batch_structure(self):
+        train_loader = self.dataset.train_dataloader()
+        self._assert_batch_structure(train_loader)
+
+    def test_val_batch_structure(self):
+        val_loader = self.dataset.val_dataloader()
+        self._assert_batch_structure(val_loader)
+
+    def test_test_batch_structure(self):
+        test_loader = self.dataset.test_dataloader()
+        self._assert_batch_structure(test_loader)
+
+    def _assert_batch_structure(self, loader):
+        batch = next(iter(loader))
+        self.assertEqual(2, len(batch))
+        features, labels = batch
+        self.assertEqual(torch.Size((16, 14, 30)), features.shape)
+        self.assertEqual(torch.Size((16,)), labels.shape)
+
+    def test_selected_source_on_train(self):
+        baseline_train_dataset = self.dataset._to_dataset('dev')
+        source_train_dataset = self.dataset.source._to_dataset(*self.dataset.source.data['dev'])
+        self._assert_datasets_equal(baseline_train_dataset, source_train_dataset)
+
+    def test_selected_source_on_val(self):
+        baseline_train_dataset = self.dataset._to_dataset('val')
+        source_train_dataset = self.dataset.source._to_dataset(*self.dataset.source.data['val'])
+        self._assert_datasets_equal(baseline_train_dataset, source_train_dataset)
+
+    def test_selected_target_on_test(self):
+        baseline_train_dataset = self.dataset._to_dataset('test')
+        source_train_dataset = self.dataset.source._to_dataset(*self.dataset.target.data['test'])
+        self._assert_datasets_equal(baseline_train_dataset, source_train_dataset)
+
+    def _assert_datasets_equal(self, baseline_dataset, inner_dataset):
+        num_samples = len(baseline_dataset)
+        baseline_features, baseline_labels = baseline_dataset[:num_samples]
+        inner_features, inner_labels = inner_dataset[:num_samples]
+        self.assertEqual(0, torch.sum(baseline_features - inner_features))
+        self.assertEqual(0, torch.sum(baseline_labels - inner_labels))
