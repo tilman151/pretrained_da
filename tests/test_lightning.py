@@ -42,14 +42,6 @@ class TestAdaptiveAE(unittest.TestCase):
         outputs = self.net.domain_disc(inputs)
         self.assertEqual(torch.Size((16, 1)), outputs.shape)
 
-    def test_trade_off(self):
-        inputs = (torch.randn(16, 14, 30), torch.randn(16), torch.randn(16, 14, 30))
-        loss = self.net.training_step(inputs, 0)
-        combined_loss = (loss['train/regression_loss'] +
-                         self.trade_off * loss['train/recon_loss'] +
-                         self.trade_off * loss['train/domain_loss'])
-        self.assertEqual(loss['train/loss'], combined_loss)
-
     def test_batch_independence(self):
         inputs = torch.randn(16, 14, 30)
         inputs.requires_grad = True
@@ -103,7 +95,7 @@ class TestAdaptiveAE(unittest.TestCase):
                                    torch.ones_like(target_labels)])
 
         expected_prediction = self.net.classifier(self.net.encoder(target))
-        expected_loss = criterion(expected_prediction.squeeze(), target_labels)
+        expected_loss = torch.sqrt(criterion(expected_prediction.squeeze(), target_labels))
         _, _, actual_loss, _ = self.net._calc_loss(target, target_labels, source, domain_labels)
 
         self.assertEqual(expected_loss, actual_loss)
