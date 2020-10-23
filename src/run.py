@@ -10,9 +10,11 @@ import lightning
 
 def run(percent_broken, domain_tradeoff, recon_tradeoff, seed):
     pl.trainer.seed_everything(seed)
-    tf_logger = loggers.TensorBoardLogger('./embeddings',
+    tf_logger = loggers.TensorBoardLogger('./test_cap',
                                           name=f'{percent_broken:.0%}pb_{domain_tradeoff:.1f}dt_{recon_tradeoff:.1f}rt')
-    trainer = pl.Trainer(gpus=[0], max_epochs=200, logger=tf_logger, deterministic=True, log_every_n_steps=10)
+    checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor='val/regression_loss')
+    trainer = pl.Trainer(gpus=[0], max_epochs=100, logger=tf_logger, checkpoint_callback=checkpoint_callback,
+                         deterministic=True, log_every_n_steps=10)
     data = datasets.DomainAdaptionDataModule(fd_source=3,
                                              fd_target=1,
                                              batch_size=512,
@@ -28,9 +30,10 @@ def run(percent_broken, domain_tradeoff, recon_tradeoff, seed):
                                  domain_trade_off=domain_tradeoff,
                                  domain_disc_dim=64,
                                  num_disc_layers=2,
+                                 source_rul_cap=int((1 - percent_broken) * 125),
                                  optim_type='adam',
                                  lr=0.01,
-                                 record_embeddings=True)
+                                 record_embeddings=False)
     model.add_data_hparams(data)
     model.hparams.update({'seed': seed})
     trainer.fit(model, datamodule=data)

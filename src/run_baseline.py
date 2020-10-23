@@ -11,11 +11,13 @@ def run(seed):
     pl.trainer.seed_everything(seed)
     tf_logger = loggers.TensorBoardLogger('./test_cap',
                                           name=f'baseline')
-    trainer = pl.Trainer(gpus=[0], max_epochs=50, logger=tf_logger, deterministic=True, log_every_n_steps=10)
-    data = datasets.DomainAdaptionDataModule(fd_source=3,
-                                             fd_target=1,
-                                             batch_size=512,
-                                             window_size=30)
+    checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor='val/regression_loss')
+    trainer = pl.Trainer(gpus=[0], max_epochs=100, logger=tf_logger, checkpoint_callback=checkpoint_callback,
+                         deterministic=True, log_every_n_steps=10)
+    data = datasets.BaselineDataModule(fd_source=3,
+                                       fd_target=1,
+                                       batch_size=512,
+                                       window_size=30)
     model = lightning.Baseline(in_channels=14,
                                seq_len=30,
                                num_layers=4,
