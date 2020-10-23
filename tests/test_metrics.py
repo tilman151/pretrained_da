@@ -13,9 +13,10 @@ class TestEmbeddingViz(unittest.TestCase):
     def test_updating(self):
         embeddings = torch.randn(16, 128)
         labels = torch.ones(16)
+        ruls = torch.arange(0, 16)
 
-        self.metric.update(embeddings, labels)
-        self.metric.update(embeddings, labels)
+        self.metric.update(embeddings, labels, ruls)
+        self.metric.update(embeddings, labels, ruls)
 
         self.assertEqual(0, torch.sum(self.metric.embeddings[:16] - embeddings))
         self.assertEqual(0, torch.sum(self.metric.labels[:16] - labels))
@@ -25,9 +26,10 @@ class TestEmbeddingViz(unittest.TestCase):
     def test_compute(self):
         embeddings = torch.randn(32, 128)
         labels = torch.cat([torch.ones(16), torch.zeros(16)])
+        ruls = torch.arange(0, 32)
 
-        self.metric.update(embeddings, labels)
+        self.metric.update(embeddings, labels, ruls)
         fig = self.metric.compute()
 
         self.assertIsInstance(fig, plt.Figure)
-        self.assertListEqual([10, 10], list(fig.get_size_inches()))
+        self.assertListEqual([20., 10.], list(fig.get_size_inches()))
