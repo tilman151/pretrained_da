@@ -22,21 +22,25 @@ class TestAdaptiveAE(unittest.TestCase):
                                         optim_type='adam',
                                         lr=0.01)
 
+    @torch.no_grad()
     def test_encoder(self):
         inputs = torch.randn(16, 14, 30)
         outputs = self.net.encoder(inputs)
         self.assertEqual(torch.Size((16, 64)), outputs.shape)
 
+    @torch.no_grad()
     def test_decoder(self):
         inputs = torch.randn(16, 64)
         outputs = self.net.decoder(inputs)
         self.assertEqual(torch.Size((16, 14, 30)), outputs.shape)
 
+    @torch.no_grad()
     def test_regressor(self):
         inputs = torch.randn(16, 64)
         outputs = self.net.regressor(inputs)
         self.assertEqual(torch.Size((16, 1)), outputs.shape)
 
+    @torch.no_grad()
     def test_domain_disc(self):
         inputs = torch.randn(16, 64)
         outputs = self.net.domain_disc(inputs)
@@ -86,6 +90,7 @@ class TestAdaptiveAE(unittest.TestCase):
                     self.assertIsNotNone(param.grad)
                     self.assertNotEqual(0., torch.sum(param.grad ** 2))
 
+    @torch.no_grad()
     def test_eval_metrics(self):
         criterion = torch.nn.MSELoss()
         target = torch.zeros(16, 14, 30)
@@ -100,6 +105,7 @@ class TestAdaptiveAE(unittest.TestCase):
 
         self.assertEqual(expected_loss, actual_loss)
 
+    @torch.no_grad()
     def test_get_rul_mask(self):
         labels = torch.arange(0, 125)
         features = torch.randn(250, 20)
@@ -117,3 +123,84 @@ class TestAdaptiveAE(unittest.TestCase):
         self.assertTrue(uncapped_rul_mask.all().item())  # all samples are True
         self.assertEqual(250, features[uncapped_rul_mask].shape[0])  # all samples are indexed
 
+
+class TestBaseline(unittest.TestCase):
+    def setUp(self):
+        self.trade_off = 0.5
+        self.net = lightning.Baseline(in_channels=14,
+                                      seq_len=30,
+                                      num_layers=4,
+                                      kernel_size=3,
+                                      base_filters=16,
+                                      latent_dim=64,
+                                      optim_type='adam',
+                                      lr=0.01)
+
+    @torch.no_grad()
+    def test_encoder(self):
+        inputs = torch.randn(16, 14, 30)
+        outputs = self.net.encoder(inputs)
+        self.assertEqual(torch.Size((16, 64)), outputs.shape)
+
+    @torch.no_grad()
+    def test_regressor(self):
+        inputs = torch.randn(16, 64)
+        outputs = self.net.regressor(inputs)
+        self.assertEqual(torch.Size((16, 1)), outputs.shape)
+
+    def test_batch_independence(self):
+        inputs = torch.randn(16, 14, 30)
+        inputs.requires_grad = True
+
+        # Compute forward pass in eval mode to deactivate batch norm
+        self.net.eval()
+        outputs = self.net(inputs)
+        self.net.train()
+
+        for n, output in enumerate(outputs):
+            with self.subTest(n_output=n):
+                # Mask loss for certain samples in batch
+                batch_size = output.shape[0]
+                mask_idx = torch.randint(0, batch_size, ())
+                mask = torch.ones_like(output)
+                mask[mask_idx] = 0
+                output = output * mask
+
+                # Compute backward pass
+                loss = output.mean()
+                loss.backward(retain_graph=True)
+
+                # Check if gradient exists and is zero for masked samples
+                for i, grad in enumerate(inputs.grad[:batch_size]):
+                    if i == mask_idx:
+                        self.assertTrue(torch.all(grad == 0).item())
+                    else:
+                        self.assertTrue(not torch.all(grad == 0))
+                inputs.grad = None
+
+    def test_all_parameters_updated(self):
+        optim = torch.optim.SGD(self.net.parameters(), lr=0.1)
+
+        loss = self.net.training_step((torch.randn(16, 14, 30), torch.ones(16), torch.randn(16, 14, 30)), batch_idx=0)
+        loss.backward()
+        optim.step()
+
+        for param_name, param in self.net.named_parameters():
+            if param.requires_grad:
+                with self.subTest(name=param_name):
+                    self.assertIsNotNone(param.grad)
+                    self.assertNotEqual(0., torch.sum(param.grad ** 2))
+
+    @torch.no_grad()
+    def test_eval_metrics(self):
+        criterion = torch.nn.MSELoss()
+        source = torch.zeros(16, 14, 30)
+        source_labels = torch.ones(16)
+        target = torch.zeros(16, 14, 30)
+        target_labels = torch.ones(16)
+
+        expected_prediction = self.net.regressor(self.net.encoder(target))
+        expected_loss = torch.sqrt(criterion(expected_prediction.squeeze(), target_labels))
+        actual_loss, _ = self.net._evaluate((source, source_labels, target, target_labels))
+
+        self.assertEqual(expected_loss, actual_loss)
