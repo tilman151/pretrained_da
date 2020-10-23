@@ -83,16 +83,11 @@ class AdaptiveAE(pl.LightningModule):
         else:
             return torch.optim.SGD(param_groups, lr=self.lr, momentum=0.9, weight_decay=0.01)
 
-    def forward(self, common):
-        batch_size = common.shape[0] // 2
+    def forward(self, inputs):
+        latent_code = self.encoder(inputs)
+        prediction = self.regressor(latent_code)
 
-        latent_code = self.encoder(common)
-        reconstruction = self.decoder(latent_code)
-        regression_code, _ = torch.split(latent_code, batch_size)
-        prediction = self.regressor(regression_code)
-        domain_prediction = self.domain_disc(latent_code)
-
-        return reconstruction, prediction, domain_prediction
+        return prediction
 
     def training_step(self, batch, batch_idx):
         source, source_labels, target = batch
@@ -156,8 +151,13 @@ class AdaptiveAE(pl.LightningModule):
         return recon_loss, regression_loss, domain_loss, batch_size
 
     def _calc_loss(self, regressor_features, regressor_labels, auxiliary_features, domain_labels, cap=False):
+        batch_size = regressor_features.shape[0]
         common = torch.cat([regressor_features, auxiliary_features])
-        reconstruction, prediction, domain_prediction = self(common)
+        latent_code = self.encoder(common)
+        reconstruction = self.decoder(latent_code)
+        regression_code, _ = torch.split(latent_code, batch_size)
+        prediction = self.regressor(regression_code)
+        domain_prediction = self.domain_disc(latent_code)
         rul_mask = self._get_rul_mask(regressor_labels, cap)
 
         recon_loss = self.criterion_recon(common, reconstruction)

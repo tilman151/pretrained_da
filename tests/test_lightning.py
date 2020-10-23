@@ -75,8 +75,8 @@ class TestAdaptiveAE(unittest.TestCase):
     def test_all_parameters_updated(self):
         optim = torch.optim.SGD(self.net.parameters(), lr=0.1)
 
-        outputs = self.net(torch.randn(16, 14, 30))
-        loss = sum(o.mean() for o in outputs)
+        loss, *_ = self.net._calc_loss(torch.randn(16, 14, 30), torch.ones(16),
+                                       torch.randn(16, 14, 30), torch.ones(32))
         loss.backward()
         optim.step()
 
