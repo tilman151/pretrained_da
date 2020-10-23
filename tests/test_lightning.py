@@ -181,7 +181,7 @@ class TestBaseline(unittest.TestCase):
     def test_all_parameters_updated(self):
         optim = torch.optim.SGD(self.net.parameters(), lr=0.1)
 
-        loss = self.net.training_step((torch.randn(16, 14, 30), torch.ones(16), torch.randn(16, 14, 30)), batch_idx=0)
+        loss = self.net.training_step((torch.randn(16, 14, 30), torch.ones(16)), batch_idx=0)
         loss.backward()
         optim.step()
 
@@ -194,13 +194,11 @@ class TestBaseline(unittest.TestCase):
     @torch.no_grad()
     def test_eval_metrics(self):
         criterion = torch.nn.MSELoss()
-        source = torch.zeros(16, 14, 30)
-        source_labels = torch.ones(16)
         target = torch.zeros(16, 14, 30)
         target_labels = torch.ones(16)
 
         expected_prediction = self.net.regressor(self.net.encoder(target))
         expected_loss = torch.sqrt(criterion(expected_prediction.squeeze(), target_labels))
-        actual_loss, _ = self.net._evaluate((source, source_labels, target, target_labels))
+        actual_loss, _ = self.net._evaluate(target, target_labels)
 
         self.assertEqual(expected_loss, actual_loss)

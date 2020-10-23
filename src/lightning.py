@@ -73,7 +73,7 @@ class Baseline(pl.LightningModule):
         return prediction
 
     def training_step(self, batch, batch_idx):
-        source, source_labels, _ = batch
+        source, source_labels = batch
         predictions = self(source)
         loss = self.criterion_regression(predictions.squeeze(), source_labels)
 
@@ -82,38 +82,16 @@ class Baseline(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        return self._evaluate(batch, record_embeddings=self.record_embeddings)
+        source, source_labels = batch
+        regression_loss, batch_size = self._evaluate(source, source_labels)
+
+        return regression_loss, batch_size
 
     def test_step(self, batch, batch_idx):
-        return self._evaluate(batch)
-
-    def validation_epoch_end(self, outputs):
-        if self.record_embeddings:
-            self.logger.experiment.add_figure('val/embeddings', self.embedding_metric.compute(), self.global_step)
-            self.embedding_metric.reset()
-
-        regression_loss = self._reduce_metrics(outputs)
-        self.log(f'val/regression_loss', regression_loss)
-        self.log('checkpoint_on', regression_loss, logger=False)
-
-    def test_epoch_end(self, outputs):
-        regression_loss = self._reduce_metrics(outputs)
-        self.log(f'test/regression_loss', regression_loss)
-
-    def _reduce_metrics(self, outputs):
-        regression_loss, batch_size = zip(*outputs)
-        num_samples = sum(batch_size)
-        regression_loss = torch.sqrt(sum(b * (loss ** 2) for b, loss in zip(batch_size, regression_loss)) / num_samples)
-
-        return regression_loss
-
-    def _evaluate(self, batch, record_embeddings=False):
         source, source_labels, target, target_labels = batch
-        batch_size = source.shape[0]
-        predictions = self(target)
-        regression_loss = self.criterion_regression(predictions.squeeze(), target_labels)
+        regression_loss, batch_size = self._evaluate(target, target_labels)
 
-        if record_embeddings:
+        if self.record_embeddings:
             domain_labels = torch.cat([torch.zeros_like(source_labels),
                                        torch.ones_like(source_labels)])
             latent_code = self.encoder(torch.cat([source, target]))
@@ -121,6 +99,32 @@ class Baseline(pl.LightningModule):
             self.embedding_metric.update(latent_code, domain_labels, ruls)
 
         return regression_loss, batch_size
+
+    def _evaluate(self, features, labels):
+        batch_size = features.shape[0]
+        predictions = self(features)
+        regression_loss = self.criterion_regression(predictions.squeeze(), labels)
+
+        return regression_loss, batch_size
+
+    def validation_epoch_end(self, outputs):
+        regression_loss = self._reduce_metrics(outputs)
+        self.log('val/regression_loss', regression_loss)
+
+    def test_epoch_end(self, outputs):
+        if self.record_embeddings:
+            self.logger.experiment.add_figure('test/embeddings', self.embedding_metric.compute(), self.global_step)
+            self.embedding_metric.reset()
+
+        regression_loss = self._reduce_metrics(outputs)
+        self.log('test/regression_loss', regression_loss)
+
+    def _reduce_metrics(self, outputs):
+        regression_loss, batch_size = zip(*outputs)
+        num_samples = sum(batch_size)
+        regression_loss = torch.sqrt(sum(b * (loss ** 2) for b, loss in zip(batch_size, regression_loss)) / num_samples)
+
+        return regression_loss
 
 
 class AdaptiveAE(pl.LightningModule):
@@ -226,7 +230,6 @@ class AdaptiveAE(pl.LightningModule):
         self.log(f'val/recon_loss', recon_loss)
         self.log(f'val/regression_loss', regression_loss)
         self.log(f'val/domain_loss', domain_loss)
-        self.log('checkpoint_on', regression_loss, logger=False)
 
     def test_epoch_end(self, outputs):
         recon_loss, regression_loss, domain_loss = self._reduce_metrics(outputs)
