@@ -32,9 +32,9 @@ class TestAdaptiveAE(unittest.TestCase):
         outputs = self.net.decoder(inputs)
         self.assertEqual(torch.Size((16, 14, 30)), outputs.shape)
 
-    def test_classifier(self):
+    def test_regressor(self):
         inputs = torch.randn(16, 64)
-        outputs = self.net.classifier(inputs)
+        outputs = self.net.regressor(inputs)
         self.assertEqual(torch.Size((16, 1)), outputs.shape)
 
     def test_domain_disc(self):
@@ -94,7 +94,7 @@ class TestAdaptiveAE(unittest.TestCase):
         domain_labels = torch.cat([torch.zeros_like(target_labels),
                                    torch.ones_like(target_labels)])
 
-        expected_prediction = self.net.classifier(self.net.encoder(target))
+        expected_prediction = self.net.regressor(self.net.encoder(target))
         expected_loss = torch.sqrt(criterion(expected_prediction.squeeze(), target_labels))
         _, _, actual_loss, _ = self.net._calc_loss(target, target_labels, source, domain_labels)
 

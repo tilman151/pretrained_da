@@ -55,7 +55,7 @@ class AdaptiveAE(pl.LightningModule):
         self.decoder = models.Decoder(self.in_channels, self.base_filters, self.kernel_size,
                                       self.num_layers, self.latent_dim, self.seq_len)
         self.domain_disc = self._build_domain_disc()
-        self.classifier = self._build_classifier()
+        self.regressor = models.Regressor(latent_dim)
 
         self.criterion_recon = nn.MSELoss()
         self.criterion_regression = RMSELoss()
@@ -74,13 +74,6 @@ class AdaptiveAE(pl.LightningModule):
 
         return common
 
-    def _build_classifier(self):
-        classifier = nn.Sequential(nn.BatchNorm1d(self.latent_dim),
-                                   nn.ReLU(True),
-                                   nn.Linear(self.latent_dim, 1))
-
-        return classifier
-
     def _build_domain_disc(self):
         sequence = [layers.GradientReversalLayer(),
                     nn.Linear(self.latent_dim, self.domain_disc_dim),
@@ -98,7 +91,7 @@ class AdaptiveAE(pl.LightningModule):
     def configure_optimizers(self):
         param_groups = [{'params': self.encoder.parameters()},
                         {'params': self.decoder.parameters()},
-                        {'params': self.classifier.parameters()},
+                        {'params': self.regressor.parameters()},
                         {'params': self.domain_disc.parameters()}]
         if self.optim_type == 'adam':
             return torch.optim.Adam(param_groups, lr=self.lr)
@@ -110,8 +103,8 @@ class AdaptiveAE(pl.LightningModule):
 
         latent_code = self.encoder(common)
         reconstruction = self.decoder(latent_code)
-        classification_code, _ = torch.split(latent_code, batch_size)
-        prediction = self.classifier(classification_code)
+        regression_code, _ = torch.split(latent_code, batch_size)
+        prediction = self.regressor(regression_code)
         domain_prediction = self.domain_disc(latent_code)
 
         return reconstruction, prediction, domain_prediction
@@ -177,13 +170,13 @@ class AdaptiveAE(pl.LightningModule):
 
         return recon_loss, regression_loss, domain_loss, batch_size
 
-    def _calc_loss(self, classifier_features, classifier_labels, auxiliary_features, domain_labels, cap=False):
-        common = torch.cat([classifier_features, auxiliary_features])
+    def _calc_loss(self, regressor_features, regressor_labels, auxiliary_features, domain_labels, cap=False):
+        common = torch.cat([regressor_features, auxiliary_features])
         reconstruction, prediction, domain_prediction = self(common)
-        rul_mask = self._get_rul_mask(classifier_labels, cap)
+        rul_mask = self._get_rul_mask(regressor_labels, cap)
 
         recon_loss = self.criterion_recon(common, reconstruction)
-        regression_loss = self.criterion_regression(prediction.squeeze(), classifier_labels)
+        regression_loss = self.criterion_regression(prediction.squeeze(), regressor_labels)
         domain_loss = self.criterion_domain(domain_prediction.squeeze()[rul_mask], domain_labels[rul_mask])
         loss = regression_loss + self.recon_trade_off * recon_loss + self.domain_trade_off * domain_loss
 
@@ -215,7 +208,7 @@ class AdverserialAdaptiveAE(AdaptiveAE):
     def configure_optimizers(self):
         gen_parameters = list(self.encoder.parameters()) + \
                          list(self.decoder.parameters()) + \
-                         list(self.classifier.parameters())
+                         list(self.regressor.parameters())
         gen_optim = torch.optim.SGD(gen_parameters, lr=self.lr, momentum=0.9, weight_decay=0.001)
         disc_optim = torch.optim.SGD(self.domain_disc.parameters(), lr=self.lr, momentum=0.9, weight_decay=0.001)
 
@@ -247,7 +240,7 @@ class AdverserialAdaptiveAE(AdaptiveAE):
         latent_code = self.encoder(common)
         reconstruction = self.decoder(latent_code)
         source_code, target_code = torch.split(latent_code, batch_size)
-        prediction = self.classifier(source_code)
+        prediction = self.regressor(source_code)
         domain_prediction_src = self.domain_disc(source_code)
         domain_prediction_trg = self.domain_disc(target_code)
         domain_labels_src = torch.ones_like(source_labels)
