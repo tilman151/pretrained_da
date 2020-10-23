@@ -93,6 +93,7 @@ class AdaptiveAE(pl.LightningModule):
         source, source_labels, target = batch
         domain_labels = torch.cat([torch.ones_like(source_labels),
                                    torch.zeros_like(source_labels)])
+        # Predict on source and reconstruct/domain classify both
         loss, recon_loss, regression_loss, domain_loss = self._calc_loss(source, source_labels, target, domain_labels,
                                                                          cap=True)
 
@@ -140,24 +141,19 @@ class AdaptiveAE(pl.LightningModule):
         batch_size = source.shape[0]
         domain_labels = torch.cat([torch.zeros_like(source_labels),
                                    torch.ones_like(source_labels)])
+        # Predict on target and reconstruct/domain classify both
+        _, recon_loss, regression_loss, domain_loss = self._calc_loss(target, target_labels, source, domain_labels)
 
         if record_embeddings:
             latent_code = self.encoder(torch.cat([source, target]))
             ruls = torch.cat([source_labels, target_labels])
             self.embedding_metric.update(latent_code, domain_labels, ruls)
 
-        _, recon_loss, regression_loss, domain_loss = self._calc_loss(target, target_labels, source, domain_labels)
-
         return recon_loss, regression_loss, domain_loss, batch_size
 
     def _calc_loss(self, regressor_features, regressor_labels, auxiliary_features, domain_labels, cap=False):
-        batch_size = regressor_features.shape[0]
         common = torch.cat([regressor_features, auxiliary_features])
-        latent_code = self.encoder(common)
-        reconstruction = self.decoder(latent_code)
-        regression_code, _ = torch.split(latent_code, batch_size)
-        prediction = self.regressor(regression_code)
-        domain_prediction = self.domain_disc(latent_code)
+        domain_prediction, prediction, reconstruction = self._complete_forward(common)
         rul_mask = self._get_rul_mask(regressor_labels, cap)
 
         recon_loss = self.criterion_recon(common, reconstruction)
@@ -166,6 +162,17 @@ class AdaptiveAE(pl.LightningModule):
         loss = regression_loss + self.recon_trade_off * recon_loss + self.domain_trade_off * domain_loss
 
         return loss, recon_loss, regression_loss, domain_loss
+
+    def _complete_forward(self, common):
+        batch_size = common.shape[0] // 2
+
+        latent_code = self.encoder(common)
+        reconstruction = self.decoder(latent_code)
+        regression_code, _ = torch.split(latent_code, batch_size)
+        prediction = self.regressor(regression_code)
+        domain_prediction = self.domain_disc(latent_code)
+
+        return domain_prediction, prediction, reconstruction
 
     def _get_rul_mask(self, classifier_labels, cap):
         if cap:
