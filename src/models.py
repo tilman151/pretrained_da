@@ -90,3 +90,32 @@ class Regressor(nn.Module):
 
     def forward(self, inputs):
         return self.layers(inputs)
+
+
+class DomainDiscriminator(nn.Module):
+    def __init__(self, latent_dim, num_layers, hidden_dim):
+        super().__init__()
+
+        self.latent_dim = latent_dim
+        self.num_layers = num_layers
+        self.hidden_dim = hidden_dim
+
+        self.layers = self._build_domain_disc()
+
+    def _build_domain_disc(self):
+        sequence = [layers.GradientReversalLayer(),
+                    nn.Linear(self.latent_dim, self.hidden_dim),
+                    nn.BatchNorm1d(self.hidden_dim),
+                    nn.ReLU(True)]
+
+        for i in range(self.num_layers - 1):
+            sequence.extend([nn.Linear(self.hidden_dim, self.hidden_dim),
+                             nn.BatchNorm1d(self.hidden_dim),
+                             nn.ReLU()])
+
+        sequence.append(nn.Linear(self.hidden_dim, 1))
+
+        return nn.Sequential(*sequence)
+
+    def forward(self, inputs):
+        return self.layers(inputs)

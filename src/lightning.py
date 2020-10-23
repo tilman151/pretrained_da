@@ -2,7 +2,6 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 
-import layers
 import metrics
 import models
 
@@ -54,7 +53,7 @@ class AdaptiveAE(pl.LightningModule):
                                       self.num_layers, self.latent_dim, self.seq_len)
         self.decoder = models.Decoder(self.in_channels, self.base_filters, self.kernel_size,
                                       self.num_layers, self.latent_dim, self.seq_len)
-        self.domain_disc = self._build_domain_disc()
+        self.domain_disc = models.DomainDiscriminator(self.latent_dim, self.num_disc_layers, self.domain_disc_dim)
         self.regressor = models.Regressor(latent_dim)
 
         self.criterion_recon = nn.MSELoss()
@@ -73,20 +72,6 @@ class AdaptiveAE(pl.LightningModule):
         common = torch.randn(32, self.in_channels, self.seq_len)
 
         return common
-
-    def _build_domain_disc(self):
-        sequence = [layers.GradientReversalLayer(),
-                    nn.Linear(self.latent_dim, self.domain_disc_dim),
-                    nn.BatchNorm1d(self.domain_disc_dim),
-                    nn.ReLU(True)]
-        for i in range(self.num_disc_layers - 1):
-            sequence.extend([nn.Linear(self.domain_disc_dim, self.domain_disc_dim),
-                             nn.BatchNorm1d(self.domain_disc_dim),
-                             nn.ReLU()])
-
-        sequence.append(nn.Linear(self.domain_disc_dim, 1))
-
-        return nn.Sequential(*sequence)
 
     def configure_optimizers(self):
         param_groups = [{'params': self.encoder.parameters()},
