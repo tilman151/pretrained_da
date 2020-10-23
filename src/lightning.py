@@ -52,7 +52,8 @@ class AdaptiveAE(pl.LightningModule):
 
         self.encoder = models.Encoder(self.in_channels, self.base_filters, self.kernel_size,
                                       self.num_layers, self.latent_dim, self.seq_len)
-        self.decoder = self._build_decoder()
+        self.decoder = models.Decoder(self.in_channels, self.base_filters, self.kernel_size,
+                                      self.num_layers, self.latent_dim, self.seq_len)
         self.domain_disc = self._build_domain_disc()
         self.classifier = self._build_classifier()
 
@@ -72,26 +73,6 @@ class AdaptiveAE(pl.LightningModule):
         common = torch.randn(32, self.in_channels, self.seq_len)
 
         return common
-
-    def _build_decoder(self):
-        cut_off = self.num_layers * (self.kernel_size - (self.kernel_size % 2))
-        max_filters = self.num_layers * self.base_filters
-        reduced_seq_len = self.seq_len - cut_off
-        flat_dim = reduced_seq_len * max_filters
-
-        sequence = [nn.Linear(self.latent_dim, flat_dim),
-                    nn.BatchNorm1d(flat_dim),
-                    nn.ReLU(True),
-                    layers.DeFlatten(reduced_seq_len, max_filters)]
-        for i in range(self.num_layers - 1, 0, -1):
-            sequence.extend([nn.ConvTranspose1d((i + 1) * self.base_filters, i * self.base_filters, self.kernel_size),
-                             nn.BatchNorm1d(i * self.base_filters),
-                             nn.ReLU(True)])
-
-        sequence.extend([nn.ConvTranspose1d(self.base_filters, self.in_channels, self.kernel_size),
-                         nn.Tanh()])
-
-        return nn.Sequential(*sequence)
 
     def _build_classifier(self):
         classifier = nn.Sequential(nn.BatchNorm1d(self.latent_dim),
