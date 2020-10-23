@@ -283,13 +283,15 @@ class BaselineDataModule(pl.LightningDataModule):
 
     def _to_dataset(self, split):
         if split == 'dev' or split == 'val':
-            features, labels = self.source.data[split]
+            data = self.source.data[split]
         elif split == 'test':
-            features, labels = self.target.data[split]
+            source, source_labels = self.source.data[split]
+            target, target_labels = self.target.data[split]
+            data = _unify_source_and_target_length(source, source_labels, target, target_labels)
         else:
             raise ValueError(f'Invalid split {split}')
 
-        dataset = TensorDataset(features, labels)
+        dataset = TensorDataset(*data)
 
         return dataset
 
@@ -358,15 +360,10 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
         source, source_labels = self.source.data[split]
         target, target_labels = self.target.data[split]
 
-        # Make source and target data the same length
-        num_source = source.shape[0]
-        num_target = target.shape[0]
-        if num_source > num_target:
-            target = target.repeat(num_source // num_target + 1, 1, 1)[:num_source]
-            target_labels = target_labels.repeat(num_source // num_target + 1)[:num_source]
-        elif num_source < num_target:
-            source = source.repeat(num_target // num_source + 1, 1, 1)[:num_target]
-            source_labels = source_labels.repeat(num_target // num_source + 1)[:num_target]
+        source, source_labels, target, target_labels = _unify_source_and_target_length(source,
+                                                                                       source_labels,
+                                                                                       target,
+                                                                                       target_labels)
 
         if use_target_labels:
             dataset = TensorDataset(source, source_labels, target, target_labels)
@@ -374,3 +371,17 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
             dataset = TensorDataset(source, source_labels, target)
 
         return dataset
+
+
+def _unify_source_and_target_length(source, source_labels, target, target_labels):
+    """Make source and target data the same length."""
+    num_source = source.shape[0]
+    num_target = target.shape[0]
+    if num_source > num_target:
+        target = target.repeat(num_source // num_target + 1, 1, 1)[:num_source]
+        target_labels = target_labels.repeat(num_source // num_target + 1)[:num_source]
+    elif num_source < num_target:
+        source = source.repeat(num_target // num_source + 1, 1, 1)[:num_target]
+        source_labels = source_labels.repeat(num_target // num_source + 1)[:num_target]
+
+    return source, source_labels, target, target_labels
