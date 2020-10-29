@@ -8,9 +8,9 @@ import datasets
 import lightning
 
 
-def run(percent_broken, domain_tradeoff, recon_tradeoff, seed):
+def run(percent_broken, domain_tradeoff, recon_tradeoff, cap, seed):
     pl.trainer.seed_everything(seed)
-    tf_logger = loggers.TensorBoardLogger('./test_cap',
+    tf_logger = loggers.TensorBoardLogger('./three2one',
                                           name=f'{percent_broken:.0%}pb_{domain_tradeoff:.1f}dt_{recon_tradeoff:.1f}rt')
     checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor='val/regression_loss')
     trainer = pl.Trainer(gpus=[0], max_epochs=100, logger=tf_logger, checkpoint_callback=checkpoint_callback,
@@ -30,7 +30,7 @@ def run(percent_broken, domain_tradeoff, recon_tradeoff, seed):
                                  domain_trade_off=domain_tradeoff,
                                  domain_disc_dim=64,
                                  num_disc_layers=2,
-                                 source_rul_cap=int((1 - percent_broken) * 125),
+                                 source_rul_cap=int((1 - percent_broken) * 125) if cap else None,
                                  optim_type='adam',
                                  lr=0.01,
                                  record_embeddings=False)
@@ -40,7 +40,7 @@ def run(percent_broken, domain_tradeoff, recon_tradeoff, seed):
     trainer.test(datamodule=data)
 
 
-def run_multiple(broken, domain_tradeoff, recon_tradeoff, replications):
+def run_multiple(broken, domain_tradeoff, recon_tradeoff, cap, replications):
     broken = broken if opt.broken is not None else [1.0]
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
@@ -51,7 +51,7 @@ def run_multiple(broken, domain_tradeoff, recon_tradeoff, replications):
 
     for params in sklearn.model_selection.ParameterGrid(parameter_grid):
         for s in seeds:
-            run(params['broken'], params['domain_tradeoff'], params['recon_tradeoff'], s)
+            run(params['broken'], params['domain_tradeoff'], params['recon_tradeoff'], cap, s)
 
 
 if __name__ == '__main__':
@@ -60,7 +60,8 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--broken', nargs='*', type=float, help='percent broken to use')
     parser.add_argument('--domain_tradeoff', nargs='*', type=float, help='tradeoff for domain classification')
     parser.add_argument('--recon_tradeoff', nargs='*', type=float, help='tradeoff for reconstruction')
+    parser.add_argument('-c', '--cap', type=bool, default=False, help='cap the source data for adaption loss')
     parser.add_argument('-r', '--replications', type=int, default=3, help='replications for each run')
     opt = parser.parse_args()
 
-    run_multiple(opt.broken, opt.domain_tradeoff, opt.recon_tradeoff, opt.replications)
+    run_multiple(opt.broken, opt.domain_tradeoff, opt.recon_tradeoff, opt.cap, opt.replications)

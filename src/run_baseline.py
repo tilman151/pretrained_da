@@ -9,8 +9,8 @@ import lightning
 
 def run(seed):
     pl.trainer.seed_everything(seed)
-    tf_logger = loggers.TensorBoardLogger('./test_cap',
-                                          name=f'baseline')
+    tf_logger = loggers.TensorBoardLogger('./three2one',
+                                          name='baseline')
     checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor='val/regression_loss')
     trainer = pl.Trainer(gpus=[0], max_epochs=100, logger=tf_logger, checkpoint_callback=checkpoint_callback,
                          deterministic=True, log_every_n_steps=10)
