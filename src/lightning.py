@@ -285,7 +285,7 @@ class AdaptiveAE(pl.LightningModule):
         return domain_prediction, prediction, reconstruction
 
     def _get_rul_mask(self, classifier_labels, cap):
-        if cap:
+        if cap and self.source_rul_cap is not None:
             rul_mask = (classifier_labels > self.source_rul_cap)
         else:
             rul_mask = torch.ones_like(classifier_labels, dtype=torch.bool)

@@ -123,6 +123,18 @@ class TestAdaptiveAE(unittest.TestCase):
         self.assertTrue(uncapped_rul_mask.all().item())  # all samples are True
         self.assertEqual(250, features[uncapped_rul_mask].shape[0])  # all samples are indexed
 
+    def test_deactivated_capping(self):
+        self.net.source_rul_cap = None  # Deactivate capping
+
+        labels = torch.arange(0, 125)
+        features = torch.randn(250, 20)
+        capped_rul_mask = self.net._get_rul_mask(labels, cap=True)
+
+        # mask should be uncapped
+        self.assertEqual(250, capped_rul_mask.shape[0])  # mask has double batch size
+        self.assertTrue(capped_rul_mask.all().item())  # all samples are True
+        self.assertEqual(250, features[capped_rul_mask].shape[0])  # all samples are indexed
+
 
 class TestBaseline(unittest.TestCase):
     def setUp(self):
