@@ -2,7 +2,7 @@ import unittest
 
 import torch
 import torch.utils.data
-from torch.utils.data import TensorDataset
+from torch.utils.data import TensorDataset, RandomSampler, SequentialSampler
 
 import datasets
 
@@ -147,27 +147,31 @@ class TestCMAPSSAdaption(unittest.TestCase):
 
 class TestCMAPSSBaseline(unittest.TestCase):
     def setUp(self):
-        self.dataset = datasets.BaselineDataModule(3, 1, batch_size=16, window_size=30)
+        self.dataset = datasets.BaselineDataModule(3, batch_size=16, window_size=30)
         self.dataset.prepare_data()
         self.dataset.setup()
 
     def test_train_batch_structure(self):
         train_loader = self.dataset.train_dataloader()
+        self.assertIsInstance(train_loader.sampler, RandomSampler)
         self._assert_train_val_batch_structure(train_loader)
 
     def test_val_batch_structure(self):
         val_loader = self.dataset.val_dataloader()
+        self.assertIsInstance(val_loader.sampler, SequentialSampler)
         self._assert_train_val_batch_structure(val_loader)
 
     def test_test_batch_structure(self):
-        test_loader = self.dataset.test_dataloader()
-        batch = next(iter(test_loader))
-        self.assertEqual(4, len(batch))
-        source, source_labels, target, target_labels = batch
-        self.assertEqual(torch.Size((16, 14, 30)), source.shape)
-        self.assertEqual(torch.Size((16, 14, 30)), target.shape)
-        self.assertEqual(torch.Size((16,)), source_labels.shape)
-        self.assertEqual(torch.Size((16,)), target_labels.shape)
+        test_loaders = self.dataset.test_dataloader()
+        for test_loader in test_loaders:
+            self.assertIsInstance(test_loader.sampler, SequentialSampler)
+            batch = next(iter(test_loader))
+            self.assertEqual(4, len(batch))
+            source, source_labels, target, target_labels = batch
+            self.assertEqual(torch.Size((16, 14, 30)), source.shape)
+            self.assertEqual(torch.Size((16, 14, 30)), target.shape)
+            self.assertEqual(torch.Size((16,)), source_labels.shape)
+            self.assertEqual(torch.Size((16,)), target_labels.shape)
 
     def _assert_train_val_batch_structure(self, loader):
         batch = next(iter(loader))
@@ -177,21 +181,35 @@ class TestCMAPSSBaseline(unittest.TestCase):
         self.assertEqual(torch.Size((16,)), labels.shape)
 
     def test_selected_source_on_train(self):
-        baseline_train_dataset = self.dataset._to_dataset('dev')
-        source_train_dataset = self.dataset.source._to_dataset(*self.dataset.source.data['dev'])
+        fd_source = self.dataset.fd_source
+        baseline_train_dataset = self.dataset._to_dataset(fd_source, split='dev')
+        source_train_dataset = self.dataset.cmapss[fd_source]._to_dataset(*self.dataset.cmapss[fd_source].data['dev'])
         self._assert_datasets_equal(baseline_train_dataset, source_train_dataset)
 
     def test_selected_source_on_val(self):
-        baseline_train_dataset = self.dataset._to_dataset('val')
-        source_train_dataset = self.dataset.source._to_dataset(*self.dataset.source.data['val'])
+        fd_source = self.dataset.fd_source
+        baseline_train_dataset = self.dataset._to_dataset(fd_source, split='val')
+        source_train_dataset = self.dataset.cmapss[fd_source]._to_dataset(*self.dataset.cmapss[fd_source].data['val'])
         self._assert_datasets_equal(baseline_train_dataset, source_train_dataset)
 
     def test_selected_both_on_test(self):
-        baseline_train_dataset = self.dataset._to_dataset('test')
-        combined_data = datasets._unify_source_and_target_length(*self.dataset.source.data['test'],
-                                                                 *self.dataset.target.data['test'])
+        fd_source = self.dataset.fd_source
+        fd_target = 1
+        baseline_train_dataset = self.dataset._to_dataset(fd_source, fd_target, split='test')
+        combined_data = datasets._unify_source_and_target_length(*self.dataset.cmapss[fd_source].data['test'],
+                                                                 *self.dataset.cmapss[fd_target].data['test'])
         source_train_dataset = TensorDataset(*combined_data)
         self._assert_datasets_equal(baseline_train_dataset, source_train_dataset)
+
+    def test_received_all_datasets_on_test(self):
+        test_loaders = self.dataset.test_dataloader()
+        fd_source = self.dataset.fd_source
+        for fd_target, test_loader in enumerate(test_loaders, start=1):
+            test_data = test_loader.dataset
+            combined_data = datasets._unify_source_and_target_length(*self.dataset.cmapss[fd_source].data['test'],
+                                                                     *self.dataset.cmapss[fd_target].data['test'])
+            source_train_dataset = TensorDataset(*combined_data)
+            self._assert_datasets_equal(test_data, source_train_dataset)
 
     def _assert_datasets_equal(self, baseline_dataset, inner_dataset):
         num_samples = len(baseline_dataset)
