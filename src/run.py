@@ -60,7 +60,7 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--broken', nargs='*', type=float, help='percent broken to use')
     parser.add_argument('--domain_tradeoff', nargs='*', type=float, help='tradeoff for domain classification')
     parser.add_argument('--recon_tradeoff', nargs='*', type=float, help='tradeoff for reconstruction')
-    parser.add_argument('-c', '--cap', type=bool, default=False, help='cap the source data for adaption loss')
+    parser.add_argument('-c', '--cap', action='store_true', help='cap the source data for adaption loss')
     parser.add_argument('-r', '--replications', type=int, default=3, help='replications for each run')
     opt = parser.parse_args()
 
