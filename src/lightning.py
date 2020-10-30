@@ -87,7 +87,7 @@ class Baseline(pl.LightningModule):
 
         return regression_loss, batch_size
 
-    def test_step(self, batch, batch_idx):
+    def test_step(self, batch, batch_idx, dataloader_idx):
         source, source_labels, target, target_labels = batch
         regression_loss, batch_size = self._evaluate(target, target_labels)
 
@@ -116,8 +116,9 @@ class Baseline(pl.LightningModule):
             self.logger.experiment.add_figure('test/embeddings', self.embedding_metric.compute(), self.global_step)
             self.embedding_metric.reset()
 
-        regression_loss = self._reduce_metrics(outputs)
-        self.log('test/regression_loss', regression_loss)
+        for fd, out in enumerate(outputs, start=1):
+            regression_loss = self._reduce_metrics(out)
+            self.log(f'test/regression_loss_fd{fd}', regression_loss)
 
     def _reduce_metrics(self, outputs):
         regression_loss, batch_size = zip(*outputs)
