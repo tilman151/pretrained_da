@@ -1,3 +1,4 @@
+import os
 import random
 
 import pytorch_lightning as pl
@@ -7,16 +8,24 @@ from pytorch_lightning import loggers
 import datasets
 import lightning
 
+ExperimentNaming = {1: 'one',
+                    2: 'two',
+                    3: 'three',
+                    4: 'four'}
+script_path = os.path.dirname(__file__)
 
-def run(percent_broken, domain_tradeoff, recon_tradeoff, cap, seed):
+
+def run(source, target, percent_broken, domain_tradeoff, recon_tradeoff, cap, seed):
     pl.trainer.seed_everything(seed)
-    tf_logger = loggers.TensorBoardLogger('./three2one',
+    tensorboard_path = os.path.join(script_path, f'results/{ExperimentNaming[source]}2{ExperimentNaming[target]}')
+    tf_logger = loggers.TensorBoardLogger(tensorboard_path,
                                           name=f'{percent_broken:.0%}pb_{domain_tradeoff:.1f}dt_{recon_tradeoff:.1f}rt')
-    checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor='val/regression_loss')
-    trainer = pl.Trainer(gpus=[0], max_epochs=100, logger=tf_logger, checkpoint_callback=checkpoint_callback,
+    mlflow_logger = loggers.MLFlowLogger(f'{ExperimentNaming[source]}2{ExperimentNaming[target]}',
+                                         tracking_uri=os.path.join(script_path, '..', 'mlruns'))
+    trainer = pl.Trainer(gpus=[1], max_epochs=200, logger=[tf_logger, mlflow_logger],
                          deterministic=True, log_every_n_steps=10)
-    data = datasets.DomainAdaptionDataModule(fd_source=3,
-                                             fd_target=1,
+    data = datasets.DomainAdaptionDataModule(fd_source=source,
+                                             fd_target=target,
                                              batch_size=512,
                                              window_size=30,
                                              percent_broken=percent_broken)
@@ -40,7 +49,7 @@ def run(percent_broken, domain_tradeoff, recon_tradeoff, cap, seed):
     trainer.test(datamodule=data)
 
 
-def run_multiple(broken, domain_tradeoff, recon_tradeoff, cap, replications):
+def run_multiple(source, target, broken, domain_tradeoff, recon_tradeoff, cap, replications):
     broken = broken if opt.broken is not None else [1.0]
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
@@ -51,12 +60,14 @@ def run_multiple(broken, domain_tradeoff, recon_tradeoff, cap, replications):
 
     for params in sklearn.model_selection.ParameterGrid(parameter_grid):
         for s in seeds:
-            run(params['broken'], params['domain_tradeoff'], params['recon_tradeoff'], cap, s)
+            run(source, target, params['broken'], params['domain_tradeoff'], params['recon_tradeoff'], cap, s)
 
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Run domain adaption experiment')
+    parser.add_argument('--source', type=int, help='FD number of the source data')
+    parser.add_argument('--target', type=int, help='FD number of the target data')
     parser.add_argument('-b', '--broken', nargs='*', type=float, help='percent broken to use')
     parser.add_argument('--domain_tradeoff', nargs='*', type=float, help='tradeoff for domain classification')
     parser.add_argument('--recon_tradeoff', nargs='*', type=float, help='tradeoff for reconstruction')
@@ -64,4 +75,4 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--replications', type=int, default=3, help='replications for each run')
     opt = parser.parse_args()
 
-    run_multiple(opt.broken, opt.domain_tradeoff, opt.recon_tradeoff, opt.cap, opt.replications)
+    run_multiple(opt.source, opt.target, opt.broken, opt.domain_tradeoff, opt.recon_tradeoff, opt.cap, opt.replications)
