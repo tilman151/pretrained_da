@@ -15,14 +15,14 @@ ExperimentNaming = {1: 'one',
 script_path = os.path.dirname(__file__)
 
 
-def run(source, target, percent_broken, domain_tradeoff, recon_tradeoff, cap, seed):
+def run(source, target, percent_broken, domain_tradeoff, recon_tradeoff, cap, seed, gpu):
     pl.trainer.seed_everything(seed)
     tensorboard_path = os.path.join(script_path, f'results/{ExperimentNaming[source]}2{ExperimentNaming[target]}')
     tf_logger = loggers.TensorBoardLogger(tensorboard_path,
                                           name=f'{percent_broken:.0%}pb_{domain_tradeoff:.1f}dt_{recon_tradeoff:.1f}rt')
     mlflow_logger = loggers.MLFlowLogger(f'{ExperimentNaming[source]}2{ExperimentNaming[target]}',
-                                         tracking_uri=os.path.join(script_path, '..', 'mlruns'))
-    trainer = pl.Trainer(gpus=[1], max_epochs=200, logger=[tf_logger, mlflow_logger],
+                                         tracking_uri=os.path.join('file:', script_path, '..', 'mlruns'))
+    trainer = pl.Trainer(gpus=[gpu], max_epochs=200, logger=[tf_logger, mlflow_logger],
                          deterministic=True, log_every_n_steps=10)
     data = datasets.DomainAdaptionDataModule(fd_source=source,
                                              fd_target=target,
@@ -49,7 +49,7 @@ def run(source, target, percent_broken, domain_tradeoff, recon_tradeoff, cap, se
     trainer.test(datamodule=data)
 
 
-def run_multiple(source, target, broken, domain_tradeoff, recon_tradeoff, cap, replications):
+def run_multiple(source, target, broken, domain_tradeoff, recon_tradeoff, cap, replications, gpu):
     broken = broken if opt.broken is not None else [1.0]
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
@@ -60,7 +60,7 @@ def run_multiple(source, target, broken, domain_tradeoff, recon_tradeoff, cap, r
 
     for params in sklearn.model_selection.ParameterGrid(parameter_grid):
         for s in seeds:
-            run(source, target, params['broken'], params['domain_tradeoff'], params['recon_tradeoff'], cap, s)
+            run(source, target, params['broken'], params['domain_tradeoff'], params['recon_tradeoff'], cap, s, gpu)
 
 
 if __name__ == '__main__':
@@ -73,6 +73,8 @@ if __name__ == '__main__':
     parser.add_argument('--recon_tradeoff', nargs='*', type=float, help='tradeoff for reconstruction')
     parser.add_argument('-c', '--cap', action='store_true', help='cap the source data for adaption loss')
     parser.add_argument('-r', '--replications', type=int, default=3, help='replications for each run')
+    parser.add_argument('--gpu', type=int, default=0, help='id of GPU to use')
     opt = parser.parse_args()
 
-    run_multiple(opt.source, opt.target, opt.broken, opt.domain_tradeoff, opt.recon_tradeoff, opt.cap, opt.replications)
+    run_multiple(opt.source, opt.target, opt.broken, opt.domain_tradeoff,
+                 opt.recon_tradeoff, opt.cap, opt.replications, opt.gpu)
