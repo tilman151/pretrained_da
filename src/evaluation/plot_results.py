@@ -11,11 +11,12 @@ task_dict = {'four2three': '4→3', 'four2two': '4→2', 'one2three': '1→3',
              'two2four':   '2→4', 'two2one': '2→1'}
 
 
-def load_data(result_dir, filter_methods=None):
-    transfer_df = _load_transfer(result_dir, filter_methods)
+def load_data(result_dir, filter_methods=None, filter_outlier=True):
+    transfer_df = _load_transfer(result_dir, filter_methods, filter_outlier)
     baseline_mse, baseline_rul = _load_baseline(result_dir)
 
     transfer_df['task'] = transfer_df['task'].map(task_dict)
+    transfer_df = transfer_df.dropna(axis=0)
     baseline_mse['task'] = baseline_mse['task'].map(task_dict)
     if baseline_rul is not None:
         baseline_rul['task'] = baseline_rul['task'].map(task_dict)
@@ -23,7 +24,7 @@ def load_data(result_dir, filter_methods=None):
     return transfer_df, baseline_rul, baseline_mse
 
 
-def _load_transfer(result_dir, filter_methods):
+def _load_transfer(result_dir, filter_methods, filter_outlier):
     transfer_path = os.path.join(result_dir, 'transfer.csv')
     df = pd.read_csv(transfer_path, index_col=0)
 
@@ -44,6 +45,18 @@ def _load_transfer(result_dir, filter_methods):
     if filter_methods is not None:
         df = df[df['method'].isin(filter_methods)]
 
+    if filter_outlier:
+        grouped = df.groupby(['task', 'percent_broken'])
+        quantiles = grouped.agg(q1=('mse', lambda x: x.quantile(0.25)),
+                                q3=('mse', lambda x: x.quantile(0.75)))
+        iqr = quantiles['q3'] - quantiles['q1']
+        thresholds = quantiles['q3'] + 1.5 * iqr
+        sub_dfs = []
+        for group in grouped.groups:
+            sub_df = grouped.get_group(group)
+            sub_dfs.append(sub_df[sub_df['mse'] < thresholds[group]])
+        df = pd.concat(sub_dfs)
+
     return df
 
 
@@ -62,6 +75,7 @@ def _load_baseline(result_dir):
     baseline.loc['cmapss_three_baseline', 'dataset'] = 2
     baseline.loc['cmapss_four_baseline', 'dataset'] = 3
 
+    # Remove non-transfer (e.g. one2one) and hard baselines (e.g. one2four)
     baseline_cross = baseline[baseline['dataset'] != baseline['measure']]
     baseline_cross = baseline_cross[(baseline_cross['dataset'] != 0) | (baseline_cross['measure'] != 3)]
     baseline_cross = baseline_cross[(baseline_cross['dataset'] != 1) | (baseline_cross['measure'] != 2)]
@@ -72,12 +86,13 @@ def _load_baseline(result_dir):
                   10: 'two2one', 31: 'four2two', 32: 'four2three', 23: 'three2four'}
     baseline_cross['task'] = 10 * baseline_cross['dataset'] + baseline_cross['measure']
     baseline_cross['task'] = baseline_cross['task'].apply(lambda x: codes2task[x])
-    baseline_mse = baseline_cross[baseline_cross['type'] == 1]
 
-    if (baseline_cross['type'] == 0).any():
+    if baseline_cross['type'].any():
+        baseline_mse = baseline_cross[baseline_cross['type'] == 1]
         baseline_rul = baseline_cross[baseline_cross['type'] == 0]
         baseline_rul['log_value'] = baseline_rul['value'].apply(np.log)
     else:
+        baseline_mse = baseline_cross[baseline_cross['type'] == 0]
         baseline_rul = None
 
     return baseline_mse, baseline_rul
@@ -175,14 +190,14 @@ def mixed_linear_factors_plot(df, x_axis, factor):
 def method_plot(df, baseline_rul, baseline_mse, method):
     plotnine.options.figure_size = (15, 8)
 
-    jan = df[df['method'] == method]
+    method_df = df[df['method'] == method]
 
-    jan['percent_broken'] = jan['percent_broken'].round().astype(np.int)
-    jan['percent_fail_runs'] = jan['percent_fail_runs'].round().astype(np.int)
+    method_df['percent_broken'] = method_df['percent_broken'].round().astype(np.int)
+    method_df['percent_fail_runs'] = method_df['percent_fail_runs'].round().astype(np.int)
 
     if baseline_rul is not None:
         plotnine.ylim = (2, 10)
-        gg = (plotnine.ggplot(jan, plotnine.aes(x='percent_broken', y='log_score', color='method'))
+        gg = (plotnine.ggplot(method_df, plotnine.aes(x='percent_broken', y='log_score', color='method'))
               + plotnine.facet_wrap('task', 2, 4)
               + plotnine.stat_boxplot(plotnine.aes(y='log_value', x=60), data=baseline_rul, width=80, color='#14639e',
                                       show_legend=False)
@@ -195,7 +210,7 @@ def method_plot(df, baseline_rul, baseline_mse, method):
         gg.save('%s_log_rul.pdf' % method)
 
     plotnine.ylim = (90, 10)
-    gg = (plotnine.ggplot(jan, plotnine.aes(x='percent_broken', y='mse', color='method'))
+    gg = (plotnine.ggplot(method_df, plotnine.aes(x='percent_broken', y='mse', color='method'))
           + plotnine.facet_wrap('task', 2, 4)
           + plotnine.stat_boxplot(plotnine.aes(y='value', x=60), data=baseline_mse, width=80, color='#14639e',
                                   show_legend=False)
@@ -250,11 +265,11 @@ if __name__ == '__main__':
     parser.add_argument('result_dir', help='path to folder with baseline.csv and transfer.csv')
     opt = parser.parse_args()
 
-    transfer, base_rul, base_rmse = load_data(opt.result_dir, filter_methods=['dadv', 'jan'])
-    mixed_linear_plots(transfer, 'percent_broken', 'Grade of Degradation in %')
-    mixed_linear_plots(transfer, 'percent_fail_runs', 'Number of Systems in %')
-    mixed_linear_factors_plot(transfer, 'percent_fail_runs', 'percent_broken')
-    mixed_linear_factors_plot(transfer, 'percent_broken', 'percent_fail_runs')
+    transfer, base_rul, base_rmse = load_data(opt.result_dir, filter_methods=['daan'], filter_outlier=True)
+    # mixed_linear_plots(transfer, 'percent_broken', 'Grade of Degradation in %')
+    # mixed_linear_plots(transfer, 'percent_fail_runs', 'Number of Systems in %')
+    # mixed_linear_factors_plot(transfer, 'percent_fail_runs', 'percent_broken')
+    # mixed_linear_factors_plot(transfer, 'percent_broken', 'percent_fail_runs')
     for m in ['daan']:
         method_plot(transfer, base_rul, base_rmse, m)
     for m in ['daan']:
