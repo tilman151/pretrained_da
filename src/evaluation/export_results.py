@@ -58,7 +58,7 @@ def _runs_of_transfer(client, experiment):
     replications = _get_replications(client, experiment)
     df = pd.DataFrame(np.zeros((len(replications), 3)),
                       columns=['percent_broken', 'percent_fail_runs', 'mse'],
-                      index=[experiment.name + '_daan'] * len(replications))
+                      index=[f'cmapss_{experiment.name}_daan'] * len(replications))
     for i, run in enumerate(replications):
         best_rmse = _get_test_value(client, 'regression_loss', run)
         if 'percent_broken' in run.data.params and not run.data.params['percent_broken'] == 'None':
