@@ -106,17 +106,26 @@ class TestCMAPSSAdaption(unittest.TestCase):
         target_length = len(self.dataset.target.train_dataloader())
         self.assertEqual(max(source_length, target_length), len(train_loader))
 
-    def test_val_length_equal(self):
-        val_loader = self.dataset.val_dataloader()
-        source_length = len(self.dataset.source.val_dataloader())
-        target_length = len(self.dataset.target.val_dataloader())
-        self.assertEqual(max(source_length, target_length), len(val_loader))
+    def test_val_source_target_order(self):
+        val_source_loader, val_target_loader = self.dataset.val_dataloader()
+        self._assert_datasets_equal(val_source_loader.dataset,
+                                    self.dataset.source._to_dataset(*self.dataset.source.data['val']))
+        self._assert_datasets_equal(val_target_loader.dataset,
+                                    self.dataset.source._to_dataset(*self.dataset.target.data['val']))
 
-    def test_test_length_equal(self):
-        test_loader = self.dataset.test_dataloader()
-        source_length = len(self.dataset.source.test_dataloader())
-        target_length = len(self.dataset.target.test_dataloader())
-        self.assertEqual(max(source_length, target_length), len(test_loader))
+    def test_test_source_target_order(self):
+        test_source_loader, test_target_loader = self.dataset.test_dataloader()
+        self._assert_datasets_equal(test_source_loader.dataset,
+                                    self.dataset.source._to_dataset(*self.dataset.source.data['test']))
+        self._assert_datasets_equal(test_target_loader.dataset,
+                                    self.dataset.source._to_dataset(*self.dataset.target.data['test']))
+
+    def _assert_datasets_equal(self, adaption_dataset, inner_dataset):
+        num_samples = len(adaption_dataset)
+        baseline_data = adaption_dataset[:num_samples]
+        inner_data = inner_dataset[:num_samples]
+        for baseline, inner in zip(baseline_data, inner_data):
+            self.assertEqual(0, torch.sum(baseline - inner))
 
     def test_train_batch_structure(self):
         train_loader = self.dataset.train_dataloader()
@@ -128,21 +137,21 @@ class TestCMAPSSAdaption(unittest.TestCase):
         self.assertEqual(torch.Size((16,)), source_labels.shape)
 
     def test_val_batch_structure(self):
-        val_loader = self.dataset.val_dataloader()
-        self._assert_val_test_batch_structure(val_loader)
+        val_source_loader, val_target_loader = self.dataset.val_dataloader()
+        self._assert_val_test_batch_structure(val_source_loader)
+        self._assert_val_test_batch_structure(val_target_loader)
 
     def test_test_batch_structure(self):
-        test_loader = self.dataset.test_dataloader()
-        self._assert_val_test_batch_structure(test_loader)
+        test_source_loader, test_target_loader = self.dataset.test_dataloader()
+        self._assert_val_test_batch_structure(test_source_loader)
+        self._assert_val_test_batch_structure(test_target_loader)
 
     def _assert_val_test_batch_structure(self, loader):
         batch = next(iter(loader))
-        self.assertEqual(4, len(batch))
-        source, source_labels, target, target_labels = batch
-        self.assertEqual(torch.Size((16, 14, 30)), source.shape)
-        self.assertEqual(torch.Size((16, 14, 30)), target.shape)
-        self.assertEqual(torch.Size((16,)), source_labels.shape)
-        self.assertEqual(torch.Size((16,)), target_labels.shape)
+        self.assertEqual(2, len(batch))
+        features, labels = batch
+        self.assertEqual(torch.Size((16, 14, 30)), features.shape)
+        self.assertEqual(torch.Size((16,)), labels.shape)
 
 
 class TestCMAPSSBaseline(unittest.TestCase):

@@ -347,16 +347,10 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
                           pin_memory=True)
 
     def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        return DataLoader(self._to_dataset('val', use_target_labels=True),
-                          batch_size=self.batch_size,
-                          shuffle=False,
-                          pin_memory=True)
+        return [self.source.val_dataloader(*args, **kwargs),self.target.val_dataloader(*args, **kwargs)]
 
     def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        return DataLoader(self._to_dataset('test', use_target_labels=True),
-                          batch_size=self.batch_size,
-                          shuffle=False,
-                          pin_memory=True)
+        return [self.source.test_dataloader(*args, **kwargs),self.target.test_dataloader(*args, **kwargs)]
 
     def _to_dataset(self, split, use_target_labels):
         source, source_labels = self.source.data[split]
