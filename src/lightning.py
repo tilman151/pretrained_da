@@ -1,6 +1,7 @@
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
+from torch.utils.tensorboard import SummaryWriter
 
 import metrics
 import models
@@ -172,7 +173,7 @@ class AdaptiveAE(pl.LightningModule):
         self.criterion_regression = RMSELoss()
         self.criterion_domain = nn.BCEWithLogitsLoss()
 
-        self.embedding_metric = metrics.EmbeddingViz(20000, self.latent_dim)
+        self.embedding_metric = metrics.EmbeddingViz(40000, self.latent_dim)
 
         self.save_hyperparameters()
 
@@ -224,13 +225,23 @@ class AdaptiveAE(pl.LightningModule):
 
     def validation_epoch_end(self, outputs):
         if self.record_embeddings:
-            self.logger.experiment.add_figure('val/embeddings', self.embedding_metric.compute(), self.global_step)
+            self._get_tensorboard().add_figure('val/embeddings', self.embedding_metric.compute(), self.global_step)
             self.embedding_metric.reset()
 
         recon_loss, regression_loss, domain_loss = self._reduce_metrics(outputs)
         self.log(f'val/recon_loss', recon_loss)
         self.log(f'val/regression_loss', regression_loss)
         self.log(f'val/domain_loss', domain_loss)
+
+    def _get_tensorboard(self):
+        if isinstance(self.logger.experiment, SummaryWriter):
+            return self.logger.experiment
+        elif isinstance(self.logger.experiment, list):
+            for logger in self.logger.experiment:
+                if isinstance(logger, SummaryWriter):
+                    return logger
+        else:
+            raise ValueError('No TensorBoard logger specified. Cannot log embeddings.')
 
     def test_epoch_end(self, outputs):
         recon_loss, regression_loss, domain_loss = self._reduce_metrics(outputs)
