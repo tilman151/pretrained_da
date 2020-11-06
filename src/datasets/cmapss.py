@@ -6,7 +6,7 @@ import numpy as np
 import pytorch_lightning as pl
 import sklearn.preprocessing as scalers
 import torch
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, ConcatDataset
 
 
 class CMAPSSDataModule(pl.LightningDataModule):
@@ -371,6 +371,98 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
             dataset = TensorDataset(source, source_labels, target, target_labels)
         else:
             dataset = TensorDataset(source, source_labels, target)
+
+        return dataset
+
+
+class PretrainingDataModule(pl.LightningDataModule):
+    def __init__(self,
+                 fd_source,
+                 fd_target,
+                 batch_size,
+                 max_rul=125,
+                 window_size=30,
+                 percent_fail_runs=None,
+                 percent_broken=None,
+                 feature_select=None):
+        super().__init__()
+
+        self.fd_source = fd_source
+        self.fd_target = fd_target
+        self.batch_size = batch_size
+        self.window_size = window_size
+        self.max_rul = max_rul
+        self.percent_broken = percent_broken
+        self.percent_fail_runs = percent_fail_runs
+        self.feature_select = feature_select
+
+        self.hparams = {'fd_source': self.fd_source,
+                        'fd_target': self.fd_target,
+                        'batch_size': self.batch_size,
+                        'window_size': self.window_size,
+                        'max_rul': self.max_rul,
+                        'percent_broken': self.percent_broken,
+                        'percent_fail_runs': self.percent_fail_runs}
+
+        self.source = CMAPSSDataModule(fd_source, batch_size, max_rul, window_size,
+                                       None, None, feature_select)
+        self.target = CMAPSSDataModule(fd_target, batch_size, np.inf, window_size,
+                                       percent_fail_runs, percent_broken, feature_select)
+
+    def prepare_data(self, *args, **kwargs):
+        self.source.prepare_data(*args, **kwargs)
+        self.target.prepare_data(*args, **kwargs)
+
+    def setup(self, stage: Optional[str] = None):
+        self.source.setup(stage)
+        self.target.setup(stage)
+        self.source_pairs = self._build_pairs(self.source)
+        self.target_pairs = self._build_pairs(self.target)
+
+    def _build_pairs(self, dataset):
+        num_samples = 10000
+        rng = np.random.default_rng()
+        pair_idx = {'dev': self._pairs_from_split(dataset.lengths['dev'], num_samples, rng),
+                    'val': self._pairs_from_split(dataset.lengths['val'], num_samples, rng)}
+
+        return pair_idx
+
+    def _pairs_from_split(self, run_lengths, num_samples, rng: np.random.Generator):
+        run_idx = np.arange(len(run_lengths) - 1)
+        run_start_idx = np.cumsum(run_lengths)
+        chosen_run_idx = rng.choice(run_idx, size=num_samples, replace=True)
+        anchor_idx = [rng.integers(low=run_start_idx[i], high=run_start_idx[i + 1] - 1)
+                      for i in chosen_run_idx]
+        query_idx = [rng.integers(low=anchor + 1, high=run_start_idx[i + 1])
+                     for anchor, i in zip(anchor_idx, chosen_run_idx)]
+        pair_idx = np.stack([anchor_idx, query_idx], axis=1)
+
+        return pair_idx
+
+    def train_dataloader(self, *args, **kwargs) -> DataLoader:
+        return DataLoader(self._to_dataset('dev'),
+                          batch_size=self.batch_size,
+                          shuffle=True,
+                          pin_memory=True)
+
+    def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
+        return DataLoader(self._to_dataset('val'),
+                          batch_size=self.batch_size,
+                          shuffle=False,
+                          pin_memory=True)
+
+    def _to_dataset(self, split):
+        source_dataset = self._pairs_to_dataset(self.source.data[split], self.source_pairs[split])
+        target_dataset = self._pairs_to_dataset(self.source.data[split], self.target_pairs[split])
+
+        return ConcatDataset([source_dataset, target_dataset])
+
+    def _pairs_to_dataset(self, data, pairs):
+        features, _ = data
+        anchors = features[pairs[:, 0]]
+        queries = features[pairs[:, 1]]
+        distances = torch.tensor(pairs[:, 1] - pairs[:, 0], dtype=torch.float)
+        dataset = TensorDataset(anchors, queries, distances)
 
         return dataset
 
