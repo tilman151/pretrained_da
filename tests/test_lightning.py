@@ -5,7 +5,7 @@ import torch
 from lightning import baseline, daan
 
 
-class TestAdaptiveAE(unittest.TestCase):
+class TestDAAN(unittest.TestCase):
     def setUp(self):
         self.trade_off = 0.5
         self.net = daan.DAAN(in_channels=14,
