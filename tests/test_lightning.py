@@ -8,31 +8,24 @@ from lightning import baseline, daan
 class TestAdaptiveAE(unittest.TestCase):
     def setUp(self):
         self.trade_off = 0.5
-        self.net = daan.AdaptiveAE(in_channels=14,
-                                   seq_len=30,
-                                   num_layers=4,
-                                   kernel_size=3,
-                                   base_filters=16,
-                                   latent_dim=64,
-                                   recon_trade_off=self.trade_off,
-                                   domain_trade_off=self.trade_off,
-                                   domain_disc_dim=32,
-                                   num_disc_layers=2,
-                                   source_rul_cap=50,
-                                   optim_type='adam',
-                                   lr=0.01)
+        self.net = daan.DAAN(in_channels=14,
+                             seq_len=30,
+                             num_layers=4,
+                             kernel_size=3,
+                             base_filters=16,
+                             latent_dim=64,
+                             domain_trade_off=self.trade_off,
+                             domain_disc_dim=32,
+                             num_disc_layers=2,
+                             source_rul_cap=50,
+                             optim_type='adam',
+                             lr=0.01)
 
     @torch.no_grad()
     def test_encoder(self):
         inputs = torch.randn(16, 14, 30)
         outputs = self.net.encoder(inputs)
         self.assertEqual(torch.Size((16, 64)), outputs.shape)
-
-    @torch.no_grad()
-    def test_decoder(self):
-        inputs = torch.randn(16, 64)
-        outputs = self.net.decoder(inputs)
-        self.assertEqual(torch.Size((16, 14, 30)), outputs.shape)
 
     @torch.no_grad()
     def test_regressor(self):
@@ -101,7 +94,7 @@ class TestAdaptiveAE(unittest.TestCase):
 
         expected_prediction = self.net.regressor(self.net.encoder(target))
         expected_loss = torch.sqrt(criterion(expected_prediction.squeeze(), target_labels))
-        _, _, actual_loss, _ = self.net._train(target, target_labels, source, domain_labels)
+        _, actual_loss, _ = self.net._train(target, target_labels, source, domain_labels)
 
         self.assertEqual(expected_loss, actual_loss)
 
