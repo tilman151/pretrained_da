@@ -3,10 +3,11 @@ import torch
 import torch.nn as nn
 
 from lightning import metrics
+from lightning.mixins import DataHparamsMixin
 from models import networks
 
 
-class UnsupervisedPretraining(pl.LightningModule):
+class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
     def __init__(self,
                  in_channels,
                  seq_len,

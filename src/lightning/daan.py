@@ -4,10 +4,11 @@ import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 
 from lightning import metrics
+from lightning.mixins import DataHparamsMixin
 from models import networks
 
 
-class DAAN(pl.LightningModule):
+class DAAN(pl.LightningModule, DataHparamsMixin):
     def __init__(self,
                  in_channels,
                  seq_len,
@@ -50,9 +51,6 @@ class DAAN(pl.LightningModule):
         self.embedding_metric = metrics.EmbeddingViz(40000, self.latent_dim)
 
         self.save_hyperparameters()
-
-    def add_data_hparams(self, data):
-        self.hparams.update(data.hparams)
 
     @property
     def example_input_array(self):
