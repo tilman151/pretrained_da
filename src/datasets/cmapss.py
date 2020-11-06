@@ -379,6 +379,7 @@ class PretrainingDataModule(pl.LightningDataModule):
     def __init__(self,
                  fd_source,
                  fd_target,
+                 num_samples,
                  batch_size,
                  max_rul=125,
                  window_size=30,
@@ -389,6 +390,7 @@ class PretrainingDataModule(pl.LightningDataModule):
 
         self.fd_source = fd_source
         self.fd_target = fd_target
+        self.num_samples = num_samples
         self.batch_size = batch_size
         self.window_size = window_size
         self.max_rul = max_rul
@@ -398,6 +400,7 @@ class PretrainingDataModule(pl.LightningDataModule):
 
         self.hparams = {'fd_source': self.fd_source,
                         'fd_target': self.fd_target,
+                        'num_samples': self.num_samples,
                         'batch_size': self.batch_size,
                         'window_size': self.window_size,
                         'max_rul': self.max_rul,
@@ -408,6 +411,9 @@ class PretrainingDataModule(pl.LightningDataModule):
                                        None, None, feature_select)
         self.target = CMAPSSDataModule(fd_target, batch_size, np.inf, window_size,
                                        percent_fail_runs, percent_broken, feature_select)
+
+        self.source_pairs = None
+        self.target_pairs = None
 
     def prepare_data(self, *args, **kwargs):
         self.source.prepare_data(*args, **kwargs)
@@ -420,10 +426,9 @@ class PretrainingDataModule(pl.LightningDataModule):
         self.target_pairs = self._build_pairs(self.target)
 
     def _build_pairs(self, dataset):
-        num_samples = 10000
         rng = np.random.default_rng()
-        pair_idx = {'dev': self._pairs_from_split(dataset.lengths['dev'], num_samples, rng),
-                    'val': self._pairs_from_split(dataset.lengths['val'], num_samples, rng)}
+        pair_idx = {'dev': self._pairs_from_split(dataset.lengths['dev'], self.num_samples, rng),
+                    'val': self._pairs_from_split(dataset.lengths['val'], self.num_samples // 10, rng)}
 
         return pair_idx
 
