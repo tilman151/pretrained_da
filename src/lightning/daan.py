@@ -17,7 +17,7 @@ class RMSELoss(nn.Module):
         return torch.sqrt(self.mse(inputs, targets))
 
 
-class AdaptiveAE(pl.LightningModule):
+class DAAN(pl.LightningModule):
     def __init__(self,
                  in_channels,
                  seq_len,
@@ -25,7 +25,6 @@ class AdaptiveAE(pl.LightningModule):
                  kernel_size,
                  base_filters,
                  latent_dim,
-                 recon_trade_off,
                  domain_trade_off,
                  domain_disc_dim,
                  num_disc_layers,
@@ -41,7 +40,6 @@ class AdaptiveAE(pl.LightningModule):
         self.kernel_size = kernel_size
         self.base_filters = base_filters
         self.latent_dim = latent_dim
-        self.recon_trade_off = recon_trade_off
         self.domain_trade_off = domain_trade_off
         self.domain_disc_dim = domain_disc_dim
         self.num_disc_layers = num_disc_layers
@@ -51,8 +49,6 @@ class AdaptiveAE(pl.LightningModule):
         self.record_embeddings = record_embeddings
 
         self.encoder = networks.Encoder(self.in_channels, self.base_filters, self.kernel_size,
-                                        self.num_layers, self.latent_dim, self.seq_len)
-        self.decoder = networks.Decoder(self.in_channels, self.base_filters, self.kernel_size,
                                         self.num_layers, self.latent_dim, self.seq_len)
         self.domain_disc = networks.DomainDiscriminator(self.latent_dim, self.num_disc_layers, self.domain_disc_dim)
         self.regressor = networks.Regressor(latent_dim)
@@ -76,7 +72,6 @@ class AdaptiveAE(pl.LightningModule):
 
     def configure_optimizers(self):
         param_groups = [{'params': self.encoder.parameters()},
-                        {'params': self.decoder.parameters()},
                         {'params': self.regressor.parameters()},
                         {'params': self.domain_disc.parameters()}]
         if self.optim_type == 'adam':
@@ -95,11 +90,9 @@ class AdaptiveAE(pl.LightningModule):
         domain_labels = torch.cat([torch.ones_like(source_labels),
                                    torch.zeros_like(source_labels)])
         # Predict on source and reconstruct/domain classify both
-        loss, recon_loss, regression_loss, domain_loss = self._train(source, source_labels, target, domain_labels,
-                                                                     cap=True)
+        loss, regression_loss, domain_loss = self._train(source, source_labels, target, domain_labels, cap=True)
 
         self.log('train/loss', loss)
-        self.log('train/recon_loss', recon_loss)
         self.log('train/regression_loss', regression_loss)
         self.log('train/domain_loss', domain_loss)
 
@@ -107,15 +100,14 @@ class AdaptiveAE(pl.LightningModule):
 
     def _train(self, regressor_features, regressor_labels, auxiliary_features, domain_labels, cap=False):
         common = torch.cat([regressor_features, auxiliary_features])
-        domain_prediction, prediction, reconstruction = self._complete_forward(common)
+        domain_prediction, prediction = self._complete_forward(common)
 
         rul_mask = self._get_rul_mask(regressor_labels, cap)
-        recon_loss = self.criterion_recon(common, reconstruction)
         regression_loss = self.criterion_regression(prediction.squeeze(), regressor_labels)
         domain_loss = self.criterion_domain(domain_prediction.squeeze()[rul_mask], domain_labels[rul_mask])
-        loss = regression_loss + self.recon_trade_off * recon_loss + self.domain_trade_off * domain_loss
+        loss = regression_loss + self.domain_trade_off * domain_loss
 
-        return loss, recon_loss, regression_loss, domain_loss
+        return loss, regression_loss, domain_loss
 
     def _get_rul_mask(self, classifier_labels, cap):
         if cap and self.source_rul_cap is not None:
@@ -139,9 +131,8 @@ class AdaptiveAE(pl.LightningModule):
         batch_size = features.shape[0]
         # Predict on target and reconstruct/domain classify both
         common = torch.cat([features, torch.empty_like(features)])
-        domain_prediction, prediction, reconstruction = self._complete_forward(common)
+        domain_prediction, prediction = self._complete_forward(common)
 
-        recon_loss = self.criterion_recon(features, reconstruction[:batch_size])
         regression_loss = self.criterion_regression(prediction.squeeze(), labels)
         domain_loss = self.criterion_domain(domain_prediction[:batch_size].squeeze(), domain_labels)
 
@@ -149,15 +140,14 @@ class AdaptiveAE(pl.LightningModule):
             latent_code = self.encoder(features)
             self.embedding_metric.update(latent_code, domain_labels, labels)
 
-        return recon_loss, regression_loss, domain_loss, batch_size
+        return regression_loss, domain_loss, batch_size
 
     def validation_epoch_end(self, outputs):
         if self.record_embeddings:
             self._get_tensorboard().add_figure('val/embeddings', self.embedding_metric.compute(), self.global_step)
             self.embedding_metric.reset()
 
-        recon_loss, regression_loss, domain_loss = self._reduce_metrics(outputs)
-        self.log(f'val/recon_loss', recon_loss)
+        regression_loss, domain_loss = self._reduce_metrics(outputs)
         self.log(f'val/regression_loss', regression_loss)
         self.log(f'val/domain_loss', domain_loss)
 
@@ -172,28 +162,25 @@ class AdaptiveAE(pl.LightningModule):
             raise ValueError('No TensorBoard logger specified. Cannot log embeddings.')
 
     def test_epoch_end(self, outputs):
-        recon_loss, regression_loss, domain_loss = self._reduce_metrics(outputs)
-        self.log(f'test/recon_loss', recon_loss)
+        regression_loss, domain_loss = self._reduce_metrics(outputs)
         self.log(f'test/regression_loss', regression_loss)
         self.log(f'test/domain_loss', domain_loss)
 
     def _reduce_metrics(self, outputs):
         outputs = [item for sublist in outputs for item in sublist]  # concat outputs of both dataloaders
-        recon_loss, regression_loss, domain_loss, batch_size = zip(*outputs)  # separate output parts
+        regression_loss, domain_loss, batch_size = zip(*outputs)  # separate output parts
         num_samples = sum(batch_size)
-        recon_loss = sum(b * loss for b, loss in zip(batch_size, recon_loss)) / num_samples
         regression_loss = torch.sqrt(sum(b * (loss ** 2) for b, loss in zip(batch_size, regression_loss)) / num_samples)
         domain_loss = sum(b * loss for b, loss in zip(batch_size, domain_loss)) / num_samples
 
-        return recon_loss, regression_loss, domain_loss
+        return regression_loss, domain_loss
 
     def _complete_forward(self, common):
         batch_size = common.shape[0] // 2
 
         latent_code = self.encoder(common)
-        reconstruction = self.decoder(latent_code)
         regression_code, _ = torch.split(latent_code, batch_size)
         prediction = self.regressor(regression_code)
         domain_prediction = self.domain_disc(latent_code)
 
-        return domain_prediction, prediction, reconstruction
+        return domain_prediction, prediction

@@ -13,7 +13,6 @@ from lightning import daan
 
 def run(config, percent_broken, seed):
     domain_tradeoff = config['domain_tradeoff']
-    recon_tradeoff = config['recon_tradeoff']
 
     pl.trainer.seed_everything(seed)
     tf_logger = loggers.TensorBoardLogger(tune.get_trial_dir(),
@@ -26,32 +25,32 @@ def run(config, percent_broken, seed):
                                            batch_size=512,
                                            window_size=30,
                                            percent_broken=percent_broken)
-    model = daan.AdaptiveAE(in_channels=14,
-                            seq_len=30,
-                            num_layers=4,
-                            kernel_size=3,
-                            base_filters=16,
-                            latent_dim=64,
-                            recon_trade_off=recon_tradeoff,
-                            domain_trade_off=domain_tradeoff,
-                            domain_disc_dim=64,
-                            num_disc_layers=2,
-                            lr=0.01)
+    model = daan.DAAN(in_channels=14,
+                      seq_len=30,
+                      num_layers=4,
+                      kernel_size=3,
+                      base_filters=16,
+                      latent_dim=64,
+                      domain_trade_off=domain_tradeoff,
+                      domain_disc_dim=64,
+                      num_disc_layers=2,
+                      optim_type='adam',
+                      lr=0.01,
+                      source_rul_cap=None)
     model.add_data_hparams(data)
     model.hparams.update({'seed': seed})
     trainer.fit(model, datamodule=data)
 
 
 def tune_hyperparameters():
-    config = {'domain_tradeoff': tune.uniform(0.1, 10.),
-              'recon_tradeoff': tune.uniform(0.0, 10.)}
+    config = {'domain_tradeoff': tune.uniform(0.1, 10.)}
     scheduler = ASHAScheduler(
             metric='loss',
             mode='min',
             max_t=200,
             grace_period=1,
             reduction_factor=2)
-    reporter = CLIReporter(parameter_columns=['domain_tradeoff', 'recon_tradeoff'],
+    reporter = CLIReporter(parameter_columns=['domain_tradeoff'],
                            metric_columns=['regression_loss'])
     training_func = partial(run, percent_broken=1., seed=42)
 
