@@ -93,6 +93,18 @@ class TestCMAPSS(unittest.TestCase):
                 self.assertTrue(torch.all(truncated_dataset.data['test'][0] == full_dataset.data['test'][0]))
                 self.assertTrue(torch.all(truncated_dataset.data['val'][0] == full_dataset.data['val'][0]))
 
+    def test_lengths(self):
+        for i in range(1, 5):
+            dataset = cmapss.CMAPSSDataModule(fd=i, window_size=30, batch_size=4)
+            dataset.prepare_data()
+            dataset.setup()
+            for split in ['dev', 'val', 'test']:
+                with self.subTest(fd=i, split=split):
+                    raw_data = dataset._load_features(dataset._file_path(split))
+                    # lengths should be length of raw data minus one less than window_size
+                    expected_lenghts = [1] * len(raw_data) if split == 'test' else [len(f) - 29 for f in raw_data]
+                    self.assertListEqual(expected_lenghts, dataset.lengths[split])
+
 
 class TestCMAPSSAdaption(unittest.TestCase):
     def setUp(self):

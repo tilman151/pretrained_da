@@ -41,16 +41,20 @@ class CMAPSSDataModule(pl.LightningDataModule):
                         'percent_fail_runs': self.percent_fail_runs}
 
         self.data = {}
+        self.lengths = {}
+
+    def _file_path(self, split):
+        return os.path.join(self.DATA_ROOT, self._file_name(split))
 
     def _file_name(self, split):
         return f'{split}_FD{self.fd:03d}.txt'
 
     def prepare_data(self, *args, **kwargs):
         # Check if training data was already split
-        dev_path = os.path.join(self.DATA_ROOT, self._file_name('dev'))
+        dev_path = self._file_path('dev')
         if not os.path.exists(dev_path):
             warnings.warn(f'Training data for FD{self.fd:03d} not yet split into dev and val. Splitting now.')
-            self._split_fd_train(os.path.join(self.DATA_ROOT, self._file_name('train')))
+            self._split_fd_train(self._file_path('train'))
 
     def _split_fd_train(self, train_path):
         train_percentage = 0.8
@@ -77,12 +81,12 @@ class CMAPSSDataModule(pl.LightningDataModule):
         np.savetxt(val_file, val_data, fmt=fmt)
 
     def setup(self, stage: Optional[str] = None):
-        self.data['dev'] = self._setup_split('dev')
-        self.data['val'] = self._setup_split('val')
-        self.data['test'] = self._setup_split('test')
+        *self.data['dev'], self.lengths['dev'] = self._setup_split('dev')
+        *self.data['val'], self.lengths['val'] = self._setup_split('val')
+        *self.data['test'], self.lengths['test'] = self._setup_split('test')
 
     def _setup_split(self, split):
-        file_path = os.path.join(self.DATA_ROOT, self._file_name(split))
+        file_path = self._file_path(split)
 
         features = self._load_features(file_path)
         if split == 'dev':
@@ -94,19 +98,19 @@ class CMAPSSDataModule(pl.LightningDataModule):
             # Build targets from time steps on training
             targets = self._generate_targets(time_steps)
             # Window data to get uniform sequence lengths
-            features, targets = self._window_data(features, targets)
+            features, targets, lengths = self._window_data(features, targets)
         else:
             # Load targets from file on test
             targets = self._load_targets()
             # Crop data to get uniform sequence lengths
-            features = self._crop_data(features)
+            features, lengths = self._crop_data(features)
 
         # Switch to channel first
         features = features.transpose((0, 2, 1))
         features = torch.tensor(features, dtype=torch.float32)
         targets = torch.tensor(targets, dtype=torch.float32)
 
-        return features, targets
+        return features, targets, lengths
 
     def _load_features(self, file_path):
         features = np.loadtxt(file_path)
@@ -139,7 +143,7 @@ class CMAPSSDataModule(pl.LightningDataModule):
     def _normalize(self, features):
         """Normalize features with sklearn transform."""
         # Fit scaler on corresponding training split
-        train_file = os.path.join(self.DATA_ROOT, self._file_name('dev'))
+        train_file = self._file_path('dev')
         train_features = self._load_features(train_file)
         full_features = np.concatenate(train_features, axis=0)
         scaler = scalers.MinMaxScaler(feature_range=(-1, 1))
@@ -187,10 +191,11 @@ class CMAPSSDataModule(pl.LightningDataModule):
             new_features.extend(feature_windows)
             new_targets.append(target)
 
+        lengths = [len(f) - self.window_size + 1 for f in features]
         features = np.stack(new_features, axis=0)
         targets = np.concatenate(new_targets)
 
-        return features, targets
+        return features, targets, lengths
 
     def _crop_data(self, features):
         """Crop length of features to specified window size."""
@@ -202,8 +207,9 @@ class CMAPSSDataModule(pl.LightningDataModule):
                 features[i] = seq[-self.window_size:]
 
         features = np.stack(features, axis=0)
+        lengths = [1] * len(features)
 
-        return features
+        return features, lengths
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
         return DataLoader(self._to_dataset(*self.data['dev']),
