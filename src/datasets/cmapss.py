@@ -451,7 +451,7 @@ class PretrainingDataModule(pl.LightningDataModule):
 
     def _to_dataset(self, split):
         source_dataset = self._pairs_to_dataset(self.source.data[split], self.source_pairs[split])
-        target_dataset = self._pairs_to_dataset(self.source.data[split], self.target_pairs[split])
+        target_dataset = self._pairs_to_dataset(self.target.data[split], self.target_pairs[split])
 
         return ConcatDataset([source_dataset, target_dataset])
 
