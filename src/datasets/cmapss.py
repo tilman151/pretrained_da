@@ -431,10 +431,8 @@ class PretrainingDataModule(pl.LightningDataModule):
         run_idx = np.arange(len(run_lengths) - 1)
         run_start_idx = np.cumsum(run_lengths)
         chosen_run_idx = rng.choice(run_idx, size=num_samples, replace=True)
-        anchor_idx = [rng.integers(low=run_start_idx[i], high=run_start_idx[i + 1] - 1)
-                      for i in chosen_run_idx]
-        query_idx = [rng.integers(low=anchor + 1, high=run_start_idx[i + 1])
-                     for anchor, i in zip(anchor_idx, chosen_run_idx)]
+        anchor_idx = rng.integers(low=run_start_idx[chosen_run_idx], high=run_start_idx[chosen_run_idx + 1] - 1)
+        query_idx = rng.integers(low=anchor_idx + 1, high=run_start_idx[chosen_run_idx + 1])
         pair_idx = np.stack([anchor_idx, query_idx], axis=1)
 
         return pair_idx
