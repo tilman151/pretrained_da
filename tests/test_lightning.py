@@ -2,7 +2,7 @@ import unittest
 
 import torch
 
-from lightning import baseline, daan
+from lightning import baseline, daan, pretraining
 
 
 class TestDAAN(unittest.TestCase):
@@ -207,3 +207,93 @@ class TestBaseline(unittest.TestCase):
         actual_loss, _ = self.net._evaluate(target, target_labels)
 
         self.assertEqual(expected_loss, actual_loss)
+
+
+class TestUnsupervisedPretraining(unittest.TestCase):
+    def setUp(self):
+        self.net = pretraining.UnsupervisedPretraining(in_channels=14,
+                                                       seq_len=30,
+                                                       num_layers=4,
+                                                       kernel_size=3,
+                                                       base_filters=16,
+                                                       latent_dim=64,
+                                                       lr=0.01)
+
+    @torch.no_grad()
+    def test_encoder(self):
+        inputs = torch.randn(16, 14, 30)
+        outputs = self.net.encoder(inputs)
+        self.assertEqual(torch.Size((16, 64)), outputs.shape)
+
+    @torch.no_grad()
+    def test_get_anchor_query_embeddings(self):
+        anchors = torch.randn(16, 14, 30)
+        queries = torch.randn(16, 14, 30)
+        anchor_embeddings, query_embeddings = self.net._get_anchor_query_embeddings(anchors, queries)
+
+        self.assertEqual(torch.Size((16, 64)), anchor_embeddings.shape)
+        self.assertEqual(torch.Size((16, 64)), query_embeddings.shape)
+
+        for norm in torch.norm(anchor_embeddings, dim=1).tolist():
+            self.assertAlmostEqual(1., norm, places=6)
+        for norm in torch.norm(query_embeddings, dim=1).tolist():
+            self.assertAlmostEqual(1., norm, places=6)
+
+    @torch.no_grad()
+    def test_forward(self):
+        anchors = torch.randn(16, 14, 30)
+        anchors[5] = 1.
+        queries = torch.randn(16, 14, 30)
+        queries[5] = 1.
+        self.net.eval()
+        distances = self.net(anchors, queries)
+
+        self.assertEqual(torch.Size((16,)), distances.shape)
+        self.assertAlmostEqual(0., distances[5].item(), delta=1e-6)
+        self.assertNotAlmostEqual(0., distances.sum().item())
+
+    def test_batch_independence(self):
+        torch.autograd.set_detect_anomaly(True)
+
+        anchors = torch.randn(16, 14, 30)
+        queries = torch.randn(16, 14, 30)
+        anchors.requires_grad = True
+
+        # Compute forward pass in eval mode to deactivate batch norm
+        self.net.eval()
+        outputs = self.net(anchors, queries)
+        self.net.train()
+
+        # Mask loss for certain samples in batch
+        batch_size = outputs.shape[0]
+        mask_idx = torch.randint(0, batch_size, ())
+        mask = torch.ones_like(outputs)
+        mask[mask_idx] = 0
+        output = outputs * mask
+
+        # Compute backward pass
+        loss = output.mean()
+        loss.backward(retain_graph=True)
+
+        # Check if gradient exists and is zero for masked samples
+        for i, grad in enumerate(anchors.grad[:batch_size]):
+            if i == mask_idx:
+                self.assertTrue(torch.all(grad == 0).item())
+            else:
+                self.assertTrue(not torch.all(grad == 0))
+        anchors.grad = None
+
+        torch.autograd.set_detect_anomaly(False)
+
+    def test_all_parameters_updated(self):
+        optim = torch.optim.SGD(self.net.parameters(), lr=0.1)
+
+        loss = self.net.training_step((torch.randn(16, 14, 30), torch.randn(16, 14, 30), torch.randn(16)), batch_idx=0)
+        loss.backward()
+        optim.step()
+
+        for param_name, param in self.net.named_parameters():
+            if param.requires_grad:
+                with self.subTest(name=param_name):
+                    self.assertIsNotNone(param.grad)
+                    self.assertNotEqual(0., torch.sum(param.grad ** 2))
