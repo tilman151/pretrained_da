@@ -12,7 +12,7 @@ ExperimentNaming = {1: 'one',
                     2: 'two',
                     3: 'three',
                     4: 'four'}
-script_path = os.path.dirname(__file__)
+script_path = '/home/tkrokots/repos/ae_adapt/src' if not os.path.dirname(__file__) else os.path.dirname(__file__)
 
 
 def run(source, target, percent_broken, domain_tradeoff, recon_tradeoff, cap, record_embeddings, seed, gpu):
@@ -60,7 +60,9 @@ def run_multiple(source, target, broken, domain_tradeoff, recon_tradeoff, cap, r
 
     for params in sklearn.model_selection.ParameterGrid(parameter_grid):
         for s in seeds:
-            run(source, target, params['broken'], params['domain_tradeoff'], params['recon_tradeoff'], cap, s, gpu)
+            run(source, target,
+                params['broken'], params['domain_tradeoff'], params['recon_tradeoff'],
+                cap, record_embeddings, s, gpu)
 
 
 if __name__ == '__main__':
