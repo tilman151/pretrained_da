@@ -79,8 +79,8 @@ class TestAdaptiveAE(unittest.TestCase):
     def test_all_parameters_updated(self):
         optim = torch.optim.SGD(self.net.parameters(), lr=0.1)
 
-        loss, *_ = self.net._calc_loss(torch.randn(16, 14, 30), torch.ones(16),
-                                       torch.randn(16, 14, 30), torch.ones(32))
+        loss, *_ = self.net._train(torch.randn(16, 14, 30), torch.ones(16),
+                                   torch.randn(16, 14, 30), torch.ones(32))
         loss.backward()
         optim.step()
 
@@ -91,7 +91,7 @@ class TestAdaptiveAE(unittest.TestCase):
                     self.assertNotEqual(0., torch.sum(param.grad ** 2))
 
     @torch.no_grad()
-    def test_eval_metrics(self):
+    def test_train_metrics(self):
         criterion = torch.nn.MSELoss()
         target = torch.zeros(16, 14, 30)
         source = torch.zeros(16, 14, 30)
@@ -101,7 +101,7 @@ class TestAdaptiveAE(unittest.TestCase):
 
         expected_prediction = self.net.regressor(self.net.encoder(target))
         expected_loss = torch.sqrt(criterion(expected_prediction.squeeze(), target_labels))
-        _, _, actual_loss, _ = self.net._calc_loss(target, target_labels, source, domain_labels)
+        _, _, actual_loss, _ = self.net._train(target, target_labels, source, domain_labels)
 
         self.assertEqual(expected_loss, actual_loss)
 
