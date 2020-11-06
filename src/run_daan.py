@@ -5,8 +5,8 @@ import pytorch_lightning as pl
 import sklearn.model_selection
 from pytorch_lightning import loggers
 
-import datasets
-import lightning
+from datasets import cmapss
+from lightning import daan
 
 ExperimentNaming = {1: 'one',
                     2: 'two',
@@ -24,25 +24,25 @@ def run(source, target, percent_broken, domain_tradeoff, recon_tradeoff, cap, re
                                          tracking_uri=os.path.join('file:', script_path, '..', 'mlruns'))
     trainer = pl.Trainer(gpus=[gpu], max_epochs=200, logger=loggers.LoggerCollection([tf_logger, mlflow_logger]),
                          deterministic=True, log_every_n_steps=10)
-    data = datasets.DomainAdaptionDataModule(fd_source=source,
-                                             fd_target=target,
-                                             batch_size=512,
-                                             window_size=30,
-                                             percent_broken=percent_broken)
-    model = lightning.AdaptiveAE(in_channels=14,
-                                 seq_len=30,
-                                 num_layers=4,
-                                 kernel_size=3,
-                                 base_filters=16,
-                                 latent_dim=128,
-                                 recon_trade_off=recon_tradeoff,
-                                 domain_trade_off=domain_tradeoff,
-                                 domain_disc_dim=64,
-                                 num_disc_layers=2,
-                                 source_rul_cap=int((1 - percent_broken) * 125) if cap else None,
-                                 optim_type='adam',
-                                 lr=0.01,
-                                 record_embeddings=record_embeddings)
+    data = cmapss.DomainAdaptionDataModule(fd_source=source,
+                                           fd_target=target,
+                                           batch_size=512,
+                                           window_size=30,
+                                           percent_broken=percent_broken)
+    model = daan.AdaptiveAE(in_channels=14,
+                            seq_len=30,
+                            num_layers=4,
+                            kernel_size=3,
+                            base_filters=16,
+                            latent_dim=128,
+                            recon_trade_off=recon_tradeoff,
+                            domain_trade_off=domain_tradeoff,
+                            domain_disc_dim=64,
+                            num_disc_layers=2,
+                            source_rul_cap=int((1 - percent_broken) * 125) if cap else None,
+                            optim_type='adam',
+                            lr=0.01,
+                            record_embeddings=record_embeddings)
     model.add_data_hparams(data)
     model.hparams.update({'seed': seed})
     trainer.fit(model, datamodule=data)

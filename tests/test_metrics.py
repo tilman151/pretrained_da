@@ -3,7 +3,7 @@ import unittest
 import matplotlib.pyplot as plt
 import torch
 
-import metrics
+from lightning import metrics
 
 
 class TestEmbeddingViz(unittest.TestCase):

@@ -2,25 +2,25 @@ import unittest
 
 import torch
 
-import lightning
+from lightning import baseline, daan
 
 
 class TestAdaptiveAE(unittest.TestCase):
     def setUp(self):
         self.trade_off = 0.5
-        self.net = lightning.AdaptiveAE(in_channels=14,
-                                        seq_len=30,
-                                        num_layers=4,
-                                        kernel_size=3,
-                                        base_filters=16,
-                                        latent_dim=64,
-                                        recon_trade_off=self.trade_off,
-                                        domain_trade_off=self.trade_off,
-                                        domain_disc_dim=32,
-                                        num_disc_layers=2,
-                                        source_rul_cap=50,
-                                        optim_type='adam',
-                                        lr=0.01)
+        self.net = daan.AdaptiveAE(in_channels=14,
+                                   seq_len=30,
+                                   num_layers=4,
+                                   kernel_size=3,
+                                   base_filters=16,
+                                   latent_dim=64,
+                                   recon_trade_off=self.trade_off,
+                                   domain_trade_off=self.trade_off,
+                                   domain_disc_dim=32,
+                                   num_disc_layers=2,
+                                   source_rul_cap=50,
+                                   optim_type='adam',
+                                   lr=0.01)
 
     @torch.no_grad()
     def test_encoder(self):
@@ -139,14 +139,14 @@ class TestAdaptiveAE(unittest.TestCase):
 class TestBaseline(unittest.TestCase):
     def setUp(self):
         self.trade_off = 0.5
-        self.net = lightning.Baseline(in_channels=14,
-                                      seq_len=30,
-                                      num_layers=4,
-                                      kernel_size=3,
-                                      base_filters=16,
-                                      latent_dim=64,
-                                      optim_type='adam',
-                                      lr=0.01)
+        self.net = baseline.Baseline(in_channels=14,
+                                     seq_len=30,
+                                     num_layers=4,
+                                     kernel_size=3,
+                                     base_filters=16,
+                                     latent_dim=64,
+                                     optim_type='adam',
+                                     lr=0.01)
 
     @torch.no_grad()
     def test_encoder(self):

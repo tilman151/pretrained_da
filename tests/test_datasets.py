@@ -4,14 +4,14 @@ import torch
 import torch.utils.data
 from torch.utils.data import TensorDataset, RandomSampler, SequentialSampler
 
-import datasets
+from datasets import cmapss
 
 
 class TestCMAPSS(unittest.TestCase):
 
     def test__data(self):
         for n, win in enumerate([30, 20, 30, 15], start=1):
-            dataset = datasets.CMAPSSDataModule(n, batch_size=16, window_size=win)
+            dataset = cmapss.CMAPSSDataModule(n, batch_size=16, window_size=win)
             dataset.prepare_data()
             dataset.setup()
             for split in ['dev', 'val', 'test']:
@@ -22,7 +22,7 @@ class TestCMAPSS(unittest.TestCase):
                     self.assertEqual(torch.float32, targets.dtype)
 
     def test_feature_select(self):
-        dataset = datasets.CMAPSSDataModule(1, batch_size=16, window_size=30, feature_select=[4, 9, 10, 13, 14, 15, 22])
+        dataset = cmapss.CMAPSSDataModule(1, batch_size=16, window_size=30, feature_select=[4, 9, 10, 13, 14, 15, 22])
         dataset.prepare_data()
         dataset.setup()
         for split in ['dev', 'val', 'test']:
@@ -30,18 +30,18 @@ class TestCMAPSS(unittest.TestCase):
             self.assertEqual(7, features.shape[1])
 
     def test_truncation_functions(self):
-        full_dataset = datasets.CMAPSSDataModule(fd=1, window_size=30, batch_size=4)
+        full_dataset = cmapss.CMAPSSDataModule(fd=1, window_size=30, batch_size=4)
         full_dataset.prepare_data()
         full_dataset.setup()
 
-        dataset = datasets.CMAPSSDataModule(fd=1, window_size=30, batch_size=4, percent_fail_runs=0.8)
+        dataset = cmapss.CMAPSSDataModule(fd=1, window_size=30, batch_size=4, percent_fail_runs=0.8)
         dataset.prepare_data()
         dataset.setup()
         self.assertGreater(len(full_dataset.data['dev'][0]), len(dataset.data['dev'][0]))
         self.assertEqual(len(full_dataset.data['val'][0]), len(dataset.data['val'][0]))
         self.assertEqual(len(full_dataset.data['test'][0]), len(dataset.data['test'][0]))
 
-        dataset = datasets.CMAPSSDataModule(fd=1, window_size=30, batch_size=4, percent_broken=0.2)
+        dataset = cmapss.CMAPSSDataModule(fd=1, window_size=30, batch_size=4, percent_broken=0.2)
         dataset.prepare_data()
         dataset.setup()
         self.assertGreater(len(full_dataset.data['dev'][0]), len(dataset.data['dev'][0]))
@@ -52,11 +52,11 @@ class TestCMAPSS(unittest.TestCase):
         self.assertEqual(full_dataset.data['dev'][1][0], dataset.data['dev'][1][0])  # First target has to be equal
 
     def test_precent_broken_truncation(self):
-        full_dataset = datasets.CMAPSSDataModule(fd=1, window_size=30, batch_size=4)
+        full_dataset = cmapss.CMAPSSDataModule(fd=1, window_size=30, batch_size=4)
         full_dataset.prepare_data()
         full_dataset.setup()
 
-        truncated_dataset = datasets.CMAPSSDataModule(fd=1, window_size=30, batch_size=4, percent_broken=0.8)
+        truncated_dataset = cmapss.CMAPSSDataModule(fd=1, window_size=30, batch_size=4, percent_broken=0.8)
         truncated_dataset.prepare_data()
         truncated_dataset.setup()
 
@@ -71,13 +71,13 @@ class TestCMAPSS(unittest.TestCase):
     def test_normalization_min_max(self):
         for i in range(1, 5):
             with self.subTest(fd=i):
-                full_dataset = datasets.CMAPSSDataModule(fd=i, window_size=30, batch_size=4)
+                full_dataset = cmapss.CMAPSSDataModule(fd=i, window_size=30, batch_size=4)
                 full_dataset.prepare_data()
                 full_dataset.setup()
                 self.assertAlmostEqual(torch.max(full_dataset.data['dev'][0]).item(), 1.)
                 self.assertAlmostEqual(torch.min(full_dataset.data['dev'][0]).item(), -1.)
 
-                truncated_dataset = datasets.CMAPSSDataModule(fd=i, window_size=30, batch_size=4, percent_fail_runs=0.8)
+                truncated_dataset = cmapss.CMAPSSDataModule(fd=i, window_size=30, batch_size=4, percent_fail_runs=0.8)
                 truncated_dataset.prepare_data()
                 truncated_dataset.setup()
                 self.assertLessEqual(torch.max(truncated_dataset.data['dev'][0]).item(), 1.)
@@ -85,7 +85,7 @@ class TestCMAPSS(unittest.TestCase):
                 self.assertTrue(torch.all(truncated_dataset.data['test'][0] == full_dataset.data['test'][0]))
                 self.assertTrue(torch.all(truncated_dataset.data['dev'][0][:50] == full_dataset.data['dev'][0][:50]))
 
-                truncated_dataset = datasets.CMAPSSDataModule(fd=i, window_size=30, batch_size=4, percent_broken=0.2)
+                truncated_dataset = cmapss.CMAPSSDataModule(fd=i, window_size=30, batch_size=4, percent_broken=0.2)
                 truncated_dataset.prepare_data()
                 truncated_dataset.setup()
                 self.assertLessEqual(torch.max(truncated_dataset.data['dev'][0]).item(), 1.)
@@ -96,7 +96,7 @@ class TestCMAPSS(unittest.TestCase):
 
 class TestCMAPSSAdaption(unittest.TestCase):
     def setUp(self):
-        self.dataset = datasets.DomainAdaptionDataModule(3, 1, batch_size=16, window_size=30)
+        self.dataset = cmapss.DomainAdaptionDataModule(3, 1, batch_size=16, window_size=30)
         self.dataset.prepare_data()
         self.dataset.setup()
 
@@ -156,7 +156,7 @@ class TestCMAPSSAdaption(unittest.TestCase):
 
 class TestCMAPSSBaseline(unittest.TestCase):
     def setUp(self):
-        self.dataset = datasets.BaselineDataModule(3, batch_size=16, window_size=30)
+        self.dataset = cmapss.BaselineDataModule(3, batch_size=16, window_size=30)
         self.dataset.prepare_data()
         self.dataset.setup()
 
@@ -205,8 +205,8 @@ class TestCMAPSSBaseline(unittest.TestCase):
         fd_source = self.dataset.fd_source
         fd_target = 1
         baseline_train_dataset = self.dataset._to_dataset(fd_source, fd_target, split='test')
-        combined_data = datasets._unify_source_and_target_length(*self.dataset.cmapss[fd_source].data['test'],
-                                                                 *self.dataset.cmapss[fd_target].data['test'])
+        combined_data = cmapss._unify_source_and_target_length(*self.dataset.cmapss[fd_source].data['test'],
+                                                               *self.dataset.cmapss[fd_target].data['test'])
         source_train_dataset = TensorDataset(*combined_data)
         self._assert_datasets_equal(baseline_train_dataset, source_train_dataset)
 
@@ -215,8 +215,8 @@ class TestCMAPSSBaseline(unittest.TestCase):
         fd_source = self.dataset.fd_source
         for fd_target, test_loader in enumerate(test_loaders, start=1):
             test_data = test_loader.dataset
-            combined_data = datasets._unify_source_and_target_length(*self.dataset.cmapss[fd_source].data['test'],
-                                                                     *self.dataset.cmapss[fd_target].data['test'])
+            combined_data = cmapss._unify_source_and_target_length(*self.dataset.cmapss[fd_source].data['test'],
+                                                                   *self.dataset.cmapss[fd_target].data['test'])
             source_train_dataset = TensorDataset(*combined_data)
             self._assert_datasets_equal(test_data, source_train_dataset)
 

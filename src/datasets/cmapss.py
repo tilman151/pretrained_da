@@ -19,7 +19,7 @@ class CMAPSSDataModule(pl.LightningDataModule):
                  percent_broken=None,
                  feature_select=None):
         super().__init__()
-        self.DATA_ROOT = os.path.join(os.path.dirname(__file__), '..', 'data', 'CMAPSS')
+        self.DATA_ROOT = os.path.join(os.path.dirname(__file__), '../..', 'data', 'CMAPSS')
 
         # Select features according to https://doi.org/10.1016/j.ress.2017.11.021
         if feature_select is None:

@@ -7,8 +7,8 @@ from ray.tune import CLIReporter
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 from ray.tune.schedulers import ASHAScheduler
 
-import datasets
-import lightning
+from datasets import cmapss
+from lightning import daan
 
 
 def run(config, percent_broken, seed):
@@ -21,22 +21,22 @@ def run(config, percent_broken, seed):
     callbacks = [TuneReportCallback({'regression_loss': 'val_checkpoint_on'})]
     trainer = pl.Trainer(gpus=1, max_epochs=200, logger=tf_logger, deterministic=True,
                          progress_bar_refresh_rate=0, callbacks=callbacks)
-    data = datasets.DomainAdaptionDataModule(fd_source=3,
-                                             fd_target=1,
-                                             batch_size=512,
-                                             window_size=30,
-                                             percent_broken=percent_broken)
-    model = lightning.AdaptiveAE(in_channels=14,
-                                 seq_len=30,
-                                 num_layers=4,
-                                 kernel_size=3,
-                                 base_filters=16,
-                                 latent_dim=64,
-                                 recon_trade_off=recon_tradeoff,
-                                 domain_trade_off=domain_tradeoff,
-                                 domain_disc_dim=64,
-                                 num_disc_layers=2,
-                                 lr=0.01)
+    data = cmapss.DomainAdaptionDataModule(fd_source=3,
+                                           fd_target=1,
+                                           batch_size=512,
+                                           window_size=30,
+                                           percent_broken=percent_broken)
+    model = daan.AdaptiveAE(in_channels=14,
+                            seq_len=30,
+                            num_layers=4,
+                            kernel_size=3,
+                            base_filters=16,
+                            latent_dim=64,
+                            recon_trade_off=recon_tradeoff,
+                            domain_trade_off=domain_tradeoff,
+                            domain_disc_dim=64,
+                            num_disc_layers=2,
+                            lr=0.01)
     model.add_data_hparams(data)
     model.hparams.update({'seed': seed})
     trainer.fit(model, datamodule=data)
