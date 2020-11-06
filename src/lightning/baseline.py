@@ -2,7 +2,6 @@ import pytorch_lightning as pl
 import torch
 
 from lightning import metrics
-from lightning.daan import RMSELoss
 from models import networks
 
 
@@ -33,7 +32,7 @@ class Baseline(pl.LightningModule):
                                         self.num_layers, self.latent_dim, self.seq_len)
         self.regressor = networks.Regressor(latent_dim)
 
-        self.criterion_regression = RMSELoss()
+        self.criterion_regression = metrics.RMSELoss()
 
         self.embedding_metric = metrics.EmbeddingViz(20000, self.latent_dim)
 

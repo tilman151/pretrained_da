@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import pytorch_lightning as pl
 import torch
 import umap
+from torch import nn as nn
 
 
 class EmbeddingViz(pl.metrics.Metric):
@@ -57,3 +58,13 @@ class EmbeddingViz(pl.metrics.Metric):
         plt.colorbar(color_bar)
 
         return fig
+
+
+class RMSELoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.mse = nn.MSELoss()
+
+    def forward(self, inputs, targets):
+        return torch.sqrt(self.mse(inputs, targets))

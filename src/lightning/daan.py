@@ -7,16 +7,6 @@ from lightning import metrics
 from models import networks
 
 
-class RMSELoss(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-        self.mse = nn.MSELoss()
-
-    def forward(self, inputs, targets):
-        return torch.sqrt(self.mse(inputs, targets))
-
-
 class DAAN(pl.LightningModule):
     def __init__(self,
                  in_channels,
@@ -54,7 +44,7 @@ class DAAN(pl.LightningModule):
         self.regressor = networks.Regressor(latent_dim)
 
         self.criterion_recon = nn.MSELoss()
-        self.criterion_regression = RMSELoss()
+        self.criterion_regression = metrics.RMSELoss()
         self.criterion_domain = nn.BCEWithLogitsLoss()
 
         self.embedding_metric = metrics.EmbeddingViz(40000, self.latent_dim)
