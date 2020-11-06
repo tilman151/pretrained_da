@@ -263,9 +263,12 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Plot results of transfer against baselines.')
     parser.add_argument('result_dir', help='path to folder with baseline.csv and transfer.csv')
+    parser.add_argument('--filter_outlier', action='store_true', help='whether to filter out outlier transfer runs')
     opt = parser.parse_args()
 
-    transfer, base_rul, base_rmse = load_data(opt.result_dir, filter_methods=['daan'], filter_outlier=True)
+    transfer, base_rul, base_rmse = load_data(opt.result_dir,
+                                              filter_methods=['daan'],
+                                              filter_outlier=opt.filter_outlier)
     # mixed_linear_plots(transfer, 'percent_broken', 'Grade of Degradation in %')
     # mixed_linear_plots(transfer, 'percent_fail_runs', 'Number of Systems in %')
     # mixed_linear_factors_plot(transfer, 'percent_fail_runs', 'percent_broken')
