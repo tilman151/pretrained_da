@@ -3,9 +3,10 @@ import unittest
 import numpy as np
 import torch
 import torch.utils.data
-from torch.utils.data import TensorDataset, RandomSampler, SequentialSampler, ConcatDataset
+from torch.utils.data import TensorDataset, RandomSampler, SequentialSampler
 
 from datasets import cmapss
+from datasets.cmapss import PairedCMAPSS
 
 
 class TestCMAPSS(unittest.TestCase):
@@ -250,9 +251,10 @@ class TestPretrainingDataModule(unittest.TestCase):
     def test_build_pairs(self):
         for split in ['dev', 'val']:
             with self.subTest(split=split):
-                pairs = self.dataset.source_pairs[split]
+                paired_dataset = self.dataset._get_paired_dataset(split)
+                pairs = np.array([paired_dataset._get_pair_idx() for _ in range(paired_dataset.num_samples)])
                 self.assertTrue(np.all(pairs[:, 0] < pairs[:, 1]))
-                run_start_idx = np.cumsum(self.dataset.source.lengths[split])
+                run_start_idx = paired_dataset._run_start_idx
                 # run idx is number of start idx smaller than or equal to anchor minus one
                 run_idx_of_pair = np.sum(run_start_idx[:, None] <= pairs[:, 0], axis=0) - 1
                 query_in_same_run = [run_start_idx[run_idx + 1] > query_idx
@@ -264,33 +266,33 @@ class TestPretrainingDataModule(unittest.TestCase):
         dataset.prepare_data()
         dataset.setup()
 
-        pairs = dataset.source_pairs['dev']
-        distances = pairs[:, 1] - pairs[:, 0]
-        self.assertTrue(np.all(pairs[:, 0] < pairs[:, 1]))
-        self.assertTrue(np.all(distances >= 30))
+        for split in ['dev', 'val']:
+            with self.subTest(split=split):
+                paired_dataset = dataset._get_paired_dataset(split)
+                pairs = np.array([paired_dataset._get_pair_idx() for _ in range(paired_dataset.num_samples)])
+                distances = pairs[:, 1] - pairs[:, 0]
+                self.assertTrue(np.all(pairs[:, 0] < pairs[:, 1]))
+                self.assertTrue(np.all(distances >= 30))
 
     def test_data_structure(self):
         with self.subTest(split='dev'):
             dataloader = self.dataset.train_dataloader()
-            self._check_concat_dataset(dataloader.dataset)
+            self._check_paired_dataset(dataloader.dataset)
 
         with self.subTest(split='val'):
             loaders = self.dataset.val_dataloader()
             self.assertIsInstance(loaders, list)
             self.assertEqual(3, len(loaders))
-            self._check_concat_dataset(loaders[0].dataset)
+            self._check_paired_dataset(loaders[0].dataset)
             for dataloader in loaders[1:]:
                 self._check_tensor_dataset(dataloader.dataset)
 
-    def _check_concat_dataset(self, data):
-        self.assertIsInstance(data, ConcatDataset)
-        for subset in data.datasets:
-            self.assertIsInstance(subset, TensorDataset)
+    def _check_paired_dataset(self, data):
+        self.assertIsInstance(data, PairedCMAPSS)
         self._check_paired_shapes(data)
 
     def _check_paired_shapes(self, data):
-        for i in range(len(data)):
-            anchors, queries, distances = data[i]
+        for anchors, queries, distances in data:
             self.assertEqual(torch.Size((14, 30)), anchors.shape)
             self.assertEqual(torch.Size((14, 30)), queries.shape)
             self.assertEqual(torch.Size(()), distances.shape)

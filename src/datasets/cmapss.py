@@ -6,7 +6,7 @@ import numpy as np
 import pytorch_lightning as pl
 import sklearn.preprocessing as scalers
 import torch
-from torch.utils.data import DataLoader, TensorDataset, ConcatDataset
+from torch.utils.data import DataLoader, TensorDataset, IterableDataset
 
 
 class CMAPSSDataModule(pl.LightningDataModule):
@@ -353,10 +353,10 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
                           pin_memory=True)
 
     def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        return [self.source.val_dataloader(*args, **kwargs),self.target.val_dataloader(*args, **kwargs)]
+        return [self.source.val_dataloader(*args, **kwargs), self.target.val_dataloader(*args, **kwargs)]
 
     def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        return [self.source.test_dataloader(*args, **kwargs),self.target.test_dataloader(*args, **kwargs)]
+        return [self.source.test_dataloader(*args, **kwargs), self.target.test_dataloader(*args, **kwargs)]
 
     def _to_dataset(self, split, use_target_labels):
         source, source_labels = self.source.data[split]
@@ -425,57 +425,85 @@ class PretrainingDataModule(pl.LightningDataModule):
     def setup(self, stage: Optional[str] = None):
         self.source.setup(stage)
         self.target.setup(stage)
-        self.source_pairs = self._build_pairs(self.source)
-        self.target_pairs = self._build_pairs(self.target)
-
-    def _build_pairs(self, dataset):
-        rng = np.random.default_rng()
-        pair_idx = {'dev': self._pairs_from_split(dataset.lengths['dev'], self.num_samples, rng),
-                    'val': self._pairs_from_split(dataset.lengths['val'], self.num_samples // 10, rng)}
-
-        return pair_idx
-
-    def _pairs_from_split(self, run_lengths, num_samples, rng: np.random.Generator):
-        min_dist = self.min_distance
-        run_idx = np.arange(len(run_lengths) - 1)
-        run_start_idx = np.cumsum(run_lengths)
-        chosen_run_idx = rng.choice(run_idx, size=num_samples, replace=True)
-        anchor_idx = rng.integers(low=run_start_idx[chosen_run_idx], high=run_start_idx[chosen_run_idx + 1] - min_dist)
-        query_idx = rng.integers(low=anchor_idx + min_dist, high=run_start_idx[chosen_run_idx + 1])
-        pair_idx = np.stack([anchor_idx, query_idx], axis=1)
-
-        return pair_idx
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
-        return DataLoader(ConcatDataset(self._to_dataset('dev')),
+        return DataLoader(self._get_paired_dataset('dev'),
                           batch_size=self.batch_size,
-                          shuffle=True,
                           pin_memory=True)
 
     def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        combined_loader = DataLoader(ConcatDataset(self._to_dataset('val')),
-                          batch_size=self.batch_size,
-                          shuffle=False,
-                          pin_memory=True)
+        combined_loader = DataLoader(self._get_paired_dataset('val'),
+                                     batch_size=self.batch_size,
+                                     pin_memory=True)
         source_loader = self.source.val_dataloader()
         target_loader = self.target.val_dataloader()
 
         return [combined_loader, source_loader, target_loader]
 
-    def _to_dataset(self, split):
-        source_dataset = self._pairs_to_dataset(self.source.data[split], self.source_pairs[split])
-        target_dataset = self._pairs_to_dataset(self.target.data[split], self.target_pairs[split])
+    def _get_paired_dataset(self, split):
+        determinsistic = split == 'val'
+        num_samples = self.num_samples // 10 if split =='val' else self.num_samples
+        paired = PairedCMAPSS([self.source, self.target], split, num_samples, self.min_distance, determinsistic)
 
-        return source_dataset, target_dataset
+        return paired
 
-    def _pairs_to_dataset(self, data, pairs):
-        features, _ = data
-        anchors = features[pairs[:, 0]]
-        queries = features[pairs[:, 1]]
-        distances = torch.tensor(pairs[:, 1] - pairs[:, 0], dtype=torch.float) / self.max_rul
-        dataset = TensorDataset(anchors, queries, distances)
 
-        return dataset
+class PairedCMAPSS(IterableDataset):
+    def __init__(self, datasets, split, num_samples, min_distance, deterministic=False):
+        super().__init__()
+
+        self.datasets = datasets
+        self.split = split
+        self.min_distance = min_distance
+        self.num_samples = num_samples
+        self.deterministic = deterministic
+
+        run_lengths = [length for dataset in self.datasets for length in dataset.lengths[self.split]]
+        self._run_idx = np.arange(len(run_lengths) - 1)
+        self._run_start_idx = np.cumsum(run_lengths)
+
+        self._features = torch.cat([dataset.data[self.split][0] for dataset in self.datasets])
+        self._max_rul = max(dataset.max_rul for dataset in self.datasets)
+
+        self._current_iteration = 0
+        self._rng = self._reset_rng()
+
+    def _reset_rng(self):
+        return np.random.default_rng(seed=42)
+
+    def __len__(self):
+        return self.num_samples
+
+    def __iter__(self):
+        self._current_iteration = 0
+        if self.deterministic:
+            self._rng = self._reset_rng()
+
+        return self
+
+    def __next__(self):
+        if self._current_iteration < self.num_samples:
+            self._current_iteration += 1
+            pair_idx = self._get_pair_idx()
+            return self._build_pair(pair_idx)
+        else:
+            raise StopIteration
+
+    def _get_pair_idx(self):
+        chosen_run_idx = self._rng.choice(self._run_idx)
+        anchor_idx = self._rng.integers(low=self._run_start_idx[chosen_run_idx],
+                                        high=self._run_start_idx[chosen_run_idx + 1] - self.min_distance)
+        query_idx = self._rng.integers(low=anchor_idx + self.min_distance,
+                                       high=self._run_start_idx[chosen_run_idx + 1])
+
+        return anchor_idx, query_idx
+
+    def _build_pair(self, pair_idx):
+        anchors = self._features[pair_idx[0]]
+        queries = self._features[pair_idx[1]]
+        distances = torch.tensor(pair_idx[1] - pair_idx[0], dtype=torch.float) / self._max_rul
+
+        return anchors, queries, distances
 
 
 def _unify_source_and_target_length(source, source_labels, target, target_labels):
