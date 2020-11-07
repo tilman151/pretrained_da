@@ -383,6 +383,7 @@ class PretrainingDataModule(pl.LightningDataModule):
                  batch_size,
                  max_rul=125,
                  window_size=30,
+                 min_distance=1,
                  percent_fail_runs=None,
                  percent_broken=None,
                  feature_select=None):
@@ -393,6 +394,7 @@ class PretrainingDataModule(pl.LightningDataModule):
         self.num_samples = num_samples
         self.batch_size = batch_size
         self.window_size = window_size
+        self.min_distance = min_distance
         self.max_rul = max_rul
         self.percent_broken = percent_broken
         self.percent_fail_runs = percent_fail_runs
@@ -404,6 +406,7 @@ class PretrainingDataModule(pl.LightningDataModule):
                         'batch_size': self.batch_size,
                         'window_size': self.window_size,
                         'max_rul': self.max_rul,
+                        'min_distance': self.min_distance,
                         'percent_broken': self.percent_broken,
                         'percent_fail_runs': self.percent_fail_runs}
 
@@ -433,11 +436,12 @@ class PretrainingDataModule(pl.LightningDataModule):
         return pair_idx
 
     def _pairs_from_split(self, run_lengths, num_samples, rng: np.random.Generator):
+        min_dist = self.min_distance
         run_idx = np.arange(len(run_lengths) - 1)
         run_start_idx = np.cumsum(run_lengths)
         chosen_run_idx = rng.choice(run_idx, size=num_samples, replace=True)
-        anchor_idx = rng.integers(low=run_start_idx[chosen_run_idx], high=run_start_idx[chosen_run_idx + 1] - 1)
-        query_idx = rng.integers(low=anchor_idx + 1, high=run_start_idx[chosen_run_idx + 1])
+        anchor_idx = rng.integers(low=run_start_idx[chosen_run_idx], high=run_start_idx[chosen_run_idx + 1] - min_dist)
+        query_idx = rng.integers(low=anchor_idx + min_dist, high=run_start_idx[chosen_run_idx + 1])
         pair_idx = np.stack([anchor_idx, query_idx], axis=1)
 
         return pair_idx

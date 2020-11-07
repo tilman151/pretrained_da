@@ -259,6 +259,16 @@ class TestPretrainingDataModule(unittest.TestCase):
                                      for run_idx, query_idx in zip(run_idx_of_pair, pairs[:, 1])]
                 self.assertTrue(all(query_in_same_run))
 
+    def test_min_distance(self):
+        dataset = cmapss.PretrainingDataModule(3, 1, num_samples=10000, min_distance=30, batch_size=16, window_size=30)
+        dataset.prepare_data()
+        dataset.setup()
+
+        pairs = dataset.source_pairs['dev']
+        distances = pairs[:, 1] - pairs[:, 0]
+        self.assertTrue(np.all(pairs[:, 0] < pairs[:, 1]))
+        self.assertTrue(np.all(distances >= 30))
+
     def test_data_structure(self):
         with self.subTest(split='dev'):
             dataloader = self.dataset.train_dataloader()
