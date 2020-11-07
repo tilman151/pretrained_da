@@ -468,7 +468,7 @@ class PretrainingDataModule(pl.LightningDataModule):
         features, _ = data
         anchors = features[pairs[:, 0]]
         queries = features[pairs[:, 1]]
-        distances = torch.tensor(pairs[:, 1] - pairs[:, 0], dtype=torch.float) / 300
+        distances = torch.tensor(pairs[:, 1] - pairs[:, 0], dtype=torch.float) / self.max_rul
         dataset = TensorDataset(anchors, queries, distances)
 
         return dataset
