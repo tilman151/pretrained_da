@@ -308,8 +308,41 @@ class TestPretrainingDataModule(unittest.TestCase):
             self.assertEqual(torch.Size(()), labels.shape)
 
     def test_distances(self):
-        for split in ['dev', 'val']:
-            with self.subTest(split=split):
-                datasets = self.dataset._to_dataset(split)
-                for data in datasets:
-                    self.assertTrue(all(distance > 0 for _, _, distance in data))
+        with self.subTest(split='dev'):
+            _, _, distances = self._run_epoch(self.dataset.train_dataloader())
+            self.assertTrue(torch.all(distances > 0))
+
+        with self.subTest(split='val'):
+            _, _, distances = self._run_epoch(self.dataset.val_dataloader()[0])
+            self.assertTrue(torch.all(distances > 0))
+
+    def test_determinism(self):
+        train_loader = self.dataset.train_dataloader()
+        one_train_data = self._run_epoch(train_loader)
+        another_train_data = self._run_epoch(train_loader)
+
+        for one, another in zip(one_train_data, another_train_data):
+            self.assertNotEqual(0., torch.sum(one - another))
+
+        val_loader, _, _ = self.dataset.val_dataloader()
+        one_train_data = self._run_epoch(val_loader)
+        another_train_data = self._run_epoch(val_loader)
+
+        for one, another in zip(one_train_data, another_train_data):
+            self.assertEqual(0., torch.sum(one - another))
+
+    def _run_epoch(self, loader):
+        anchors = torch.empty((len(loader.dataset), 14, 30))
+        queries = torch.empty((len(loader.dataset), 14, 30))
+        distances = torch.empty(len(loader.dataset))
+
+        start = 0
+        end = loader.batch_size
+        for anchor, query, dist in loader:
+            anchors[start:end] = anchor
+            queries[start:end] = query
+            distances[start:end] = dist
+            start = end
+            end += anchor.shape[0]
+
+        return anchors, queries, distances
