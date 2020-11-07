@@ -409,7 +409,7 @@ class PretrainingDataModule(pl.LightningDataModule):
 
         self.source = CMAPSSDataModule(fd_source, batch_size, max_rul, window_size,
                                        None, None, feature_select)
-        self.target = CMAPSSDataModule(fd_target, batch_size, np.inf, window_size,
+        self.target = CMAPSSDataModule(fd_target, batch_size, max_rul, window_size,
                                        percent_fail_runs, percent_broken, feature_select)
 
         self.source_pairs = None
