@@ -317,19 +317,21 @@ class TestPretrainingDataModule(unittest.TestCase):
             self.assertTrue(torch.all(distances > 0))
 
     def test_determinism(self):
-        train_loader = self.dataset.train_dataloader()
-        one_train_data = self._run_epoch(train_loader)
-        another_train_data = self._run_epoch(train_loader)
+        with self.subTest(split='dev'):
+            train_loader = self.dataset.train_dataloader()
+            one_train_data = self._run_epoch(train_loader)
+            another_train_data = self._run_epoch(train_loader)
 
-        for one, another in zip(one_train_data, another_train_data):
-            self.assertNotEqual(0., torch.sum(one - another))
+            for one, another in zip(one_train_data, another_train_data):
+                self.assertNotEqual(0., torch.sum(one - another))
 
-        val_loader, _, _ = self.dataset.val_dataloader()
-        one_train_data = self._run_epoch(val_loader)
-        another_train_data = self._run_epoch(val_loader)
+        with self.subTest(split='val'):
+            val_loader, _, _ = self.dataset.val_dataloader()
+            one_train_data = self._run_epoch(val_loader)
+            another_train_data = self._run_epoch(val_loader)
 
-        for one, another in zip(one_train_data, another_train_data):
-            self.assertEqual(0., torch.sum(one - another))
+            for one, another in zip(one_train_data, another_train_data):
+                self.assertEqual(0., torch.sum(one - another))
 
     def _run_epoch(self, loader):
         anchors = torch.empty((len(loader.dataset), 14, 30))
