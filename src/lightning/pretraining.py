@@ -1,6 +1,7 @@
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
+from torch.utils.tensorboard import SummaryWriter
 
 from lightning import metrics
 from lightning.mixins import DataHparamsMixin
@@ -36,7 +37,7 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         self.save_hyperparameters()
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
+        return torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=0.00001)
 
     def forward(self, anchors, queries):
         anchor_embeddings, query_embeddings = self._get_anchor_query_embeddings(anchors, queries)
@@ -64,11 +65,36 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
 
         return loss
 
-    def validation_step(self, batch, batch_idx):
-        loss = self._get_loss(batch)
+    def validation_step(self, batch, batch_idx, dataloader_idx):
+        if dataloader_idx == 0:
+            return self._get_loss(batch), batch[0].shape[0]
+        else:
+            self._record_embeddings(batch, dataloader_idx)
+
+    def _record_embeddings(self, batch, dataloader_idx):
+        features, labels = batch
+        embedding = self.encoder(features)
+        domain_labels = torch.full_like(labels, fill_value=(2 - dataloader_idx), dtype=torch.int)
+        self.embedding_metric.update(embedding, domain_labels, labels)
+
+    def validation_epoch_end(self, validation_step_outputs):
+        self._get_tensorboard().add_figure('val/embeddings', self.embedding_metric.compute(), self.global_step)
+        self.embedding_metric.reset()
+
+        val_loss = validation_step_outputs[0]
+        _, batch_sizes = zip(*val_loss)
+        loss = sum(loss * batch_size for loss, batch_size in val_loss) / sum(batch_sizes)
         self.log('val/loss', loss)
 
-        return loss
+    def _get_tensorboard(self):
+        if isinstance(self.logger.experiment, SummaryWriter):
+            return self.logger.experiment
+        elif isinstance(self.logger.experiment, list):
+            for logger in self.logger.experiment:
+                if isinstance(logger, SummaryWriter):
+                    return logger
+        else:
+            raise ValueError('No TensorBoard logger specified. Cannot log embeddings.')
 
     def test_step(self, batch, batch_idx):
         loss = self._get_loss(batch)
