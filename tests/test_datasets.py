@@ -242,16 +242,17 @@ class TestCMAPSSBaseline(unittest.TestCase):
 
 
 class TestPretrainingDataModule(unittest.TestCase):
-    def test_build_pairs(self):
-        dataset = cmapss.PretrainingDataModule(3, 1, batch_size=16, window_size=30)
-        dataset.prepare_data()
-        dataset.setup()
+    def setUp(self):
+        self.dataset = cmapss.PretrainingDataModule(3, 1, num_samples=10000, batch_size=16, window_size=30)
+        self.dataset.prepare_data()
+        self.dataset.setup()
 
+    def test_build_pairs(self):
         for split in ['dev', 'val']:
             with self.subTest(split=split):
-                pairs = dataset.source_pairs[split]
+                pairs = self.dataset.source_pairs[split]
                 self.assertTrue(np.all(pairs[:, 0] < pairs[:, 1]))
-                run_start_idx = np.cumsum(dataset.source.lengths[split])
+                run_start_idx = np.cumsum(self.dataset.source.lengths[split])
                 # run idx is number of start idx smaller than or equal to anchor minus one
                 run_idx_of_pair = np.sum(run_start_idx[:, None] <= pairs[:, 0], axis=0) - 1
                 query_in_same_run = [run_start_idx[run_idx + 1] > query_idx
@@ -259,29 +260,33 @@ class TestPretrainingDataModule(unittest.TestCase):
                 self.assertTrue(all(query_in_same_run))
 
     def test_data_structure(self):
-        dataset = cmapss.PretrainingDataModule(3, 1, batch_size=16, window_size=30)
-        dataset.prepare_data()
-        dataset.setup()
+        with self.subTest(split='dev'):
+            dataloader = self.dataset.train_dataloader()
+            data = dataloader.dataset
+            self.assertIsInstance(data, ConcatDataset)
+            for subset in data.datasets:
+                self.assertIsInstance(subset, TensorDataset)
+            self._check_shapes(data)
 
-        for split in ['dev', 'val']:
-            with self.subTest(split=split):
-                data = dataset._to_dataset(split)
-                self.assertIsInstance(data, ConcatDataset)
-                for subset in data.datasets:
-                    self.assertIsInstance(subset, TensorDataset)
+        with self.subTest(split='val'):
+            loaders = self.dataset.val_dataloader()
+            self.assertIsInstance(loaders, list)
+            self.assertEqual(2, len(loaders))
+            for dataloader in loaders:
+                data = dataloader.dataset
+                self.assertIsInstance(data, TensorDataset)
+                self._check_shapes(data)
 
-                for i in range(len(data)):
-                    anchors, queries, distances = data[i]
-                    self.assertEqual(torch.Size((14, 30)), anchors.shape)
-                    self.assertEqual(torch.Size((14, 30)), queries.shape)
-                    self.assertEqual(torch.Size(()), distances.shape)
+    def _check_shapes(self, data):
+        for i in range(len(data)):
+            anchors, queries, distances = data[i]
+            self.assertEqual(torch.Size((14, 30)), anchors.shape)
+            self.assertEqual(torch.Size((14, 30)), queries.shape)
+            self.assertEqual(torch.Size(()), distances.shape)
 
     def test_distances(self):
-        dataset = cmapss.PretrainingDataModule(3, 1, batch_size=16, window_size=30)
-        dataset.prepare_data()
-        dataset.setup()
-
         for split in ['dev', 'val']:
             with self.subTest(split=split):
-                data = dataset._to_dataset(split)
-                self.assertTrue(all(distance > 0 for _, _, distance in data))
+                datasets = self.dataset._to_dataset(split)
+                for data in datasets:
+                    self.assertTrue(all(distance > 0 for _, _, distance in data))

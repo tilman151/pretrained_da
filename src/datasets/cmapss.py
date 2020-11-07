@@ -443,22 +443,28 @@ class PretrainingDataModule(pl.LightningDataModule):
         return pair_idx
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
-        return DataLoader(self._to_dataset('dev'),
+        return DataLoader(ConcatDataset(self._to_dataset('dev')),
                           batch_size=self.batch_size,
                           shuffle=True,
                           pin_memory=True)
 
     def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        return DataLoader(self._to_dataset('val'),
-                          batch_size=self.batch_size,
-                          shuffle=False,
-                          pin_memory=True)
+        source_dataset, target_dataset = self._to_dataset('val')
+        source_loader = DataLoader(source_dataset,
+                                   batch_size=self.batch_size,
+                                   shuffle=False,
+                                   pin_memory=True)
+        target_loader = DataLoader(target_dataset,
+                                   batch_size=self.batch_size,
+                                   shuffle=False,
+                                   pin_memory=True)
+        return [source_loader, target_loader]
 
     def _to_dataset(self, split):
         source_dataset = self._pairs_to_dataset(self.source.data[split], self.source_pairs[split])
         target_dataset = self._pairs_to_dataset(self.target.data[split], self.target_pairs[split])
 
-        return ConcatDataset([source_dataset, target_dataset])
+        return source_dataset, target_dataset
 
     def _pairs_to_dataset(self, data, pairs):
         features, _ = data
