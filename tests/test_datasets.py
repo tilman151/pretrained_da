@@ -262,27 +262,38 @@ class TestPretrainingDataModule(unittest.TestCase):
     def test_data_structure(self):
         with self.subTest(split='dev'):
             dataloader = self.dataset.train_dataloader()
-            data = dataloader.dataset
-            self.assertIsInstance(data, ConcatDataset)
-            for subset in data.datasets:
-                self.assertIsInstance(subset, TensorDataset)
-            self._check_shapes(data)
+            self._check_concat_dataset(dataloader.dataset)
 
         with self.subTest(split='val'):
             loaders = self.dataset.val_dataloader()
             self.assertIsInstance(loaders, list)
-            self.assertEqual(2, len(loaders))
-            for dataloader in loaders:
-                data = dataloader.dataset
-                self.assertIsInstance(data, TensorDataset)
-                self._check_shapes(data)
+            self.assertEqual(3, len(loaders))
+            self._check_concat_dataset(loaders[0].dataset)
+            for dataloader in loaders[1:]:
+                self._check_tensor_dataset(dataloader.dataset)
 
-    def _check_shapes(self, data):
+    def _check_concat_dataset(self, data):
+        self.assertIsInstance(data, ConcatDataset)
+        for subset in data.datasets:
+            self.assertIsInstance(subset, TensorDataset)
+        self._check_paired_shapes(data)
+
+    def _check_paired_shapes(self, data):
         for i in range(len(data)):
             anchors, queries, distances = data[i]
             self.assertEqual(torch.Size((14, 30)), anchors.shape)
             self.assertEqual(torch.Size((14, 30)), queries.shape)
             self.assertEqual(torch.Size(()), distances.shape)
+
+    def _check_tensor_dataset(self, data):
+        self.assertIsInstance(data, TensorDataset)
+        self._check_cmapss_shapes(data)
+
+    def _check_cmapss_shapes(self, data):
+        for i in range(len(data)):
+            features, labels = data[i]
+            self.assertEqual(torch.Size((14, 30)), features.shape)
+            self.assertEqual(torch.Size(()), labels.shape)
 
     def test_distances(self):
         for split in ['dev', 'val']:
