@@ -21,13 +21,14 @@ def run(source, target, percent_broken, record_embeddings, seed, gpu):
                                           name=f'pretraining_{percent_broken:.0%}pb')
     mlflow_logger = loggers.MLFlowLogger(f'pretraining_{ExperimentNaming[source]}2{ExperimentNaming[target]}',
                                          tracking_uri=os.path.join('file:', script_path, '..', 'mlruns'))
-    trainer = pl.Trainer(gpus=[gpu], max_epochs=200, logger=loggers.LoggerCollection([tf_logger, mlflow_logger]),
+    trainer = pl.Trainer(gpus=[gpu], max_epochs=100, logger=loggers.LoggerCollection([tf_logger, mlflow_logger]),
                          deterministic=True, log_every_n_steps=10)
     data = cmapss.PretrainingDataModule(fd_source=source,
                                         fd_target=target,
-                                        num_samples=500000,
+                                        num_samples=50000,
                                         batch_size=512,
                                         window_size=30,
+                                        min_distance=1,
                                         percent_broken=percent_broken)
     model = pretraining.UnsupervisedPretraining(in_channels=14,
                                                 seq_len=30,
@@ -35,7 +36,10 @@ def run(source, target, percent_broken, record_embeddings, seed, gpu):
                                                 kernel_size=3,
                                                 base_filters=16,
                                                 latent_dim=128,
+                                                dropout=0.1,
+                                                domain_tradeoff=0.01,
                                                 lr=0.01,
+                                                weight_decay=0,
                                                 record_embeddings=record_embeddings)
     model.add_data_hparams(data)
     model.hparams.update({'seed': seed})
