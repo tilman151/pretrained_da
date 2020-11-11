@@ -458,9 +458,12 @@ class PairedCMAPSS(IterableDataset):
         self.num_samples = num_samples
         self.deterministic = deterministic
 
-        run_lengths = [length for dataset in self.datasets for length in dataset.lengths[self.split]]
+        run_lengths = [(length, domain_idx)
+                       for domain_idx, dataset in enumerate(self.datasets)
+                       for length in dataset.lengths[self.split]]
         self._run_idx = np.arange(len(run_lengths) - 1)
-        self._run_start_idx = np.cumsum(run_lengths)
+        self._run_start_idx = np.cumsum([length for length, _ in run_lengths])
+        self._run_domain_idx = [domain_idx for _, domain_idx in run_lengths]
 
         self._features = torch.cat([dataset.data[self.split][0] for dataset in self.datasets])
         self._max_rul = max(dataset.max_rul for dataset in self.datasets)
@@ -491,20 +494,22 @@ class PairedCMAPSS(IterableDataset):
 
     def _get_pair_idx(self):
         chosen_run_idx = self._rng.choice(self._run_idx)
+        domain_label = self._run_domain_idx[chosen_run_idx]
         anchor_idx = self._rng.integers(low=self._run_start_idx[chosen_run_idx],
                                         high=self._run_start_idx[chosen_run_idx + 1] - self.min_distance)
         query_idx = self._rng.integers(low=anchor_idx + self.min_distance,
                                        high=self._run_start_idx[chosen_run_idx + 1])
 
-        return anchor_idx, query_idx
+        return anchor_idx, query_idx, domain_label
 
     def _build_pair(self, pair_idx):
         anchors = self._features[pair_idx[0]]
         queries = self._features[pair_idx[1]]
+        domain_label = torch.tensor(pair_idx[2])
         distances = torch.tensor(pair_idx[1] - pair_idx[0], dtype=torch.float) / self._max_rul
         distances = torch.clamp_max(distances, max=1)  # max distance is max_rul
 
-        return anchors, queries, distances
+        return anchors, queries, distances, domain_label
 
 
 def _unify_source_and_target_length(source, source_labels, target, target_labels):
