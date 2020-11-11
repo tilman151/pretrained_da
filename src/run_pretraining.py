@@ -2,6 +2,7 @@ import os
 import random
 
 import pytorch_lightning as pl
+import sklearn
 from pytorch_lightning import loggers
 
 from datasets import cmapss
@@ -52,9 +53,12 @@ def run_multiple(source, target, broken, domain_tradeoff, record_embeddings, rep
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
 
-    for b in broken:
+    parameter_grid = {'domain_tradeoff': domain_tradeoff,
+                      'broken': broken}
+
+    for params in sklearn.model_selection.ParameterGrid(parameter_grid):
         for s in seeds:
-            run(source, target, b, domain_tradeoff, record_embeddings, s, gpu)
+            run(source, target, params['broken'], params['domain_tradeoff'], record_embeddings, s, gpu)
 
 
 if __name__ == '__main__':
