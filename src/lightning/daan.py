@@ -4,11 +4,11 @@ import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 
 from lightning import metrics
-from lightning.mixins import DataHparamsMixin
+from lightning.mixins import DataHparamsMixin, LoadEncoderMixin
 from models import networks
 
 
-class DAAN(pl.LightningModule, DataHparamsMixin):
+class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
     def __init__(self,
                  in_channels,
                  seq_len,
@@ -40,7 +40,7 @@ class DAAN(pl.LightningModule, DataHparamsMixin):
         self.record_embeddings = record_embeddings
 
         self.encoder = networks.Encoder(self.in_channels, self.base_filters, self.kernel_size,
-                                        self.num_layers, self.latent_dim, self.seq_len)
+                                        self.num_layers, self.latent_dim, self.seq_len, dropout=0)
         self.domain_disc = networks.DomainDiscriminator(self.latent_dim, self.num_disc_layers, self.domain_disc_dim)
         self.regressor = networks.Regressor(latent_dim)
 
@@ -59,7 +59,8 @@ class DAAN(pl.LightningModule, DataHparamsMixin):
         return common
 
     def configure_optimizers(self):
-        param_groups = [{'params': self.encoder.parameters()},
+        encoder_lr = self.lr / 10 if 'pretrained_checkpoint' in self.hparams else self.lr
+        param_groups = [{'params': self.encoder.parameters(), 'lr': encoder_lr},
                         {'params': self.regressor.parameters()},
                         {'params': self.domain_disc.parameters()}]
         if self.optim_type == 'adam':

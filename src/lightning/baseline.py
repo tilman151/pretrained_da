@@ -2,10 +2,11 @@ import pytorch_lightning as pl
 import torch
 
 from lightning import metrics
+from lightning.mixins import LoadEncoderMixin
 from models import networks
 
 
-class Baseline(pl.LightningModule):
+class Baseline(pl.LightningModule, LoadEncoderMixin):
     def __init__(self,
                  in_channels,
                  seq_len,
@@ -29,7 +30,7 @@ class Baseline(pl.LightningModule):
         self.record_embeddings = record_embeddings
 
         self.encoder = networks.Encoder(self.in_channels, self.base_filters, self.kernel_size,
-                                        self.num_layers, self.latent_dim, self.seq_len)
+                                        self.num_layers, self.latent_dim, self.seq_len, dropout=0)
         self.regressor = networks.Regressor(latent_dim)
 
         self.criterion_regression = metrics.RMSELoss()
@@ -48,7 +49,8 @@ class Baseline(pl.LightningModule):
         return common
 
     def configure_optimizers(self):
-        param_groups = [{'params': self.encoder.parameters()},
+        encoder_lr = 0 if 'pretrained_checkpoint' in self.hparams else self.lr
+        param_groups = [{'params': self.encoder.parameters(), 'lr': encoder_lr},
                         {'params': self.regressor.parameters()}]
         if self.optim_type == 'adam':
             return torch.optim.Adam(param_groups, lr=self.lr)
