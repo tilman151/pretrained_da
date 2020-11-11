@@ -442,7 +442,7 @@ class PretrainingDataModule(pl.LightningDataModule):
 
     def _get_paired_dataset(self, split):
         determinsistic = split == 'val'
-        num_samples = self.num_samples // 10 if split =='val' else self.num_samples
+        num_samples = 50000 if split == 'val' else self.num_samples
         paired = PairedCMAPSS([self.source, self.target], split, num_samples, self.min_distance, determinsistic)
 
         return paired
