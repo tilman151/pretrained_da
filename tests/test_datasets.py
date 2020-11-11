@@ -242,12 +242,7 @@ class TestCMAPSSBaseline(unittest.TestCase):
             self.assertEqual(0, torch.sum(baseline - inner))
 
 
-class TestPretrainingDataModule(unittest.TestCase):
-    def setUp(self):
-        self.dataset = cmapss.PretrainingDataModule(3, 1, num_samples=10000, batch_size=16, window_size=30)
-        self.dataset.prepare_data()
-        self.dataset.setup()
-
+class PretrainingDataModuleTemplate:
     def test_build_pairs(self):
         for split in ['dev', 'val']:
             with self.subTest(split=split):
@@ -373,3 +368,18 @@ class TestPretrainingDataModule(unittest.TestCase):
             end += anchor.shape[0]
 
         return anchors, queries, distances, domain_labels
+
+
+class TestPretrainingDataModuleFullData(unittest.TestCase, PretrainingDataModuleTemplate):
+    def setUp(self):
+        self.dataset = cmapss.PretrainingDataModule(3, 1, num_samples=10000, batch_size=16, window_size=30)
+        self.dataset.prepare_data()
+        self.dataset.setup()
+
+
+class TestPretrainingDataModuleLowData(unittest.TestCase, PretrainingDataModuleTemplate):
+    def setUp(self):
+        self.dataset = cmapss.PretrainingDataModule(3, 1, percent_broken=0.2, num_samples=10000,
+                                                    batch_size=16, window_size=30)
+        self.dataset.prepare_data()
+        self.dataset.setup()
