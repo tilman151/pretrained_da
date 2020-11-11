@@ -14,7 +14,7 @@ ExperimentNaming = {1: 'one',
 script_path = '/home/tkrokots/repos/ae_adapt/src' if not os.path.dirname(__file__) else os.path.dirname(__file__)
 
 
-def run(source, target, percent_broken, record_embeddings, seed, gpu):
+def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed, gpu):
     pl.trainer.seed_everything(seed)
     tensorboard_path = os.path.join(script_path, '..', 'tensorboard', f'{ExperimentNaming[source]}2{ExperimentNaming[target]}')
     tf_logger = loggers.TensorBoardLogger(tensorboard_path,
@@ -37,7 +37,7 @@ def run(source, target, percent_broken, record_embeddings, seed, gpu):
                                                 base_filters=16,
                                                 latent_dim=128,
                                                 dropout=0.1,
-                                                domain_tradeoff=0.01,
+                                                domain_tradeoff=domain_tradeoff,
                                                 lr=0.01,
                                                 weight_decay=0,
                                                 record_embeddings=record_embeddings)
@@ -47,14 +47,14 @@ def run(source, target, percent_broken, record_embeddings, seed, gpu):
     trainer.test(datamodule=data)
 
 
-def run_multiple(source, target, broken, record_embeddings, replications, gpu):
+def run_multiple(source, target, broken, domain_tradeoff, record_embeddings, replications, gpu):
     broken = broken if opt.broken is not None else [1.0]
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
 
     for b in broken:
         for s in seeds:
-            run(source, target, b, record_embeddings, s, gpu)
+            run(source, target, b, domain_tradeoff, record_embeddings, s, gpu)
 
 
 if __name__ == '__main__':
@@ -63,9 +63,11 @@ if __name__ == '__main__':
     parser.add_argument('--source', type=int, help='FD number of the source data')
     parser.add_argument('--target', type=int, help='FD number of the target data')
     parser.add_argument('-b', '--broken', nargs='*', type=float, help='percent broken to use')
+    parser.add_argument('--domain_tradeoff', nargs='*', type=float, help='tradeoff for domain classification')
     parser.add_argument('--record_embeddings', action='store_true', help='whether to record embeddings of val data')
     parser.add_argument('-r', '--replications', type=int, default=3, help='replications for each run')
     parser.add_argument('--gpu', type=int, default=0, help='id of GPU to use')
     opt = parser.parse_args()
 
-    run_multiple(opt.source, opt.target, opt.broken, opt.record_embeddings, opt.replications, opt.gpu)
+    run_multiple(opt.source, opt.target, opt.broken, opt.domain_tradeoff,
+                 opt.record_embeddings, opt.replications, opt.gpu)
