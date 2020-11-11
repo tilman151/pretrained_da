@@ -16,6 +16,7 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
                  kernel_size,
                  base_filters,
                  latent_dim,
+                 dropout,
                  lr,
                  weight_decay,
                  record_embeddings=False):
@@ -27,12 +28,13 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         self.kernel_size = kernel_size
         self.base_filters = base_filters
         self.latent_dim = latent_dim
+        self.dropout = dropout
         self.lr = lr
         self.weight_decay = weight_decay
         self.record_embeddings = record_embeddings
 
         self.encoder = networks.Encoder(self.in_channels, self.base_filters, self.kernel_size,
-                                        self.num_layers, self.latent_dim, self.seq_len)
+                                        self.num_layers, self.latent_dim, self.seq_len, self.dropout)
         self.criterion_regression = nn.MSELoss()
         self.embedding_metric = metrics.EmbeddingViz(40000, self.latent_dim)
 

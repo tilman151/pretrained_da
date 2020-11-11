@@ -4,7 +4,7 @@ from models import layers
 
 
 class Encoder(nn.Module):
-    def __init__(self, in_channels, base_filters, kernel_size, num_layers, latent_dim, seq_len):
+    def __init__(self, in_channels, base_filters, kernel_size, num_layers, latent_dim, seq_len, dropout):
         super().__init__()
 
         self.in_channels = in_channels
@@ -13,6 +13,7 @@ class Encoder(nn.Module):
         self.num_layers = num_layers
         self.latent_dim = latent_dim
         self.seq_len = seq_len
+        self.dropout = dropout
 
         self.layers = self._build_encoder()
 
@@ -23,7 +24,8 @@ class Encoder(nn.Module):
         for i in range(1, self.num_layers):
             sequence.extend([nn.Conv1d(i * self.base_filters, (i + 1) * self.base_filters, self.kernel_size),
                              nn.BatchNorm1d((i + 1) * self.base_filters),
-                             nn.ReLU(True)])
+                             nn.ReLU(True),
+                             nn.Dropout2d(p=self.dropout)])
 
         cut_off = self.num_layers * (self.kernel_size - (self.kernel_size % 2))
         flat_dim = (self.seq_len - cut_off) * self.num_layers * self.base_filters
