@@ -17,6 +17,7 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
                  base_filters,
                  latent_dim,
                  dropout,
+                 domain_tradeoff,
                  lr,
                  weight_decay,
                  record_embeddings=False):
@@ -29,13 +30,19 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         self.base_filters = base_filters
         self.latent_dim = latent_dim
         self.dropout = dropout
+        self.domain_tradeoff = domain_tradeoff
         self.lr = lr
         self.weight_decay = weight_decay
         self.record_embeddings = record_embeddings
 
         self.encoder = networks.Encoder(self.in_channels, self.base_filters, self.kernel_size,
                                         self.num_layers, self.latent_dim, self.seq_len, self.dropout)
+        if self.domain_tradeoff > 0:
+            self.domain_disc = networks.DomainDiscriminator(self.latent_dim, num_layers=2, hidden_dim=self.latent_dim)
+        else:
+            self.domain_disc = None
         self.criterion_regression = nn.MSELoss()
+        self.criterion_domain = nn.BCEWithLogitsLoss()
         self.embedding_metric = metrics.EmbeddingViz(40000, self.latent_dim)
 
         self.save_hyperparameters()
@@ -45,9 +52,12 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
 
     def forward(self, anchors, queries):
         anchor_embeddings, query_embeddings = self._get_anchor_query_embeddings(anchors, queries)
-        pred_distances = torch.pairwise_distance(anchor_embeddings, query_embeddings, eps=1e-8)
+        pred_distances = self._pairwise_distance(anchor_embeddings, query_embeddings)
 
         return pred_distances
+
+    def _pairwise_distance(self, anchor_embeddings, query_embeddings):
+        return torch.pairwise_distance(anchor_embeddings, query_embeddings, eps=1e-8)
 
     def _get_anchor_query_embeddings(self, anchors, queries):
         batch_size = anchors.shape[0]
@@ -64,14 +74,18 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         return embeddings
 
     def training_step(self, batch, batch_idx):
-        loss = self._get_loss(batch)
+        regression_loss, domain_loss = self._get_losses(batch)
+        loss = regression_loss + self.domain_tradeoff * domain_loss
         self.log('train/loss', loss)
+        self.log('train/regression_loss', regression_loss)
+        self.log('train/domain_loss', domain_loss)
 
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx):
         if dataloader_idx == 0:
-            return self._get_loss(batch), batch[0].shape[0]
+            regression_loss, domain_loss = self._get_losses(batch)
+            return regression_loss, domain_loss, batch[0].shape[0]
         else:
             self._record_embeddings(batch, dataloader_idx)
 
@@ -86,9 +100,12 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         self.embedding_metric.reset()
 
         val_loss = validation_step_outputs[0]
-        _, batch_sizes = zip(*val_loss)
-        loss = sum(loss * batch_size for loss, batch_size in val_loss) / sum(batch_sizes)
-        self.log('val/loss', loss)
+        _, _, batch_sizes = zip(*val_loss)
+        regression_loss = sum(loss * batch_size for loss, _, batch_size in val_loss) / sum(batch_sizes)
+        domain_loss = sum(loss * batch_size for _, loss, batch_size in val_loss) / sum(batch_sizes)
+
+        self.log('val/regression_loss', regression_loss)
+        self.log('val/domain_loss', domain_loss)
 
     def _get_tensorboard(self):
         if isinstance(self.logger.experiment, SummaryWriter):
@@ -100,15 +117,16 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         else:
             raise ValueError('No TensorBoard logger specified. Cannot log embeddings.')
 
-    def test_step(self, batch, batch_idx):
-        loss = self._get_loss(batch)
-        self.log('test/loss', loss)
+    def _get_losses(self, batch):
+        anchors, queries, true_distances, domain_labels = batch
+        anchor_embeddings, query_embeddings = self._get_anchor_query_embeddings(anchors, queries)
+        pred_distances = self._pairwise_distance(anchor_embeddings, query_embeddings)
+        regression_loss = self.criterion_regression(pred_distances, true_distances)
 
-        return loss
+        if self.domain_tradeoff > 0:
+            domain_pred = self.domain_disc(anchor_embeddings)
+            domain_loss = self.criterion_domain(domain_pred, domain_labels)
+        else:
+            domain_loss = 0
 
-    def _get_loss(self, batch):
-        anchors, queries, true_distances = batch
-        pred_distances = self.forward(anchors, queries)
-        loss = self.criterion_regression(pred_distances, true_distances)
-
-        return loss
+        return regression_loss, domain_loss
