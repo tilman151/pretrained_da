@@ -461,8 +461,8 @@ class PairedCMAPSS(IterableDataset):
         run_lengths = [(length, domain_idx)
                        for domain_idx, dataset in enumerate(self.datasets)
                        for length in dataset.lengths[self.split]]
-        self._run_idx = np.arange(len(run_lengths) - 1)
-        self._run_start_idx = np.cumsum([length for length, _ in run_lengths])
+        self._run_start_idx = np.cumsum([length for length, _ in run_lengths if length > self.min_distance])
+        self._run_idx = np.arange(len(self._run_start_idx) - 1)
         self._run_domain_idx = [domain_idx for _, domain_idx in run_lengths]
 
         self._features = torch.cat([dataset.data[self.split][0] for dataset in self.datasets])
