@@ -124,7 +124,7 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         regression_loss = self.criterion_regression(pred_distances, true_distances)
 
         if self.domain_tradeoff > 0:
-            domain_pred = self.domain_disc(anchor_embeddings)
+            domain_pred = self.domain_disc(anchor_embeddings).squeeze()
             domain_loss = self.criterion_domain(domain_pred, domain_labels)
         else:
             domain_loss = 0

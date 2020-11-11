@@ -505,7 +505,7 @@ class PairedCMAPSS(IterableDataset):
     def _build_pair(self, pair_idx):
         anchors = self._features[pair_idx[0]]
         queries = self._features[pair_idx[1]]
-        domain_label = torch.tensor(pair_idx[2])
+        domain_label = torch.tensor(pair_idx[2], dtype=torch.float)
         distances = torch.tensor(pair_idx[1] - pair_idx[0], dtype=torch.float) / self._max_rul
         distances = torch.clamp_max(distances, max=1)  # max distance is max_rul
 
