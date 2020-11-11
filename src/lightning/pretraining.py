@@ -17,6 +17,7 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
                  base_filters,
                  latent_dim,
                  lr,
+                 weight_decay,
                  record_embeddings=False):
         super().__init__()
 
@@ -27,6 +28,7 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         self.base_filters = base_filters
         self.latent_dim = latent_dim
         self.lr = lr
+        self.weight_decay = weight_decay
         self.record_embeddings = record_embeddings
 
         self.encoder = networks.Encoder(self.in_channels, self.base_filters, self.kernel_size,
@@ -37,7 +39,7 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         self.save_hyperparameters()
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=0.00001)
+        return torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
     def forward(self, anchors, queries):
         anchor_embeddings, query_embeddings = self._get_anchor_query_embeddings(anchors, queries)
