@@ -61,7 +61,7 @@ def _get_checkpoint_path(mlflow_logger, tf_logger):
 
 
 def run_multiple(source, target, broken, domain_tradeoff, record_embeddings, replications, gpu):
-    broken = broken if opt.broken is not None else [1.0]
+    broken = broken if broken is not None else [1.0]
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
 

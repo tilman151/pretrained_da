@@ -52,7 +52,7 @@ def run(source, target, percent_broken, domain_tradeoff, cap, record_embeddings,
 
 def run_multiple(source, target, broken, domain_tradeoff, cap,
                  record_embeddings, replications, gpu, pretrained_encoder_path):
-    broken = broken if opt.broken is not None else [1.0]
+    broken = broken if broken is not None else [1.0]
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
 
