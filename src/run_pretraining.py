@@ -17,7 +17,7 @@ script_path = '/home/tkrokots/repos/ae_adapt/src' if not os.path.dirname(__file_
 
 def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed, gpu):
     pl.trainer.seed_everything(seed)
-    tensorboard_path = os.path.join(script_path, '..', 'tensorboard', f'{ExperimentNaming[source]}2{ExperimentNaming[target]}')
+    tensorboard_path = os.path.join(script_path, '..', 'tensorboard', f'{ExperimentNaming[source]}&{ExperimentNaming[target]}')
     tf_logger = loggers.TensorBoardLogger(tensorboard_path,
                                           name=f'pretraining_{percent_broken:.0%}pb')
     mlflow_logger = loggers.MLFlowLogger(f'pretraining_{ExperimentNaming[source]}2{ExperimentNaming[target]}',
