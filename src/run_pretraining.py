@@ -22,7 +22,7 @@ def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed
                                           name=f'pretraining_{percent_broken:.0%}pb')
     mlflow_logger = loggers.MLFlowLogger(f'pretraining_{ExperimentNaming[source]}2{ExperimentNaming[target]}',
                                          tracking_uri=os.path.join('file:', script_path, '..', 'mlruns'))
-    trainer = pl.Trainer(gpus=[gpu], max_epochs=100, logger=loggers.LoggerCollection([tf_logger, mlflow_logger]),
+    trainer = pl.Trainer(gpus=[gpu], max_epochs=1, logger=loggers.LoggerCollection([tf_logger, mlflow_logger]),
                          deterministic=True, log_every_n_steps=10)
     data = cmapss.PretrainingDataModule(fd_source=source,
                                         fd_target=target,
@@ -47,6 +47,18 @@ def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
 
+    return _get_checkpoint_path(mlflow_logger, tf_logger)
+
+
+def _get_checkpoint_path(mlflow_logger, tf_logger):
+    experiment_path = os.path.join(script_path, f'{tf_logger.name}_{mlflow_logger.experiment_id}')
+    run_dir, *_ = [f for f in os.listdir(experiment_path) if f.endswith(mlflow_logger.run_id)]
+    checkpoints_path = os.path.join(experiment_path, run_dir, 'checkpoints')
+    *_, checkpoint = sorted([f for f in os.listdir(checkpoints_path)])  # get last checkpoint
+    checkpoint_path = os.path.join(checkpoints_path, checkpoint)
+
+    return checkpoint_path
+
 
 def run_multiple(source, target, broken, domain_tradeoff, record_embeddings, replications, gpu):
     broken = broken if opt.broken is not None else [1.0]
@@ -56,9 +68,14 @@ def run_multiple(source, target, broken, domain_tradeoff, record_embeddings, rep
     parameter_grid = {'domain_tradeoff': domain_tradeoff,
                       'broken': broken}
 
+    checkpoints = {b: {dt: [] for dt in domain_tradeoff} for b in broken}
     for params in sklearn.model_selection.ParameterGrid(parameter_grid):
         for s in seeds:
-            run(source, target, params['broken'], params['domain_tradeoff'], record_embeddings, s, gpu)
+            checkpoint_path = run(source, target, params['broken'], params['domain_tradeoff'],
+                                  record_embeddings, s, gpu)
+            checkpoints[params['broken']][params['domain_tradeoff']].append(checkpoint_path)
+
+    return checkpoints
 
 
 if __name__ == '__main__':
