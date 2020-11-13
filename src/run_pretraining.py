@@ -22,7 +22,7 @@ def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed
                                           name=f'pretraining_{percent_broken:.0%}pb')
     mlflow_logger = loggers.MLFlowLogger(f'pretraining_{ExperimentNaming[source]}2{ExperimentNaming[target]}',
                                          tracking_uri=os.path.join('file:', script_path, '..', 'mlruns'))
-    trainer = pl.Trainer(gpus=[gpu], max_epochs=1, logger=loggers.LoggerCollection([tf_logger, mlflow_logger]),
+    trainer = pl.Trainer(gpus=[gpu], max_epochs=100, logger=loggers.LoggerCollection([tf_logger, mlflow_logger]),
                          deterministic=True, log_every_n_steps=10)
     data = cmapss.PretrainingDataModule(fd_source=source,
                                         fd_target=target,
