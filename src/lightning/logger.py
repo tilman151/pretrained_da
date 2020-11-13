@@ -83,3 +83,7 @@ class MLTBLogger(loggers.LoggerCollection):
     @property
     def save_dir(self):
         return self._mlflow_logger.save_dir
+
+    @property
+    def checkpoint_path(self):
+        return os.path.join(self.save_dir, self.name, self.version, 'checkpoints')

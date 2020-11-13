@@ -17,7 +17,7 @@ class TestMLTBLogger(unittest.TestCase):
 
     def test_save_path(self):
         self._run_dummy_training()
-        artifact_path = os.path.join(self.logger.save_dir, self.logger.name, self.logger.version, 'checkpoints')
+        artifact_path = self.logger.checkpoint_path
         self.assertListEqual(['epoch=0.ckpt'], os.listdir(artifact_path))
 
     def test_tensorboard_struct(self):

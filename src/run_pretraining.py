@@ -38,7 +38,7 @@ def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
 
-    return _get_checkpoint_path(mlflow_logger, tf_logger)
+    return _get_checkpoint_path(logger)
 
 
 def _get_logdir():
@@ -48,10 +48,8 @@ def _get_logdir():
     return log_dir
 
 
-def _get_checkpoint_path(mlflow_logger, tf_logger):
-    experiment_path = os.path.join(script_path, f'{tf_logger.name}_{mlflow_logger.experiment_id}')
-    run_dir, *_ = [f for f in os.listdir(experiment_path) if f.endswith(mlflow_logger.run_id)]
-    checkpoints_path = os.path.join(experiment_path, run_dir, 'checkpoints')
+def _get_checkpoint_path(logger):
+    checkpoints_path = logger.checkpoint_path
     *_, checkpoint = sorted([f for f in os.listdir(checkpoints_path)])  # get last checkpoint
     checkpoint_path = os.path.join(checkpoints_path, checkpoint)
 
