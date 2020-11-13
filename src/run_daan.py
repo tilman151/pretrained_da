@@ -3,26 +3,17 @@ import random
 
 import pytorch_lightning as pl
 import sklearn.model_selection
-from pytorch_lightning import loggers
 
 from datasets import cmapss
 from lightning import daan
-
-ExperimentNaming = {1: 'one',
-                    2: 'two',
-                    3: 'three',
-                    4: 'four'}
-script_path = '/home/tkrokots/repos/ae_adapt/src' if not os.path.dirname(__file__) else os.path.dirname(__file__)
+from lightning import logger as loggers
 
 
 def run(source, target, percent_broken, domain_tradeoff, cap, record_embeddings, seed, gpu, pretrained_encoder_path):
     pl.trainer.seed_everything(seed)
-    tensorboard_path = os.path.join(script_path, '..', 'tensorboard', f'{ExperimentNaming[source]}2{ExperimentNaming[target]}')
-    tf_logger = loggers.TensorBoardLogger(tensorboard_path,
-                                          name=f'{percent_broken:.0%}pb_{domain_tradeoff:.1f}dt')
-    mlflow_logger = loggers.MLFlowLogger(f'{ExperimentNaming[source]}2{ExperimentNaming[target]}',
-                                         tracking_uri=os.path.join('file:', script_path, '..', 'mlruns'))
-    trainer = pl.Trainer(gpus=[gpu], max_epochs=200, logger=loggers.LoggerCollection([tf_logger, mlflow_logger]),
+    logger = loggers.MLTBLogger(_get_logdir(), loggers.transfer_experiment_name(source, target),
+                                tensorboard_struct={'pb': percent_broken, 'dt': domain_tradeoff})
+    trainer = pl.Trainer(gpus=[gpu], max_epochs=200, logger=logger,
                          deterministic=True, log_every_n_steps=10)
     data = cmapss.DomainAdaptionDataModule(fd_source=source,
                                            fd_target=target,
@@ -48,6 +39,13 @@ def run(source, target, percent_broken, domain_tradeoff, cap, record_embeddings,
     model.hparams.update({'seed': seed})
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
+
+
+def _get_logdir():
+    script_path = os.path.dirname(__file__)
+    log_dir = os.path.normpath(os.path.join(script_path, '..'))
+
+    return log_dir
 
 
 def run_multiple(source, target, broken, domain_tradeoff, cap,

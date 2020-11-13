@@ -2,27 +2,17 @@ import os
 import random
 
 import pytorch_lightning as pl
-import pytorch_lightning.loggers as loggers
 
 from datasets import cmapss
 from lightning import baseline
-
-ExperimentNaming = {1: 'one',
-                    2: 'two',
-                    3: 'three',
-                    4: 'four'}
-script_path = os.path.dirname(__file__)
+from lightning import logger as loggers
 
 
 def run(source, seed, gpu, pretrained_encoder_path):
     pl.trainer.seed_everything(seed)
-    tensorboard_path = os.path.join(script_path, '..', 'tensorboard')
-    tf_logger = loggers.TensorBoardLogger(tensorboard_path,
-                                          name=f'cmapss_{ExperimentNaming[source]}_baseline')
-    mlflow_logger = loggers.MLFlowLogger(f'cmapss_{ExperimentNaming[source]}_baseline',
-                                         tracking_uri=os.path.join(script_path, '..', 'mlruns'))
+    logger = loggers.MLTBLogger(_get_logdir(), loggers.baseline_experiment_name(source))
     checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor='val/regression_loss')
-    trainer = pl.Trainer(gpus=[gpu], max_epochs=100, logger=[tf_logger, mlflow_logger],
+    trainer = pl.Trainer(gpus=[gpu], max_epochs=100, logger=logger,
                          checkpoint_callback=checkpoint_callback, deterministic=True, log_every_n_steps=10)
     data = cmapss.BaselineDataModule(fd_source=source,
                                      batch_size=512,
@@ -42,6 +32,13 @@ def run(source, seed, gpu, pretrained_encoder_path):
     model.hparams.update({'seed': seed})
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
+
+
+def _get_logdir():
+    script_path = os.path.dirname(__file__)
+    log_dir = os.path.normpath(os.path.join(script_path, '..'))
+
+    return log_dir
 
 
 def run_multiple(source, replications, gpu, pretrained_encoder_path):
