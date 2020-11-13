@@ -86,7 +86,7 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         if dataloader_idx == 0:
             regression_loss, domain_loss = self._get_losses(batch)
             return regression_loss, domain_loss, batch[0].shape[0]
-        else:
+        elif self.record_embeddings:
             self._record_embeddings(batch, dataloader_idx)
 
     def _record_embeddings(self, batch, dataloader_idx):
@@ -96,8 +96,9 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         self.embedding_metric.update(embedding, domain_labels, labels)
 
     def validation_epoch_end(self, validation_step_outputs):
-        self._get_tensorboard().add_figure('val/embeddings', self.embedding_metric.compute(), self.global_step)
-        self.embedding_metric.reset()
+        if self.record_embeddings:
+            self._get_tensorboard().add_figure('val/embeddings', self.embedding_metric.compute(), self.global_step)
+            self.embedding_metric.reset()
 
         val_loss = validation_step_outputs[0]
         _, _, batch_sizes = zip(*val_loss)
