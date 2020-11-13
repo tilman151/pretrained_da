@@ -20,7 +20,7 @@ def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed
     tensorboard_path = os.path.join(script_path, '..', 'tensorboard', f'{ExperimentNaming[source]}&{ExperimentNaming[target]}')
     tf_logger = loggers.TensorBoardLogger(tensorboard_path,
                                           name=f'pretraining_{percent_broken:.0%}pb')
-    mlflow_logger = loggers.MLFlowLogger(f'pretraining_{ExperimentNaming[source]}2{ExperimentNaming[target]}',
+    mlflow_logger = loggers.MLFlowLogger(f'pretraining_{ExperimentNaming[source]}&{ExperimentNaming[target]}',
                                          tracking_uri=os.path.join('file:', script_path, '..', 'mlruns'))
     trainer = pl.Trainer(gpus=[gpu], max_epochs=100, logger=loggers.LoggerCollection([tf_logger, mlflow_logger]),
                          deterministic=True, log_every_n_steps=10)
