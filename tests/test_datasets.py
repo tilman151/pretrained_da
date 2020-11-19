@@ -172,7 +172,7 @@ class TestCMAPSSAdaption(unittest.TestCase):
 
 class TestCMAPSSBaseline(unittest.TestCase):
     def setUp(self):
-        self.dataset = datasets.BaselineDataModule(3, batch_size=16, window_size=30)
+        self.dataset = datasets.BaselineDataModule(3, batch_size=16, window_size=30, percent_fail_runs=0.8)
         self.dataset.prepare_data()
         self.dataset.setup()
 
@@ -242,6 +242,10 @@ class TestCMAPSSBaseline(unittest.TestCase):
         inner_data = inner_dataset[:num_samples]
         for baseline, inner in zip(baseline_data, inner_data):
             self.assertEqual(0, torch.sum(baseline - inner))
+
+    def test_fail_runs_passed_correctly(self):
+        for i in range(1, 5):
+            self.assertEqual(0.8, self.dataset.cmapss[i].percent_fail_runs)
 
 
 class PretrainingDataModuleTemplate:
