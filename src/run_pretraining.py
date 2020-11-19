@@ -15,13 +15,7 @@ def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed
                                 tensorboard_struct={'pb': percent_broken, 'dt': domain_tradeoff})
     trainer = pl.Trainer(gpus=[gpu], max_epochs=100, logger=logger,
                          deterministic=True, log_every_n_steps=10)
-    data = datasets.PretrainingAdaptionDataModule(fd_source=source,
-                                                  fd_target=target,
-                                                  num_samples=50000,
-                                                  batch_size=512,
-                                                  window_size=30,
-                                                  min_distance=1,
-                                                  percent_broken=percent_broken)
+    data = _build_datamodule(percent_broken, source, target)
     model = pretraining.UnsupervisedPretraining(in_channels=14,
                                                 seq_len=30,
                                                 num_layers=4,
@@ -39,6 +33,24 @@ def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed
     trainer.test(datamodule=data)
 
     return _get_checkpoint_path(logger)
+
+
+def _build_datamodule(percent_broken, source, target):
+    if target is None:
+        return datasets.PretrainingBaselineDataModule(fd_source=source,
+                                                      num_samples=25000,
+                                                      batch_size=512,
+                                                      window_size=30,
+                                                      min_distance=1,
+                                                      percent_broken=percent_broken)
+    else:
+        return datasets.PretrainingAdaptionDataModule(fd_source=source,
+                                                      fd_target=target,
+                                                      num_samples=50000,
+                                                      batch_size=512,
+                                                      window_size=30,
+                                                      min_distance=1,
+                                                      percent_broken=percent_broken)
 
 
 def _get_logdir():
@@ -77,10 +89,10 @@ def run_multiple(source, target, broken, domain_tradeoff, record_embeddings, rep
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Run domain adaption experiment')
-    parser.add_argument('--source', type=int, help='FD number of the source data')
+    parser.add_argument('--source', type=int, required=True, help='FD number of the source data')
     parser.add_argument('--target', type=int, help='FD number of the target data')
-    parser.add_argument('-b', '--broken', nargs='*', type=float, help='percent broken to use')
-    parser.add_argument('--domain_tradeoff', nargs='*', type=float, help='tradeoff for domain classification')
+    parser.add_argument('-b', '--broken', nargs='+', type=float, help='percent broken to use')
+    parser.add_argument('--domain_tradeoff', nargs='+', type=float, help='tradeoff for domain classification')
     parser.add_argument('--record_embeddings', action='store_true', help='whether to record embeddings of val data')
     parser.add_argument('-r', '--replications', type=int, default=3, help='replications for each run')
     parser.add_argument('--gpu', type=int, default=0, help='id of GPU to use')
