@@ -5,8 +5,8 @@ import unittest
 
 import pytorch_lightning as pl
 
+import datasets
 import lightning.logger as loggers
-from datasets import cmapss
 from lightning import baseline
 
 
@@ -28,9 +28,9 @@ class TestMLTBLogger(unittest.TestCase):
     def _run_dummy_training(self):
         trainer = pl.Trainer(gpus=0, max_epochs=1, logger=self.logger,
                              deterministic=True, log_every_n_steps=10)
-        data = cmapss.BaselineDataModule(fd_source=1,
-                                         batch_size=512,
-                                         window_size=30)
+        data = datasets.BaselineDataModule(fd_source=1,
+                                           batch_size=512,
+                                           window_size=30)
         model = baseline.Baseline(in_channels=14,
                                   seq_len=30,
                                   num_layers=1,

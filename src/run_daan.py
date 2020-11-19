@@ -4,7 +4,7 @@ import random
 import pytorch_lightning as pl
 import sklearn.model_selection
 
-from datasets import cmapss
+import datasets
 from lightning import daan
 from lightning import logger as loggers
 
@@ -15,11 +15,11 @@ def run(source, target, percent_broken, domain_tradeoff, cap, record_embeddings,
                                 tensorboard_struct={'pb': percent_broken, 'dt': domain_tradeoff})
     trainer = pl.Trainer(gpus=[gpu], max_epochs=200, logger=logger,
                          deterministic=True, log_every_n_steps=10)
-    data = cmapss.DomainAdaptionDataModule(fd_source=source,
-                                           fd_target=target,
-                                           batch_size=512,
-                                           window_size=30,
-                                           percent_broken=percent_broken)
+    data = datasets.DomainAdaptionDataModule(fd_source=source,
+                                             fd_target=target,
+                                             batch_size=512,
+                                             window_size=30,
+                                             percent_broken=percent_broken)
     model = daan.DAAN(in_channels=14,
                       seq_len=30,
                       num_layers=4,

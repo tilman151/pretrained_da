@@ -3,7 +3,7 @@ import random
 
 import pytorch_lightning as pl
 
-from datasets import cmapss
+import datasets
 from lightning import baseline
 from lightning import logger as loggers
 
@@ -14,9 +14,9 @@ def run(source, seed, gpu, pretrained_encoder_path):
     checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor='val/regression_loss')
     trainer = pl.Trainer(gpus=[gpu], max_epochs=100, logger=logger,
                          checkpoint_callback=checkpoint_callback, deterministic=True, log_every_n_steps=10)
-    data = cmapss.BaselineDataModule(fd_source=source,
-                                     batch_size=512,
-                                     window_size=30)
+    data = datasets.BaselineDataModule(fd_source=source,
+                                       batch_size=512,
+                                       window_size=30)
     model = baseline.Baseline(in_channels=14,
                               seq_len=30,
                               num_layers=4,

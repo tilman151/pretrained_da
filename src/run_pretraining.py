@@ -4,7 +4,7 @@ import random
 import pytorch_lightning as pl
 import sklearn
 
-from datasets import cmapss
+import datasets
 from lightning import logger as loggers
 from lightning import pretraining
 
@@ -15,13 +15,13 @@ def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed
                                 tensorboard_struct={'pb': percent_broken, 'dt': domain_tradeoff})
     trainer = pl.Trainer(gpus=[gpu], max_epochs=100, logger=logger,
                          deterministic=True, log_every_n_steps=10)
-    data = cmapss.PretrainingDataModule(fd_source=source,
-                                        fd_target=target,
-                                        num_samples=50000,
-                                        batch_size=512,
-                                        window_size=30,
-                                        min_distance=1,
-                                        percent_broken=percent_broken)
+    data = datasets.PretrainingAdaptionDataModule(fd_source=source,
+                                                  fd_target=target,
+                                                  num_samples=50000,
+                                                  batch_size=512,
+                                                  window_size=30,
+                                                  min_distance=1,
+                                                  percent_broken=percent_broken)
     model = pretraining.UnsupervisedPretraining(in_channels=14,
                                                 seq_len=30,
                                                 num_layers=4,

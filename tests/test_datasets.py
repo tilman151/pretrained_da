@@ -5,7 +5,9 @@ import torch
 import torch.utils.data
 from torch.utils.data import TensorDataset, RandomSampler, SequentialSampler
 
+import datasets
 from datasets import cmapss
+from datasets.adaption import _unify_source_and_target_length
 from datasets.cmapss import PairedCMAPSS
 
 
@@ -110,7 +112,7 @@ class TestCMAPSS(unittest.TestCase):
 
 class TestCMAPSSAdaption(unittest.TestCase):
     def setUp(self):
-        self.dataset = cmapss.DomainAdaptionDataModule(3, 1, batch_size=16, window_size=30)
+        self.dataset = datasets.DomainAdaptionDataModule(3, 1, batch_size=16, window_size=30)
         self.dataset.prepare_data()
         self.dataset.setup()
 
@@ -170,7 +172,7 @@ class TestCMAPSSAdaption(unittest.TestCase):
 
 class TestCMAPSSBaseline(unittest.TestCase):
     def setUp(self):
-        self.dataset = cmapss.BaselineDataModule(3, batch_size=16, window_size=30)
+        self.dataset = datasets.BaselineDataModule(3, batch_size=16, window_size=30)
         self.dataset.prepare_data()
         self.dataset.setup()
 
@@ -219,8 +221,8 @@ class TestCMAPSSBaseline(unittest.TestCase):
         fd_source = self.dataset.fd_source
         fd_target = 1
         baseline_train_dataset = self.dataset._to_dataset(fd_source, fd_target, split='test')
-        combined_data = cmapss._unify_source_and_target_length(*self.dataset.cmapss[fd_source].data['test'],
-                                                               *self.dataset.cmapss[fd_target].data['test'])
+        combined_data = _unify_source_and_target_length(*self.dataset.cmapss[fd_source].data['test'],
+                                                        *self.dataset.cmapss[fd_target].data['test'])
         source_train_dataset = TensorDataset(*combined_data)
         self._assert_datasets_equal(baseline_train_dataset, source_train_dataset)
 
@@ -229,8 +231,8 @@ class TestCMAPSSBaseline(unittest.TestCase):
         fd_source = self.dataset.fd_source
         for fd_target, test_loader in enumerate(test_loaders, start=1):
             test_data = test_loader.dataset
-            combined_data = cmapss._unify_source_and_target_length(*self.dataset.cmapss[fd_source].data['test'],
-                                                                   *self.dataset.cmapss[fd_target].data['test'])
+            combined_data = _unify_source_and_target_length(*self.dataset.cmapss[fd_source].data['test'],
+                                                            *self.dataset.cmapss[fd_target].data['test'])
             source_train_dataset = TensorDataset(*combined_data)
             self._assert_datasets_equal(test_data, source_train_dataset)
 
@@ -275,7 +277,7 @@ class PretrainingDataModuleTemplate:
         return np.sum(run_start_idx[:, None] <= pairs[:, 0], axis=0) - 1
 
     def test_min_distance(self):
-        dataset = cmapss.PretrainingDataModule(3, 1, num_samples=10000, min_distance=30, batch_size=16, window_size=30)
+        dataset = datasets.PretrainingAdaptionDataModule(3, 1, num_samples=10000, min_distance=30, batch_size=16, window_size=30)
         dataset.prepare_data()
         dataset.setup()
 
@@ -372,14 +374,14 @@ class PretrainingDataModuleTemplate:
 
 class TestPretrainingDataModuleFullData(unittest.TestCase, PretrainingDataModuleTemplate):
     def setUp(self):
-        self.dataset = cmapss.PretrainingDataModule(3, 1, num_samples=10000, batch_size=16, window_size=30)
+        self.dataset = datasets.PretrainingAdaptionDataModule(3, 1, num_samples=10000, batch_size=16, window_size=30)
         self.dataset.prepare_data()
         self.dataset.setup()
 
 
 class TestPretrainingDataModuleLowData(unittest.TestCase, PretrainingDataModuleTemplate):
     def setUp(self):
-        self.dataset = cmapss.PretrainingDataModule(3, 1, percent_broken=0.2, num_samples=10000,
-                                                    batch_size=16, window_size=30)
+        self.dataset = datasets.PretrainingAdaptionDataModule(3, 1, percent_broken=0.2, num_samples=10000,
+                                                              batch_size=16, window_size=30)
         self.dataset.prepare_data()
         self.dataset.setup()

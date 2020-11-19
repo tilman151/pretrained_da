@@ -7,7 +7,7 @@ from ray.tune import CLIReporter
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 from ray.tune.schedulers import ASHAScheduler
 
-from datasets import cmapss
+import datasets.adaption
 from lightning import daan
 
 
@@ -20,11 +20,11 @@ def run(config, percent_broken, seed):
     callbacks = [TuneReportCallback({'regression_loss': 'val_checkpoint_on'})]
     trainer = pl.Trainer(gpus=1, max_epochs=200, logger=tf_logger, deterministic=True,
                          progress_bar_refresh_rate=0, callbacks=callbacks)
-    data = cmapss.DomainAdaptionDataModule(fd_source=3,
-                                           fd_target=1,
-                                           batch_size=512,
-                                           window_size=30,
-                                           percent_broken=percent_broken)
+    data = datasets.adaption.DomainAdaptionDataModule(fd_source=3,
+                                                      fd_target=1,
+                                                      batch_size=512,
+                                                      window_size=30,
+                                                      percent_broken=percent_broken)
     model = daan.DAAN(in_channels=14,
                       seq_len=30,
                       num_layers=4,
