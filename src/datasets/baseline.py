@@ -4,7 +4,7 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader, TensorDataset
 
 from datasets.adaption import _unify_source_and_target_length
-from datasets.cmapss import CMAPSSDataModule
+from datasets.cmapss import CMAPSSDataModule, PairedCMAPSS
 
 
 class BaselineDataModule(pl.LightningDataModule):
@@ -76,3 +76,65 @@ class BaselineDataModule(pl.LightningDataModule):
         dataset = TensorDataset(*data)
 
         return dataset
+
+
+class PretrainingBaselineDataModule(pl.LightningDataModule):
+    def __init__(self,
+                 fd_source,
+                 num_samples,
+                 batch_size,
+                 max_rul=125,
+                 window_size=30,
+                 min_distance=1,
+                 percent_fail_runs=None,
+                 percent_broken=None,
+                 feature_select=None):
+        super().__init__()
+
+        self.fd_source = fd_source
+        self.num_samples = num_samples
+        self.batch_size = batch_size
+        self.window_size = window_size
+        self.min_distance = min_distance
+        self.max_rul = max_rul
+        self.percent_broken = percent_broken
+        self.percent_fail_runs = percent_fail_runs
+        self.feature_select = feature_select
+
+        self.hparams = {'fd_source': self.fd_source,
+                        'num_samples': self.num_samples,
+                        'batch_size': self.batch_size,
+                        'window_size': self.window_size,
+                        'max_rul': self.max_rul,
+                        'min_distance': self.min_distance,
+                        'percent_broken': self.percent_broken,
+                        'percent_fail_runs': self.percent_fail_runs}
+
+        self.source = CMAPSSDataModule(fd_source, batch_size, max_rul, window_size,
+                                       percent_fail_runs, percent_broken, feature_select)
+
+    def prepare_data(self, *args, **kwargs):
+        self.source.prepare_data(*args, **kwargs)
+
+    def setup(self, stage: Optional[str] = None):
+        self.source.setup(stage)
+
+    def train_dataloader(self, *args, **kwargs) -> DataLoader:
+        return DataLoader(self._get_paired_dataset('dev'),
+                          batch_size=self.batch_size,
+                          pin_memory=True)
+
+    def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
+        combined_loader = DataLoader(self._get_paired_dataset('val'),
+                                     batch_size=self.batch_size,
+                                     pin_memory=True)
+        source_loader = self.source.val_dataloader()
+
+        return [combined_loader, source_loader]
+
+    def _get_paired_dataset(self, split):
+        deterministic = split == 'val'
+        num_samples = 25000 if split == 'val' else self.num_samples
+        paired = PairedCMAPSS([self.source], split, num_samples, self.min_distance, deterministic)
+
+        return paired

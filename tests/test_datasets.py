@@ -301,7 +301,7 @@ class PretrainingDataModuleTemplate:
         with self.subTest(split='val'):
             loaders = self.dataset.val_dataloader()
             self.assertIsInstance(loaders, list)
-            self.assertEqual(3, len(loaders))
+            self.assertEqual(self.expected_num_val_loaders, len(loaders))
             self._check_paired_dataset(loaders[0].dataset)
             for dataloader in loaders[1:]:
                 self._check_tensor_dataset(dataloader.dataset)
@@ -339,16 +339,16 @@ class PretrainingDataModuleTemplate:
     def test_determinism(self):
         with self.subTest(split='dev'):
             train_loader = self.dataset.train_dataloader()
-            one_train_data = self._run_epoch(train_loader)
-            another_train_data = self._run_epoch(train_loader)
+            *one_train_data, one_domain_labels = self._run_epoch(train_loader)
+            *another_train_data, another_domain_labels = self._run_epoch(train_loader)
 
             for one, another in zip(one_train_data, another_train_data):
                 self.assertNotEqual(0., torch.sum(one - another))
 
         with self.subTest(split='val'):
-            val_loader, _, _ = self.dataset.val_dataloader()
-            one_train_data = self._run_epoch(val_loader)
-            another_train_data = self._run_epoch(val_loader)
+            paired_val_loader = self.dataset.val_dataloader()[0]
+            one_train_data = self._run_epoch(paired_val_loader)
+            another_train_data = self._run_epoch(paired_val_loader)
 
             for one, another in zip(one_train_data, another_train_data):
                 self.assertEqual(0., torch.sum(one - another))
@@ -378,6 +378,8 @@ class TestPretrainingDataModuleFullData(unittest.TestCase, PretrainingDataModule
         self.dataset.prepare_data()
         self.dataset.setup()
 
+        self.expected_num_val_loaders = 3
+
 
 class TestPretrainingDataModuleLowData(unittest.TestCase, PretrainingDataModuleTemplate):
     def setUp(self):
@@ -385,3 +387,24 @@ class TestPretrainingDataModuleLowData(unittest.TestCase, PretrainingDataModuleT
                                                               batch_size=16, window_size=30)
         self.dataset.prepare_data()
         self.dataset.setup()
+
+        self.expected_num_val_loaders = 3
+
+
+class TestPretrainingBaselineDataModuleFullData(unittest.TestCase, PretrainingDataModuleTemplate):
+    def setUp(self):
+        self.dataset = datasets.PretrainingBaselineDataModule(3, num_samples=10000, batch_size=16, window_size=30)
+        self.dataset.prepare_data()
+        self.dataset.setup()
+
+        self.expected_num_val_loaders = 2
+
+
+class TestPretrainingBaselineDataModuleLowData(unittest.TestCase, PretrainingDataModuleTemplate):
+    def setUp(self):
+        self.dataset = datasets.PretrainingBaselineDataModule(3, percent_broken=0.2, num_samples=10000,
+                                                              batch_size=16, window_size=30)
+        self.dataset.prepare_data()
+        self.dataset.setup()
+
+        self.expected_num_val_loaders = 2
