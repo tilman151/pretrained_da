@@ -49,8 +49,7 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         return common
 
     def configure_optimizers(self):
-        encoder_lr = 0 if 'pretrained_checkpoint' in self.hparams else self.lr
-        param_groups = [{'params': self.encoder.parameters(), 'lr': encoder_lr},
+        param_groups = [{'params': self.encoder.parameters()},
                         {'params': self.regressor.parameters()}]
         if self.optim_type == 'adam':
             return torch.optim.Adam(param_groups, lr=self.lr)

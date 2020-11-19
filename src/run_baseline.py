@@ -8,7 +8,7 @@ from lightning import baseline
 from lightning import logger as loggers
 
 
-def run(source, seed, gpu, pretrained_encoder_path):
+def run(source, fails, seed, gpu, pretrained_encoder_path):
     pl.trainer.seed_everything(seed)
     logger = loggers.MLTBLogger(_get_logdir(), loggers.baseline_experiment_name(source))
     checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor='val/regression_loss')
@@ -16,7 +16,8 @@ def run(source, seed, gpu, pretrained_encoder_path):
                          checkpoint_callback=checkpoint_callback, deterministic=True, log_every_n_steps=10)
     data = datasets.BaselineDataModule(fd_source=source,
                                        batch_size=512,
-                                       window_size=30)
+                                       window_size=30,
+                                       percent_fail_runs=fails)
     model = baseline.Baseline(in_channels=14,
                               seq_len=30,
                               num_layers=4,
@@ -41,21 +42,23 @@ def _get_logdir():
     return log_dir
 
 
-def run_multiple(source, replications, gpu, pretrained_encoder_path):
+def run_multiple(source, fails, replications, gpu, pretrained_encoder_path):
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
 
-    for s in seeds:
-        run(source, s, gpu, pretrained_encoder_path)
+    for f in fails:
+        for s in seeds:
+            run(source, f, s, gpu, pretrained_encoder_path)
 
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Run baseline experiment')
     parser.add_argument('--source', type=int, help='FD number of the source data')
+    parser.add_argument('-f', '--fails', nargs='+', type=float, help='percent fail runs to use')
     parser.add_argument('--pretrained_encoder', default=None, help='Path to checkpoint file form pretraining')
     parser.add_argument('-r', '--replications', type=int, default=3, help='replications for each run')
     parser.add_argument('--gpu', type=int, default=0, help='id of GPU to use')
     opt = parser.parse_args()
 
-    run_multiple(opt.source, opt.replications, opt.gpu, opt.pretrained_encoder)
+    run_multiple(opt.source, opt.fails, opt.replications, opt.gpu, opt.pretrained_encoder)
