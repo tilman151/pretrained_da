@@ -19,12 +19,11 @@ def transfer_experiment_name(source, target):
     return f'{ExperimentNaming[source]}2{ExperimentNaming[target]}'
 
 
-def pretraining_experiment_name(dataset1, dataset2):
-    assert dataset1 in ExperimentNaming, f'Unknown dataset1 FD number {dataset1}.'
-    assert dataset2 in ExperimentNaming, f'Unknown dataset2 FD number {dataset2}.'
-    if dataset1 > dataset2:
-        dataset1, dataset2 = dataset2, dataset2  # swap to use smaller FD first for consistency
-    return f'pretraining_{ExperimentNaming[dataset1]}&{ExperimentNaming[dataset2]}'
+def pretraining_experiment_name(source, target):
+    assert source in ExperimentNaming, f'Unknown source FD number {source}.'
+    assert target in ExperimentNaming, f'Unknown target FD number {target}.'
+
+    return f'pretraining_{ExperimentNaming[source]}&{ExperimentNaming[target]}'
 
 
 class MLTBLogger(loggers.LoggerCollection):
