@@ -1,7 +1,6 @@
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
-from torch.utils.tensorboard import SummaryWriter
 
 from lightning import metrics
 from lightning.mixins import DataHparamsMixin
@@ -97,7 +96,7 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
 
     def validation_epoch_end(self, validation_step_outputs):
         if self.record_embeddings:
-            self._get_tensorboard().add_figure('val/embeddings', self.embedding_metric.compute(), self.global_step)
+            self.logger.tf_experiment.add_figure('val/embeddings', self.embedding_metric.compute(), self.global_step)
             self.embedding_metric.reset()
 
         val_loss = validation_step_outputs[0]
@@ -107,16 +106,6 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
 
         self.log('val/regression_loss', regression_loss)
         self.log('val/domain_loss', domain_loss)
-
-    def _get_tensorboard(self):
-        if isinstance(self.logger.experiment, SummaryWriter):
-            return self.logger.experiment
-        elif isinstance(self.logger.experiment, list):
-            for logger in self.logger.experiment:
-                if isinstance(logger, SummaryWriter):
-                    return logger
-        else:
-            raise ValueError('No TensorBoard logger specified. Cannot log embeddings.')
 
     def _get_losses(self, batch):
         anchors, queries, true_distances, domain_labels = batch

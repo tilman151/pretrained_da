@@ -92,3 +92,11 @@ class MLTBLogger(loggers.LoggerCollection):
     @property
     def checkpoint_path(self):
         return os.path.join(self.save_dir, self.name, self.version, 'checkpoints')
+
+    @property
+    def tf_experiment(self):
+        return self._tf_logger.experiment
+
+    @property
+    def mlflow_experiment(self):
+        return self._mlflow_logger.experiment
