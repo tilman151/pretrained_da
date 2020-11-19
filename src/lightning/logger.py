@@ -19,6 +19,12 @@ def transfer_experiment_name(source, target):
     return f'{ExperimentNaming[source]}2{ExperimentNaming[target]}'
 
 
+def pretraining_baseline_experiment_name(dataset):
+    assert dataset in ExperimentNaming, f'Unknown dataset FD number {dataset}.'
+
+    return f'pretraining_{ExperimentNaming[dataset]}'
+
+
 def pretraining_experiment_name(source, target):
     assert source in ExperimentNaming, f'Unknown source FD number {source}.'
     assert target in ExperimentNaming, f'Unknown target FD number {target}.'
