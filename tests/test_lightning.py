@@ -217,6 +217,9 @@ class TestUnsupervisedPretraining(unittest.TestCase):
                                                        kernel_size=3,
                                                        base_filters=16,
                                                        latent_dim=64,
+                                                       dropout=0.1,
+                                                       domain_tradeoff=0.001,
+                                                       weight_decay=0,
                                                        lr=0.01)
 
     @torch.no_grad()
@@ -288,7 +291,8 @@ class TestUnsupervisedPretraining(unittest.TestCase):
     def test_all_parameters_updated(self):
         optim = torch.optim.SGD(self.net.parameters(), lr=0.1)
 
-        loss = self.net.training_step((torch.randn(16, 14, 30), torch.randn(16, 14, 30), torch.randn(16)), batch_idx=0)
+        inputs = (torch.randn(16, 14, 30), torch.randn(16, 14, 30), torch.randn(16), torch.randn(16))
+        loss = self.net.training_step(inputs, batch_idx=0)
         loss.backward()
         optim.step()
 
