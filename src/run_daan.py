@@ -34,7 +34,7 @@ def run(source, target, percent_broken, domain_tradeoff, cap, record_embeddings,
                       lr=0.01,
                       record_embeddings=record_embeddings)
     if pretrained_encoder_path is not None:
-        model.load_encoder(pretrained_encoder_path)
+        model.load_encoder(pretrained_encoder_path, load_disc=True)
     model.add_data_hparams(data)
     model.hparams.update({'seed': seed})
     trainer.fit(model, datamodule=data)
