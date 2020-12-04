@@ -13,7 +13,7 @@ def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed
     pl.trainer.seed_everything(seed)
     logger = loggers.MLTBLogger(_get_logdir(), loggers.transfer_experiment_name(source, target),
                                 tensorboard_struct={'pb': percent_broken, 'dt': domain_tradeoff})
-    trainer = pl.Trainer(gpus=[gpu], max_epochs=200, logger=logger,
+    trainer = pl.Trainer(gpus=[gpu], max_epochs=50, logger=logger,
                          deterministic=True, log_every_n_steps=10)
     data = datasets.DomainAdaptionDataModule(fd_source=source,
                                              fd_target=target,
@@ -33,7 +33,7 @@ def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed
                       lr=0.01,
                       record_embeddings=record_embeddings)
     if pretrained_encoder_path is not None:
-        model.load_encoder(pretrained_encoder_path, load_disc=True)
+        model.load_encoder(pretrained_encoder_path, load_disc=False)
     model.add_data_hparams(data)
     model.hparams.update({'seed': seed})
     trainer.fit(model, datamodule=data)

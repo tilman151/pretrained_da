@@ -57,7 +57,7 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         return common
 
     def configure_optimizers(self):
-        encoder_lr = self.lr / 10 if 'pretrained_checkpoint' in self.hparams else self.lr
+        encoder_lr = self.lr if 'pretrained_checkpoint' in self.hparams else self.lr
         param_groups = [{'params': self.encoder.parameters(), 'lr': encoder_lr},
                         {'params': self.regressor.parameters()},
                         {'params': self.domain_disc.parameters()}]
@@ -98,21 +98,33 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
     def validation_step(self, batch, batch_idx, dataloader_idx):
         features, labels = batch
         domain_labels = torch.ones_like(labels) if dataloader_idx == 0 else torch.zeros_like(labels)
-        return self._evaluate(features, labels, domain_labels, record_embeddings=self.record_embeddings)
+        regression_loss, domain_loss, rul_score, batch_size = self._evaluate(features, labels, domain_labels,
+                                                                             record_embeddings=self.record_embeddings)
+
+        if dataloader_idx == 0:
+            return torch.zeros(1, device=self.device), domain_loss, torch.zeros(1, device=self.device), batch_size
+        else:
+            return regression_loss, domain_loss, rul_score, batch_size
 
     def test_step(self, batch, batch_idx, dataloader_idx):
         features, labels = batch
         domain_labels = torch.ones_like(labels) if dataloader_idx == 0 else torch.zeros_like(labels)
-        return self._evaluate(features, labels, domain_labels, record_embeddings=False)
+        regression_loss, domain_loss, rul_score, batch_size = self._evaluate(features, labels, domain_labels,
+                                                                             record_embeddings=False)
+
+        if dataloader_idx == 0:
+            return torch.zeros(1, device=self.device), domain_loss, torch.zeros(1, device=self.device), batch_size
+        else:
+            return regression_loss, domain_loss, rul_score, batch_size
 
     def _evaluate(self, features, labels, domain_labels, record_embeddings=False):
         batch_size = features.shape[0]
-        # Predict on target and reconstruct/domain classify both
-        common = torch.cat([features, torch.empty_like(features)])
-        domain_prediction, prediction = self._complete_forward(common)
+        latent_code = self.encoder(features)
+        prediction = self.regressor(latent_code)
+        domain_prediction = self.domain_disc(latent_code)
 
         regression_loss = self.criterion_regression(prediction.squeeze(), labels)
-        domain_loss = self.criterion_domain(domain_prediction[:batch_size].squeeze(), domain_labels)
+        domain_loss = self.criterion_domain(domain_prediction.squeeze(), domain_labels)
         rul_score = self.rul_score(prediction.squeeze(), labels)
 
         if record_embeddings:
@@ -137,14 +149,21 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         self.log('test/rul_score', rul_score)
 
     def _reduce_metrics(self, outputs):
-        outputs = [item for sublist in outputs for item in sublist]  # concat outputs of both dataloaders
+        source_outputs, target_outputs = outputs
+
+        source_domain_loss, _, _, source_num_samples = self.__reduce_metrics(source_outputs)
+        target_domain_loss, regression_loss, rul_score, target_num_samples = self.__reduce_metrics(target_outputs)
+        domain_loss = (source_domain_loss + target_domain_loss) / (source_num_samples + target_num_samples)
+
+        return regression_loss, domain_loss, rul_score
+
+    def __reduce_metrics(self, outputs):
         regression_loss, domain_loss, rul_score, batch_size = zip(*outputs)  # separate output parts
         num_samples = sum(batch_size)
         regression_loss = torch.sqrt(sum(b * (loss ** 2) for b, loss in zip(batch_size, regression_loss)) / num_samples)
-        domain_loss = sum(b * loss for b, loss in zip(batch_size, domain_loss)) / num_samples
+        summed_domain_loss = sum(b * loss for b, loss in zip(batch_size, domain_loss))
         rul_score = sum(rul_score)
-
-        return regression_loss, domain_loss, rul_score
+        return summed_domain_loss, regression_loss, rul_score, num_samples
 
     def _complete_forward(self, common):
         batch_size = common.shape[0] // 2
