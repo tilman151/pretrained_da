@@ -44,6 +44,7 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         self.criterion_recon = nn.MSELoss()
         self.criterion_regression = metrics.RMSELoss()
         self.criterion_domain = nn.BCEWithLogitsLoss()
+        self.rul_score = metrics.RULScore()
 
         self.embedding_metric = metrics.EmbeddingViz(40000, self.latent_dim)
 
@@ -112,35 +113,38 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
 
         regression_loss = self.criterion_regression(prediction.squeeze(), labels)
         domain_loss = self.criterion_domain(domain_prediction[:batch_size].squeeze(), domain_labels)
+        rul_score = self.rul_score(prediction.squeeze(), labels)
 
         if record_embeddings:
             latent_code = self.encoder(features)
             self.embedding_metric.update(latent_code, domain_labels, labels)
 
-        return regression_loss, domain_loss, batch_size
+        return regression_loss, domain_loss, rul_score, batch_size
 
     def validation_epoch_end(self, outputs):
         if self.record_embeddings:
             self.logger.tf_experiment.add_figure('val/embeddings', self.embedding_metric.compute(), self.global_step)
             self.embedding_metric.reset()
 
-        regression_loss, domain_loss = self._reduce_metrics(outputs)
-        self.log(f'val/regression_loss', regression_loss)
-        self.log(f'val/domain_loss', domain_loss)
+        regression_loss, domain_loss, _ = self._reduce_metrics(outputs)
+        self.log('val/regression_loss', regression_loss)
+        self.log('val/domain_loss', domain_loss)
 
     def test_epoch_end(self, outputs):
-        regression_loss, domain_loss = self._reduce_metrics(outputs)
+        regression_loss, domain_loss, rul_score = self._reduce_metrics(outputs)
         self.log(f'test/regression_loss', regression_loss)
         self.log(f'test/domain_loss', domain_loss)
+        self.log('test/rul_score', rul_score)
 
     def _reduce_metrics(self, outputs):
         outputs = [item for sublist in outputs for item in sublist]  # concat outputs of both dataloaders
-        regression_loss, domain_loss, batch_size = zip(*outputs)  # separate output parts
+        regression_loss, domain_loss, rul_score, batch_size = zip(*outputs)  # separate output parts
         num_samples = sum(batch_size)
         regression_loss = torch.sqrt(sum(b * (loss ** 2) for b, loss in zip(batch_size, regression_loss)) / num_samples)
         domain_loss = sum(b * loss for b, loss in zip(batch_size, domain_loss)) / num_samples
+        rul_score = sum(rul_score)
 
-        return regression_loss, domain_loss
+        return regression_loss, domain_loss, rul_score
 
     def _complete_forward(self, common):
         batch_size = common.shape[0] // 2
