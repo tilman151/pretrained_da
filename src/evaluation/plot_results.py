@@ -8,7 +8,8 @@ from tabulate import tabulate
 
 task_dict = {'four2three': '4→3', 'four2two': '4→2', 'one2three': '1→3',
              'one2two':    '1→2', 'three2four': '3→4', 'three2one': '3→1',
-             'two2four':   '2→4', 'two2one': '2→1'}
+             'two2four':   '2→4', 'two2one': '2→1', 'one2four': '1→4',
+             'four2one': '4→1', 'two2three': '2→3', 'three2two': '3→2'}
 
 
 def load_data(result_dir, filter_methods=None, filter_outlier=True):
@@ -75,17 +76,12 @@ def _load_baseline(result_dir):
     baseline.loc['cmapss_three_baseline', 'dataset'] = 2
     baseline.loc['cmapss_four_baseline', 'dataset'] = 3
 
-    # Remove non-transfer (e.g. one2one) and hard baselines (e.g. one2four)
+    # Remove non-transfer (e.g. one2one)
     baseline_cross = baseline[baseline['dataset'] != baseline['measure']]
-    baseline_cross = baseline_cross[(baseline_cross['dataset'] != 0) | (baseline_cross['measure'] != 3)]
-    baseline_cross = baseline_cross[(baseline_cross['dataset'] != 1) | (baseline_cross['measure'] != 2)]
-    baseline_cross = baseline_cross[(baseline_cross['dataset'] != 2) | (baseline_cross['measure'] != 1)]
-    baseline_cross = baseline_cross[(baseline_cross['dataset'] != 3) | (baseline_cross['measure'] != 0)]
 
-    codes2task = {20: 'three2one', 1: 'one2two', 2: 'one2three', 13: 'two2four',
-                  10: 'two2one', 31: 'four2two', 32: 'four2three', 23: 'three2four'}
-    baseline_cross['task'] = 10 * baseline_cross['dataset'] + baseline_cross['measure']
-    baseline_cross['task'] = baseline_cross['task'].apply(lambda x: codes2task[x])
+    codes2dataset = {0: 'one', 1: 'two', 2: 'three', 3: 'four'}
+    task = [f'{codes2dataset[x["dataset"]]}2{codes2dataset[x["measure"]]}' for _, x in baseline_cross.iterrows()]
+    baseline_cross = baseline_cross.assign(task=task)
 
     if baseline_cross['type'].any():
         baseline_mse = baseline_cross[baseline_cross['type'] == 1]
@@ -102,13 +98,13 @@ def mixed_linear_plots(df, x_axis, x_label):
     plotnine.options.figure_size = (8, 10)
 
     if 'log_score' in df.columns:
-        md = smf.mixedlm('log_score ~ percent_broken + percent_fail_runs', df, groups=df.index.values)
+        md = smf.mixedlm('log_score ~ percent_broken', df, groups=df.index.values)
         mdf_rul = md.fit()
 
         print('#' * 18 + 'Log RUL' + '#' * 18)
         print(mdf_rul.summary())
 
-    md = smf.mixedlm('mse ~ percent_broken + percent_fail_runs', df, groups=df.index.values)
+    md = smf.mixedlm('mse ~ percent_broken', df, groups=df.index.values)
     mdf_mse = md.fit()
 
     print('#' * 18 + 'RMSE' + '#' * 18)
@@ -124,7 +120,7 @@ def mixed_linear_plots(df, x_axis, x_label):
               + plotnine.stat_smooth(method='gls', show_legend=False)
               + plotnine.xlab(x_label)
               + plotnine.ylab('Logarithmic RUL-Score')
-              + plotnine.scale_color_discrete(name='Method', labels=['DAAN', 'JAN'])
+              + plotnine.scale_color_discrete(name='Method')
               + plotnine.theme_classic(base_size=20)
               )
         gg.save('%s_log_rul_by_method.pdf' % x_axis)
@@ -135,7 +131,7 @@ def mixed_linear_plots(df, x_axis, x_label):
               + plotnine.stat_smooth(method='gls', show_legend=False)
               + plotnine.xlab(x_label)
               + plotnine.ylab('Logarithmic RUL-Score')
-              + plotnine.scale_color_discrete(name='Task', labels=['4→3', '4→2', '1→3', '1→2', '3→4', '3→1', '2→4', '2→1'])
+              + plotnine.scale_color_discrete(name='Task')
               + plotnine.theme_classic(base_size=20)
               )
         gg.save('%s_log_rul_by_task.pdf' % x_axis)
@@ -146,7 +142,7 @@ def mixed_linear_plots(df, x_axis, x_label):
           + plotnine.stat_smooth(method='gls')
           + plotnine.ylab('RMSE')
           + plotnine.xlab(x_label)
-          + plotnine.scale_color_discrete(name='Method', labels=['DAAN', 'JAN'])
+          + plotnine.scale_color_discrete(name='Method')
           + plotnine.theme_classic(base_size=20)
           )
     gg.save('%s_mse_by_method.pdf' % x_axis)
@@ -156,7 +152,7 @@ def mixed_linear_plots(df, x_axis, x_label):
           + plotnine.geom_abline(plotnine.aes(intercept=mdf_mse.params['Intercept'], slope=mdf_mse.params[x_axis]))
           + plotnine.stat_smooth(method='gls')
           + plotnine.ylab('RMSE')
-          + plotnine.scale_color_discrete(name='Task', labels=['4→3', '4→2', '1→3', '1→2', '3→4', '3→1', '2→4', '2→1'])
+          + plotnine.scale_color_discrete(name='Task')
           + plotnine.theme_classic(base_size=20)
           )
     gg.save('%s_mse_by_task.pdf' % x_axis)
@@ -198,7 +194,7 @@ def method_plot(df, baseline_rul, baseline_mse, method):
     if baseline_rul is not None:
         plotnine.ylim = (2, 10)
         gg = (plotnine.ggplot(method_df, plotnine.aes(x='percent_broken', y='log_score', color='method'))
-              + plotnine.facet_wrap('task', 2, 4)
+              + plotnine.facet_wrap('task', 3, 4)
               + plotnine.stat_boxplot(plotnine.aes(y='log_value', x=60), data=baseline_rul, width=80, color='#14639e',
                                       show_legend=False)
               + plotnine.geom_jitter(width=2.5, show_legend=False)
@@ -211,7 +207,7 @@ def method_plot(df, baseline_rul, baseline_mse, method):
 
     plotnine.ylim = (90, 10)
     gg = (plotnine.ggplot(method_df, plotnine.aes(x='percent_broken', y='mse', color='method'))
-          + plotnine.facet_wrap('task', 2, 4)
+          + plotnine.facet_wrap('task', 3, 4)
           + plotnine.stat_boxplot(plotnine.aes(y='value', x=60), data=baseline_mse, width=80, color='#14639e',
                                   show_legend=False)
           + plotnine.geom_jitter(width=2.5, show_legend=False)
@@ -269,7 +265,7 @@ if __name__ == '__main__':
     transfer, base_rul, base_rmse = load_data(opt.result_dir,
                                               filter_methods=['daan'],
                                               filter_outlier=opt.filter_outlier)
-    # mixed_linear_plots(transfer, 'percent_broken', 'Grade of Degradation in %')
+    mixed_linear_plots(transfer, 'percent_broken', 'Grade of Degradation in %')
     # mixed_linear_plots(transfer, 'percent_fail_runs', 'Number of Systems in %')
     # mixed_linear_factors_plot(transfer, 'percent_fail_runs', 'percent_broken')
     # mixed_linear_factors_plot(transfer, 'percent_broken', 'percent_fail_runs')
