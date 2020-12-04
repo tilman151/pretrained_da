@@ -37,7 +37,7 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         self.encoder = networks.Encoder(self.in_channels, self.base_filters, self.kernel_size,
                                         self.num_layers, self.latent_dim, self.seq_len, self.dropout)
         if self.domain_tradeoff > 0:
-            self.domain_disc = networks.DomainDiscriminator(self.latent_dim, num_layers=2, hidden_dim=self.latent_dim)
+            self.domain_disc = networks.DomainDiscriminator(self.latent_dim, num_layers=2, hidden_dim=self.latent_dim // 2)
         else:
             self.domain_disc = None
         self.criterion_regression = nn.MSELoss()
