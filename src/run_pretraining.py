@@ -9,7 +9,7 @@ from lightning import logger as loggers
 from lightning import pretraining
 
 
-def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed, gpu):
+def run(source, target, percent_broken, domain_tradeoff, dropout, record_embeddings, seed, gpu):
     pl.trainer.seed_everything(seed)
     logger = loggers.MLTBLogger(_get_logdir(), loggers.pretraining_experiment_name(source, target),
                                 tensorboard_struct={'pb': percent_broken, 'dt': domain_tradeoff})
@@ -22,7 +22,7 @@ def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed
                                                 kernel_size=3,
                                                 base_filters=16,
                                                 latent_dim=128,
-                                                dropout=0.1,
+                                                dropout=dropout,
                                                 domain_tradeoff=domain_tradeoff,
                                                 lr=0.01,
                                                 weight_decay=0,
@@ -68,7 +68,7 @@ def _get_checkpoint_path(logger):
     return checkpoint_path
 
 
-def run_multiple(source, target, broken, domain_tradeoff, record_embeddings, replications, gpu):
+def run_multiple(source, target, broken, domain_tradeoff, dropout, record_embeddings, replications, gpu):
     broken = broken if broken is not None else [1.0]
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
@@ -80,7 +80,7 @@ def run_multiple(source, target, broken, domain_tradeoff, record_embeddings, rep
     for params in sklearn.model_selection.ParameterGrid(parameter_grid):
         for s in seeds:
             checkpoint_path = run(source, target, params['broken'], params['domain_tradeoff'],
-                                  record_embeddings, s, gpu)
+                                  dropout, record_embeddings, s, gpu)
             checkpoints[params['broken']][params['domain_tradeoff']].append(checkpoint_path)
 
     return checkpoints
@@ -93,10 +93,11 @@ if __name__ == '__main__':
     parser.add_argument('--target', type=int, help='FD number of the target data')
     parser.add_argument('-b', '--broken', nargs='+', type=float, help='percent broken to use')
     parser.add_argument('--domain_tradeoff', nargs='+', type=float, help='tradeoff for domain classification')
+    parser.add_argument('--dropout', type=int, default=0.1, help='dropout used after each conv layer')
     parser.add_argument('--record_embeddings', action='store_true', help='whether to record embeddings of val data')
     parser.add_argument('-r', '--replications', type=int, default=3, help='replications for each run')
     parser.add_argument('--gpu', type=int, default=0, help='id of GPU to use')
     opt = parser.parse_args()
 
     run_multiple(opt.source, opt.target, opt.broken, opt.domain_tradeoff,
-                 opt.record_embeddings, opt.replications, opt.gpu)
+                 opt.dropout, opt.record_embeddings, opt.replications, opt.gpu)
