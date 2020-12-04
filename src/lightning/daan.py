@@ -18,7 +18,6 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
                  domain_trade_off,
                  domain_disc_dim,
                  num_disc_layers,
-                 source_rul_cap,
                  optim_type,
                  lr,
                  record_embeddings=False):
@@ -33,7 +32,6 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         self.domain_trade_off = domain_trade_off
         self.domain_disc_dim = domain_disc_dim
         self.num_disc_layers = num_disc_layers
-        self.source_rul_cap = source_rul_cap
         self.optim_type = optim_type
         self.lr = lr
         self.record_embeddings = record_embeddings
@@ -78,7 +76,7 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         domain_labels = torch.cat([torch.ones_like(source_labels),
                                    torch.zeros_like(source_labels)])
         # Predict on source and reconstruct/domain classify both
-        loss, regression_loss, domain_loss = self._train(source, source_labels, target, domain_labels, cap=True)
+        loss, regression_loss, domain_loss = self._train(source, source_labels, target, domain_labels)
 
         self.log('train/loss', loss)
         self.log('train/regression_loss', regression_loss)
@@ -86,24 +84,15 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
 
         return loss
 
-    def _train(self, regressor_features, regressor_labels, auxiliary_features, domain_labels, cap=False):
+    def _train(self, regressor_features, regressor_labels, auxiliary_features, domain_labels):
         common = torch.cat([regressor_features, auxiliary_features])
         domain_prediction, prediction = self._complete_forward(common)
 
-        rul_mask = self._get_rul_mask(regressor_labels, cap)
         regression_loss = self.criterion_regression(prediction.squeeze(), regressor_labels)
-        domain_loss = self.criterion_domain(domain_prediction.squeeze()[rul_mask], domain_labels[rul_mask])
+        domain_loss = self.criterion_domain(domain_prediction.squeeze(), domain_labels)
         loss = regression_loss + self.domain_trade_off * domain_loss
 
         return loss, regression_loss, domain_loss
-
-    def _get_rul_mask(self, classifier_labels, cap):
-        if cap and self.source_rul_cap is not None:
-            rul_mask = (classifier_labels > self.source_rul_cap)
-        else:
-            rul_mask = torch.ones_like(classifier_labels, dtype=torch.bool)
-
-        return rul_mask.repeat(2)
 
     def validation_step(self, batch, batch_idx, dataloader_idx):
         features, labels = batch

@@ -9,7 +9,7 @@ from lightning import daan
 from lightning import logger as loggers
 
 
-def run(source, target, percent_broken, domain_tradeoff, cap, record_embeddings, seed, gpu, pretrained_encoder_path):
+def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed, gpu, pretrained_encoder_path):
     pl.trainer.seed_everything(seed)
     logger = loggers.MLTBLogger(_get_logdir(), loggers.transfer_experiment_name(source, target),
                                 tensorboard_struct={'pb': percent_broken, 'dt': domain_tradeoff})
@@ -29,7 +29,6 @@ def run(source, target, percent_broken, domain_tradeoff, cap, record_embeddings,
                       domain_trade_off=domain_tradeoff,
                       domain_disc_dim=64,
                       num_disc_layers=2,
-                      source_rul_cap=int((1 - percent_broken) * 125) if cap else None,
                       optim_type='adam',
                       lr=0.01,
                       record_embeddings=record_embeddings)
@@ -48,7 +47,7 @@ def _get_logdir():
     return log_dir
 
 
-def run_multiple(source, target, broken, domain_tradeoff, cap,
+def run_multiple(source, target, broken, domain_tradeoff,
                  record_embeddings, replications, gpu, pretrained_encoder_path):
     broken = broken if broken is not None else [1.0]
     random.seed(999)
@@ -61,7 +60,7 @@ def run_multiple(source, target, broken, domain_tradeoff, cap,
         for s in seeds:
             run(source, target,
                 params['broken'], params['domain_tradeoff'],
-                cap, record_embeddings, s, gpu, pretrained_encoder_path)
+                record_embeddings, s, gpu, pretrained_encoder_path)
 
 
 if __name__ == '__main__':
@@ -72,11 +71,10 @@ if __name__ == '__main__':
     parser.add_argument('--pretrained_encoder', default=None, help='Path to checkpoint file form pretraining')
     parser.add_argument('-b', '--broken', nargs='*', type=float, help='percent broken to use')
     parser.add_argument('--domain_tradeoff', nargs='*', type=float, help='tradeoff for domain classification')
-    parser.add_argument('-c', '--cap', action='store_true', help='cap the source data for adaption loss')
     parser.add_argument('--record_embeddings', action='store_true', help='whether to record embeddings of val data')
     parser.add_argument('-r', '--replications', type=int, default=3, help='replications for each run')
     parser.add_argument('--gpu', type=int, default=0, help='id of GPU to use')
     opt = parser.parse_args()
 
     run_multiple(opt.source, opt.target, opt.broken, opt.domain_tradeoff,
-                 opt.cap, opt.record_embeddings, opt.replications, opt.gpu, opt.pretrained_encoder)
+                 opt.record_embeddings, opt.replications, opt.gpu, opt.pretrained_encoder)
