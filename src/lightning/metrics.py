@@ -71,14 +71,14 @@ class RMSELoss(nn.Module):
 
 
 class RULScore:
-    def __init__(self, pos_factor=10, neg_factor=13):
+    def __init__(self, pos_factor=10, neg_factor=-13):
         self.pos_factor = pos_factor
         self.neg_factor = neg_factor
 
     def __call__(self, inputs, targets):
         dist = inputs - targets
         for i, d in enumerate(dist):
-            dist[i] = (- d / self.neg_factor) if d < 0 else (d / self.pos_factor)
+            dist[i] = (d / self.neg_factor) if d < 0 else (d / self.pos_factor)
         dist = torch.exp(dist) - 1
         score = dist.sum()
 
