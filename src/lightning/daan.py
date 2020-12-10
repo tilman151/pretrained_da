@@ -114,6 +114,7 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
     def _evaluate(self, features, labels, domain_labels, record_embeddings=False):
         batch_size = features.shape[0]
         latent_code = self.encoder(features)
+        latent_code = latent_code / torch.norm(latent_code, dim=1, keepdim=True)
         prediction = self.regressor(latent_code)
         domain_prediction = self.domain_disc(latent_code)
 
@@ -164,6 +165,7 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         batch_size = common.shape[0] // 2
 
         latent_code = self.encoder(common)
+        latent_code = latent_code / torch.norm(latent_code, dim=1, keepdim=True)
         regression_code, _ = torch.split(latent_code, batch_size)
         prediction = self.regressor(regression_code)
         domain_prediction = self.domain_disc(latent_code)
