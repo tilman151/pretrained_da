@@ -12,8 +12,8 @@ task_dict = {'four2three': '4→3', 'four2two': '4→2', 'one2three': '1→3',
              'four2one': '4→1', 'two2three': '2→3', 'three2two': '3→2'}
 
 
-def load_data(result_dir, filter_methods=None, filter_outlier=True):
-    transfer_df = _load_transfer(result_dir, filter_methods, filter_outlier)
+def load_data(result_dir, filter_methods=None, filter_outlier=True, split='test'):
+    transfer_df = _load_transfer(result_dir, filter_methods, filter_outlier, split)
     baseline_mse, baseline_rul = _load_baseline(result_dir)
 
     transfer_df['task'] = transfer_df['task'].map(task_dict)
@@ -25,9 +25,10 @@ def load_data(result_dir, filter_methods=None, filter_outlier=True):
     return transfer_df, baseline_rul, baseline_mse
 
 
-def _load_transfer(result_dir, filter_methods, filter_outlier):
+def _load_transfer(result_dir, filter_methods, filter_outlier, split):
     transfer_path = os.path.join(result_dir, 'transfer.csv')
     df = pd.read_csv(transfer_path, index_col=0)
+    mse_name = 'mse' if split == 'test' else 'val_mse'
 
     # Transform to percentages
     df['percent_broken'] *= 100
@@ -48,15 +49,21 @@ def _load_transfer(result_dir, filter_methods, filter_outlier):
 
     if filter_outlier:
         grouped = df.groupby(['task', 'percent_broken'])
-        quantiles = grouped.agg(q1=('mse', lambda x: x.quantile(0.25)),
-                                q3=('mse', lambda x: x.quantile(0.75)))
+        quantiles = grouped.agg(q1=(mse_name, lambda x: x.quantile(0.25)),
+                                q3=(mse_name, lambda x: x.quantile(0.75)))
         iqr = quantiles['q3'] - quantiles['q1']
         thresholds = quantiles['q3'] + 1.5 * iqr
         sub_dfs = []
         for group in grouped.groups:
             sub_df = grouped.get_group(group)
-            sub_dfs.append(sub_df[sub_df['mse'] < thresholds[group]])
+            sub_dfs.append(sub_df[sub_df[mse_name] < thresholds[group]])
         df = pd.concat(sub_dfs)
+
+    if mse_name == 'mse':
+        df = df.drop('val_mse', axis=1)
+    else:
+        df['mse'] = df[mse_name]
+        df = df.drop(mse_name)
 
     return df
 
@@ -77,18 +84,18 @@ def _load_baseline(result_dir):
     baseline.loc['cmapss_four_baseline', 'dataset'] = 3
 
     # Remove non-transfer (e.g. one2one)
-    baseline_cross = baseline[baseline['dataset'] != baseline['measure']]
+    baseline = baseline[baseline['dataset'] != baseline['measure']]
 
     codes2dataset = {0: 'one', 1: 'two', 2: 'three', 3: 'four'}
-    task = [f'{codes2dataset[x["dataset"]]}2{codes2dataset[x["measure"]]}' for _, x in baseline_cross.iterrows()]
-    baseline_cross = baseline_cross.assign(task=task)
+    task = [f'{codes2dataset[x["dataset"]]}2{codes2dataset[x["measure"]]}' for _, x in baseline.iterrows()]
+    baseline = baseline.assign(task=task)
 
-    if baseline_cross['type'].any():
-        baseline_mse = baseline_cross[baseline_cross['type'] == 1]
-        baseline_rul = baseline_cross[baseline_cross['type'] == 0]
+    if baseline['type'].any():
+        baseline_mse = baseline[baseline['type'] == 1]
+        baseline_rul = baseline[baseline['type'] == 0]
         baseline_rul['log_value'] = baseline_rul['value'].apply(np.log)
     else:
-        baseline_mse = baseline_cross[baseline_cross['type'] == 0]
+        baseline_mse = baseline[baseline['type'] == 0]
         baseline_rul = None
 
     return baseline_mse, baseline_rul
@@ -259,12 +266,14 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Plot results of transfer against baselines.')
     parser.add_argument('result_dir', help='path to folder with baseline.csv and transfer.csv')
+    parser.add_argument('--split', choices=['val', 'test'], default='test', help='plot validation or test results')
     parser.add_argument('--filter_outlier', action='store_true', help='whether to filter out outlier transfer runs')
     opt = parser.parse_args()
 
     transfer, base_rul, base_rmse = load_data(opt.result_dir,
                                               filter_methods=['dann'],
-                                              filter_outlier=opt.filter_outlier)
+                                              filter_outlier=opt.filter_outlier,
+                                              split=opt.split)
     mixed_linear_plots(transfer, 'percent_broken', 'Grade of Degradation in %')
     # mixed_linear_plots(transfer, 'percent_fail_runs', 'Number of Systems in %')
     # mixed_linear_factors_plot(transfer, 'percent_fail_runs', 'percent_broken')
