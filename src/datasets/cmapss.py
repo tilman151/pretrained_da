@@ -17,7 +17,8 @@ class CMAPSSDataModule(pl.LightningDataModule):
                  window_size=30,
                  percent_fail_runs=None,
                  percent_broken=None,
-                 feature_select=None):
+                 feature_select=None,
+                 truncate_val=False):
         super().__init__()
         self.DATA_ROOT = os.path.join(os.path.dirname(__file__), '../..', 'data', 'CMAPSS')
 
@@ -32,6 +33,7 @@ class CMAPSSDataModule(pl.LightningDataModule):
         self.percent_broken = percent_broken
         self.percent_fail_runs = percent_fail_runs
         self.feature_select = feature_select
+        self.truncate_val = truncate_val
 
         self.hparams = {'fd': self.fd,
                         'batch_size': self.batch_size,
@@ -89,7 +91,7 @@ class CMAPSSDataModule(pl.LightningDataModule):
         file_path = self._file_path(split)
 
         features = self._load_features(file_path)
-        if split == 'dev':
+        if split == 'dev' or (split == 'val' and self.truncate_val):
             features = self._truncate_features(features)
         features = self._normalize(features)
         features, time_steps = self._remove_time_steps_from_features(features)

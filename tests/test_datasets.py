@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 
 import numpy as np
 import torch
@@ -12,7 +13,6 @@ from datasets.cmapss import PairedCMAPSS
 
 
 class TestCMAPSS(unittest.TestCase):
-
     def test__data(self):
         for n, win in enumerate([30, 20, 30, 15], start=1):
             dataset = cmapss.CMAPSSDataModule(n, batch_size=16, window_size=win)
@@ -108,6 +108,26 @@ class TestCMAPSS(unittest.TestCase):
                     # lengths should be length of raw data minus one less than window_size
                     expected_lenghts = [1] * len(raw_data) if split == 'test' else [len(f) - 29 for f in raw_data]
                     self.assertListEqual(expected_lenghts, dataset.lengths[split])
+
+    @mock.patch('datasets.cmapss.CMAPSSDataModule._truncate_features', wraps=lambda x: x)
+    def test_val_truncation(self, mock_truncate):
+        dataset = cmapss.CMAPSSDataModule(fd=1, window_size=30, batch_size=4)
+        dataset.prepare_data()
+        with self.subTest(truncate_val=False):
+            dataset._setup_split('dev')
+            mock_truncate.assert_called_once()
+            mock_truncate.reset_mock()
+            dataset._setup_split('val')
+            mock_truncate.assert_not_called()
+
+        dataset = cmapss.CMAPSSDataModule(fd=1, window_size=30, batch_size=4, truncate_val=True)
+        dataset.prepare_data()
+        with self.subTest(truncate_val=True):
+            dataset._setup_split('dev')
+            mock_truncate.assert_called_once()
+            mock_truncate.reset_mock()
+            dataset._setup_split('val')
+            mock_truncate.assert_called_once()
 
 
 class TestCMAPSSAdaption(unittest.TestCase):
