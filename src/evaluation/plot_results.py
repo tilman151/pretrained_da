@@ -263,15 +263,15 @@ if __name__ == '__main__':
     opt = parser.parse_args()
 
     transfer, base_rul, base_rmse = load_data(opt.result_dir,
-                                              filter_methods=['daan'],
+                                              filter_methods=['dann'],
                                               filter_outlier=opt.filter_outlier)
     mixed_linear_plots(transfer, 'percent_broken', 'Grade of Degradation in %')
     # mixed_linear_plots(transfer, 'percent_fail_runs', 'Number of Systems in %')
     # mixed_linear_factors_plot(transfer, 'percent_fail_runs', 'percent_broken')
     # mixed_linear_factors_plot(transfer, 'percent_broken', 'percent_fail_runs')
-    for m in ['daan']:
+    for m in ['dann']:
         method_plot(transfer, base_rul, base_rmse, m)
-    for m in ['daan']:
+    for m in ['dann']:
         print('')
         print('#' * 18 + m + '#' * 18)
         print('')
