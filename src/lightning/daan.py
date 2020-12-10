@@ -101,10 +101,7 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         regression_loss, domain_loss, rul_score, batch_size = self._evaluate(features, labels, domain_labels,
                                                                              record_embeddings=self.record_embeddings)
 
-        if dataloader_idx == 0:
-            return torch.zeros(1, device=self.device), domain_loss, torch.zeros(1, device=self.device), batch_size
-        else:
-            return regression_loss, domain_loss, rul_score, batch_size
+        return regression_loss, domain_loss, rul_score, batch_size
 
     def test_step(self, batch, batch_idx, dataloader_idx):
         features, labels = batch
@@ -112,10 +109,7 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         regression_loss, domain_loss, rul_score, batch_size = self._evaluate(features, labels, domain_labels,
                                                                              record_embeddings=False)
 
-        if dataloader_idx == 0:
-            return torch.zeros(1, device=self.device), domain_loss, torch.zeros(1, device=self.device), batch_size
-        else:
-            return regression_loss, domain_loss, rul_score, batch_size
+        return regression_loss, domain_loss, rul_score, batch_size
 
     def _evaluate(self, features, labels, domain_labels, record_embeddings=False):
         batch_size = features.shape[0]
@@ -138,12 +132,13 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
             self.logger.tf_experiment.add_figure('val/embeddings', self.embedding_metric.compute(), self.global_step)
             self.embedding_metric.reset()
 
-        regression_loss, domain_loss, _ = self._reduce_metrics(outputs)
+        regression_loss, source_regression_loss, domain_loss, _ = self._reduce_metrics(outputs)
         self.log('val/regression_loss', regression_loss)
+        self.log('val/source_regression_loss', source_regression_loss)
         self.log('val/domain_loss', domain_loss)
 
     def test_epoch_end(self, outputs):
-        regression_loss, domain_loss, rul_score = self._reduce_metrics(outputs)
+        regression_loss, source_regression_loss, domain_loss, rul_score = self._reduce_metrics(outputs)
         self.log(f'test/regression_loss', regression_loss)
         self.log(f'test/domain_loss', domain_loss)
         self.log('test/rul_score', rul_score)
@@ -151,11 +146,11 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
     def _reduce_metrics(self, outputs):
         source_outputs, target_outputs = outputs
 
-        source_domain_loss, _, _, source_num_samples = self.__reduce_metrics(source_outputs)
+        source_domain_loss, source_regression_loss, _, source_num_samples = self.__reduce_metrics(source_outputs)
         target_domain_loss, regression_loss, rul_score, target_num_samples = self.__reduce_metrics(target_outputs)
         domain_loss = (source_domain_loss + target_domain_loss) / (source_num_samples + target_num_samples)
 
-        return regression_loss, domain_loss, rul_score
+        return regression_loss, source_regression_loss, domain_loss, rul_score
 
     def __reduce_metrics(self, outputs):
         regression_loss, domain_loss, rul_score, batch_size = zip(*outputs)  # separate output parts
