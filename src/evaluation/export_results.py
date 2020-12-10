@@ -56,11 +56,13 @@ def _runs_of_baseline(client, e):
 def _runs_of_transfer(client, experiment):
     """Retrieve and evaluate RUL experiment."""
     replications = _get_replications(client, experiment)
-    df = pd.DataFrame(np.zeros((len(replications), 3)),
-                      columns=['percent_broken', 'percent_fail_runs', 'mse'],
-                      index=[f'cmapss_{experiment.name}_daan'] * len(replications))
+    replications = sorted(replications, key=lambda r: -r.info.start_time)[:50]
+    df = pd.DataFrame(np.zeros((len(replications), 4)),
+                      columns=['percent_broken', 'percent_fail_runs', 'mse', 'val_mse'],
+                      index=[f'cmapss_{experiment.name}_dann'] * len(replications))
     for i, run in enumerate(replications):
-        best_rmse = _get_test_value(client, 'regression_loss', run)
+        test_rmse = _get_test_value(client, 'regression_loss', run)
+        val_rmse = _get_val_value(client, 'regression_loss', run)
         if 'percent_broken' in run.data.params and not run.data.params['percent_broken'] == 'None':
             percent_broken = run.data.params['percent_broken']
         else:
@@ -69,7 +71,7 @@ def _runs_of_transfer(client, experiment):
             percent_fail_runs = run.data.params['percent_fail_runs']
         else:
             percent_fail_runs = 0.
-        df.iloc[i] = [percent_broken, percent_fail_runs, best_rmse]
+        df.iloc[i] = [percent_broken, percent_fail_runs, test_rmse, val_rmse]
 
     df = df.sort_values(['percent_broken', 'percent_fail_runs'])
     print('Return %d runs...' % len(df))
@@ -88,6 +90,14 @@ def _get_replications(client, experiment):
 def _get_test_value(client, metric, run):
     """Return test value of selected metric."""
     best_value = client.get_run(run.info.run_id).data.metrics[f'test/{metric}']
+
+    return best_value
+
+
+def _get_val_value(client, metric, run):
+    """Return test value of selected metric."""
+    best_value = client.get_metric_history(run.info.run_id, f'val/{metric}')
+    best_value = best_value[-1].value
 
     return best_value
 
