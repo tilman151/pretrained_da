@@ -88,7 +88,8 @@ class PretrainingAdaptionDataModule(pl.LightningDataModule):
                  min_distance=1,
                  percent_fail_runs=None,
                  percent_broken=None,
-                 feature_select=None):
+                 feature_select=None,
+                 truncate_target_val=False):
         super().__init__()
 
         self.fd_source = fd_source
@@ -101,6 +102,7 @@ class PretrainingAdaptionDataModule(pl.LightningDataModule):
         self.percent_broken = percent_broken
         self.percent_fail_runs = percent_fail_runs
         self.feature_select = feature_select
+        self.truncate_target_val = truncate_target_val
 
         self.hparams = {'fd_source': self.fd_source,
                         'fd_target': self.fd_target,
@@ -110,15 +112,13 @@ class PretrainingAdaptionDataModule(pl.LightningDataModule):
                         'max_rul': self.max_rul,
                         'min_distance': self.min_distance,
                         'percent_broken': self.percent_broken,
-                        'percent_fail_runs': self.percent_fail_runs}
+                        'percent_fail_runs': self.percent_fail_runs,
+                        'truncate_target_val': self.truncate_target_val}
 
         self.source = CMAPSSDataModule(fd_source, batch_size, max_rul, window_size,
                                        None, None, feature_select)
         self.target = CMAPSSDataModule(fd_target, batch_size, max_rul, window_size,
-                                       percent_fail_runs, percent_broken, feature_select)
-
-        self.source_pairs = None
-        self.target_pairs = None
+                                       percent_fail_runs, percent_broken, feature_select, truncate_target_val)
 
     def prepare_data(self, *args, **kwargs):
         self.source.prepare_data(*args, **kwargs)

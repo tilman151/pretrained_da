@@ -404,6 +404,16 @@ class TestPretrainingDataModuleFullData(unittest.TestCase, PretrainingDataModule
 
         self.expected_num_val_loaders = 3
 
+    def test_target_val_truncation(self):
+        with self.subTest(truncation=False):
+            dataset = datasets.PretrainingAdaptionDataModule(3, 1, num_samples=10000, batch_size=16, window_size=30)
+            self.assertFalse(dataset.target.truncate_val)
+
+        with self.subTest(truncation=True):
+            dataset = datasets.PretrainingAdaptionDataModule(3, 1, num_samples=10000, batch_size=16, window_size=30,
+                                                             truncate_target_val=True)
+            self.assertTrue(dataset.target.truncate_val)
+
 
 class TestPretrainingDataModuleLowData(unittest.TestCase, PretrainingDataModuleTemplate):
     def setUp(self):
@@ -422,6 +432,16 @@ class TestPretrainingBaselineDataModuleFullData(unittest.TestCase, PretrainingDa
         self.dataset.setup()
 
         self.expected_num_val_loaders = 2
+
+    def test_val_truncation(self):
+        with self.subTest(truncation=False):
+            dataset = datasets.PretrainingBaselineDataModule(3, num_samples=10000, batch_size=16, window_size=30)
+            self.assertFalse(dataset.source.truncate_val)
+
+        with self.subTest(truncation=True):
+            dataset = datasets.PretrainingBaselineDataModule(3, num_samples=10000, batch_size=16, window_size=30,
+                                                             truncate_val=True)
+            self.assertTrue(dataset.source.truncate_val)
 
 
 class TestPretrainingBaselineDataModuleLowData(unittest.TestCase, PretrainingDataModuleTemplate):

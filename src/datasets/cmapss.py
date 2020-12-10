@@ -40,7 +40,8 @@ class CMAPSSDataModule(pl.LightningDataModule):
                         'window_size': self.window_size,
                         'max_rul': self.max_rul,
                         'percent_broken': self.percent_broken,
-                        'percent_fail_runs': self.percent_fail_runs}
+                        'percent_fail_runs': self.percent_fail_runs,
+                        'truncate_val': self.truncate_val}
 
         self.data = {}
         self.lengths = {}
