@@ -35,7 +35,7 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         self.record_embeddings = record_embeddings
 
         self.encoder = networks.Encoder(self.in_channels, self.base_filters, self.kernel_size,
-                                        self.num_layers, self.latent_dim, self.seq_len, self.dropout)
+                                        self.num_layers, self.latent_dim, self.seq_len, self.dropout, norm_outputs=True)
         if self.domain_tradeoff > 0:
             self.domain_disc = networks.DomainDiscriminator(self.latent_dim, num_layers=2, hidden_dim=self.latent_dim // 2)
         else:
@@ -68,7 +68,6 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
 
     def _get_embeddings(self, inputs):
         embeddings = self.encoder(inputs)
-        embeddings = embeddings / torch.norm(embeddings, dim=1, keepdim=True)
 
         return embeddings
 
@@ -107,6 +106,7 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
 
         self.log('val/regression_loss', regression_loss)
         self.log('val/domain_loss', domain_loss)
+        self.log('val/checkpoint_score', regression_loss - self.domain_tradeoff * domain_loss)
 
     def _get_losses(self, batch):
         anchors, queries, true_distances, domain_labels = batch

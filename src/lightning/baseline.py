@@ -30,7 +30,7 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         self.record_embeddings = record_embeddings
 
         self.encoder = networks.Encoder(self.in_channels, self.base_filters, self.kernel_size,
-                                        self.num_layers, self.latent_dim, self.seq_len, dropout=0)
+                                        self.num_layers, self.latent_dim, self.seq_len, dropout=0, norm_outputs=False)
         self.regressor = networks.Regressor(latent_dim)
 
         self.criterion_regression = metrics.RMSELoss()

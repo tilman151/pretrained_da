@@ -1,10 +1,11 @@
+import torch
 import torch.nn as nn
 
 from models import layers
 
 
 class Encoder(nn.Module):
-    def __init__(self, in_channels, base_filters, kernel_size, num_layers, latent_dim, seq_len, dropout):
+    def __init__(self, in_channels, base_filters, kernel_size, num_layers, latent_dim, seq_len, dropout, norm_outputs):
         super().__init__()
 
         self.in_channels = in_channels
@@ -14,6 +15,7 @@ class Encoder(nn.Module):
         self.latent_dim = latent_dim
         self.seq_len = seq_len
         self.dropout = dropout
+        self.norm_outputs = norm_outputs
 
         self.layers = self._build_encoder()
 
@@ -35,7 +37,11 @@ class Encoder(nn.Module):
         return nn.Sequential(*sequence)
 
     def forward(self, inputs):
-        return self.layers(inputs)
+        outputs = self.layers(inputs)
+        if self.norm_features:
+            outputs /= torch.norm(outputs, dim=1, keepdim=True)
+
+        return outputs
 
 
 class Decoder(nn.Module):
