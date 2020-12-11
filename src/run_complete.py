@@ -1,15 +1,19 @@
-from run_daan import run_multiple as run_daan
+import random
+
+from run_daan import run as run_daan
 from run_pretraining import run_multiple as run_pretraining
 
 
 def run(source, target, percent_broken, domain_tradeoff, dropout,
-        record_embeddings, pretraining_reps, replications, gpu):
+        record_embeddings, pretraining_reps, gpu):
     pretrained_checkpoints = run_pretraining(source, target, percent_broken, domain_tradeoff, dropout,
                                              record_embeddings, pretraining_reps, gpu)
+    random.seed(999)
+    seeds = [random.randint(0, 9999999) for _ in range(pretraining_reps)]
     for broken, checkpoint_per_tradeoff in pretrained_checkpoints.items():
         for _, checkpoints in checkpoint_per_tradeoff.items():
-            for pretrained_checkpoint in checkpoints:
-                run_daan(source, target, [broken], [1.0], record_embeddings, replications, gpu, pretrained_checkpoint)
+            for pretrained_checkpoint, s in zip(checkpoints, seeds):
+                run_daan(source, target, [broken], [1.0], record_embeddings, s, gpu, pretrained_checkpoint)
 
 
 if __name__ == '__main__':
@@ -21,10 +25,9 @@ if __name__ == '__main__':
     parser.add_argument('--domain_tradeoff', nargs='*', type=float, default=[0.01], help='tradeoff for pre-training')
     parser.add_argument('--dropout', type=int, default=0.1, help='dropout used after each conv layer')
     parser.add_argument('-p', '--pretraining_reps', type=int, default=1, help='replications for each pretraining run')
-    parser.add_argument('-r', '--replications', type=int, default=10, help='replications for each adaption run')
     parser.add_argument('--record_embeddings', action='store_true', help='whether to record embeddings of val data')
     parser.add_argument('--gpu', type=int, default=0, help='id of GPU to use')
     opt = parser.parse_args()
 
     run(opt.source, opt.target, opt.broken, opt.domain_tradeoff, opt.dropout,
-        opt.record_embeddings, opt.pretraining_reps, opt.replications, opt.gpu)
+        opt.record_embeddings, opt.pretraining_reps, opt.gpu)
