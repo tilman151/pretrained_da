@@ -17,6 +17,7 @@ class LoadEncoderMixin:
             self.domain_disc.load_state_dict(disc_state)
 
         self.hparams['pretrained_checkpoint'] = checkpoint_path
+        self.encoder.norm_outputs = True
 
     def _extract_state_dict(self, checkpoint, model):
         encoder_state = {n.replace(model + '.', ''): weight
