@@ -130,7 +130,8 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
 
     def validation_epoch_end(self, outputs):
         if self.record_embeddings:
-            self.logger.tf_experiment.add_figure('val/embeddings', self.embedding_metric.compute(), self.global_step)
+            embedding_fig = self.embedding_metric.compute()
+            self.logger.log_figure('val/embeddings', embedding_fig, self.global_step)
             self.embedding_metric.reset()
 
         regression_loss, source_regression_loss, domain_loss, _ = self._reduce_metrics(outputs)

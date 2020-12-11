@@ -96,7 +96,8 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
 
     def validation_epoch_end(self, validation_step_outputs):
         if self.record_embeddings:
-            self.logger.tf_experiment.add_figure('val/embeddings', self.embedding_metric.compute(), self.global_step)
+            embedding_fig = self.embedding_metric.compute()
+            self.logger.log_figure('val/embeddings', embedding_fig, self.global_step)
             self.embedding_metric.reset()
 
         val_loss = validation_step_outputs[0]

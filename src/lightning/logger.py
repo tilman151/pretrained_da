@@ -1,4 +1,5 @@
 import os
+import tempfile
 
 import pytorch_lightning.loggers as loggers
 
@@ -107,3 +108,9 @@ class MLTBLogger(loggers.LoggerCollection):
     @property
     def mlflow_experiment(self):
         return self._mlflow_logger.experiment
+
+    def log_figure(self, tag, figure, step):
+        tmp_file = tempfile.mktemp() + '.png'
+        figure.savefig(tmp_file)
+        self.mlflow_experiment.log_artifact(self._mlflow_logger.run_id, tmp_file, f'{tag}_{step:05}')
+        self.tf_experiment.add_figure(tag, figure, step)
