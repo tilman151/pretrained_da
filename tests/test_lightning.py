@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 
 import torch
 
@@ -96,6 +97,27 @@ class TestDAAN(unittest.TestCase):
         _, actual_loss, _ = self.net._train(target, target_labels, source, domain_labels)
 
         self.assertEqual(expected_loss, actual_loss)
+
+    def test_norm_output(self):
+        with self.subTest(norm=False):
+            inputs = torch.randn(10, 14, 30)
+            outputs = self.net.encoder(inputs)
+            for sample in outputs:
+                self.assertNotEqual(1., torch.norm(sample, p=2))
+
+        with self.subTest(norm=True):
+            self.net.encoder.norm_outputs = True
+            outputs = self.net.encoder(inputs)
+            for sample in outputs:
+                self.assertAlmostEqual(1., torch.norm(sample, p=2).item(), places=5)
+
+    @mock.patch('torch.load')
+    @mock.patch('lightning.mixins.LoadEncoderMixin._extract_state_dict')
+    @mock.patch('torch.nn.Module.load_state_dict')
+    def test_feature_norm_on_transferred_encoder(self, mock_load_state_dict, mock_extract_state_dict, mock_load):
+        self.assertFalse(self.net.encoder.norm_outputs)
+        self.net.load_encoder('bogus', load_disc=False)
+        self.assertTrue(self.net.encoder.norm_outputs)
 
 
 class TestBaseline(unittest.TestCase):
