@@ -13,7 +13,8 @@ def run(source, target, percent_broken, domain_tradeoff, dropout, record_embeddi
     pl.trainer.seed_everything(seed)
     logger = loggers.MLTBLogger(_get_logdir(), loggers.pretraining_experiment_name(source, target),
                                 tensorboard_struct={'pb': percent_broken, 'dt': domain_tradeoff})
-    checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor='val/checkpoint_score')
+    checkpoint_callback = loggers.MinEpochModelCheckpoint(monitor='val/checkpoint_score',
+                                                          min_epochs_before_saving=1)
     trainer = pl.Trainer(gpus=[gpu], max_epochs=100, logger=logger,
                          deterministic=True, log_every_n_steps=10, checkpoint_callback=checkpoint_callback)
     truncate_val = not record_embeddings
