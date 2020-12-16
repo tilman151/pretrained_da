@@ -122,12 +122,14 @@ class TestRunComplete(unittest.TestCase):
         pretraining_reps = 2
         best_only = False
         gpu = 1
-        high_val_pretrained_path = 'high_val'
-        low_val_pretrained_path = 'low_val'
-        mock_pretraining.return_value = {broken[0]: {0.01: [(high_val_pretrained_path, 0.5),
-                                                            (low_val_pretrained_path, 0.2)]},
-                                         broken[1]: {0.01: [(high_val_pretrained_path, 0.5),
-                                                            (low_val_pretrained_path, 0.2)]}}
+        high_val_broken0_pretrained_path = 'high_val_b0'
+        low_val__broken0_pretrained_path = 'low_val_b0'
+        high_val_broken1_pretrained_path = 'high_val_b1'
+        low_val__broken1_pretrained_path = 'low_val_b1'
+        mock_pretraining.return_value = {broken[0]: {0.01: [(high_val_broken0_pretrained_path, 0.5),
+                                                            (low_val__broken0_pretrained_path, 0.2)]},
+                                         broken[1]: {0.01: [(high_val_broken1_pretrained_path, 0.5),
+                                                            (low_val__broken1_pretrained_path, 0.2)]}}
 
         run_complete.run(source, target, broken, domain_tradeoff, dropout,
                          record_embeddings, pretraining_reps, best_only, gpu)
@@ -135,13 +137,13 @@ class TestRunComplete(unittest.TestCase):
         mock_pretraining.assert_called_with(source, target, broken, domain_tradeoff, dropout,
                                             record_embeddings, pretraining_reps, gpu)
         dann_calls = [mock.call(source, target, broken[0], 1.0, record_embeddings, 1343278, gpu,
-                                high_val_pretrained_path),
+                                high_val_broken0_pretrained_path),
                       mock.call(source, target, broken[0], 1.0, record_embeddings, 9525887, gpu,
-                                low_val_pretrained_path),
+                                low_val__broken0_pretrained_path),
                       mock.call(source, target, broken[1], 1.0, record_embeddings, 1343278, gpu,
-                                high_val_pretrained_path),
+                                high_val_broken1_pretrained_path),
                       mock.call(source, target, broken[1], 1.0, record_embeddings, 9525887, gpu,
-                                low_val_pretrained_path)
+                                low_val__broken1_pretrained_path)
                       ]
         mock_dann.assert_has_calls(dann_calls)
 
@@ -157,12 +159,14 @@ class TestRunComplete(unittest.TestCase):
         pretraining_reps = 2
         best_only = True
         gpu = 1
-        high_val_pretrained_path = 'high_val'
-        low_val_pretrained_path = 'low_val'
-        mock_pretraining.return_value = {broken[0]: {0.01: [(high_val_pretrained_path, 0.5),
-                                                            (low_val_pretrained_path, 0.2)]},
-                                         broken[1]: {0.01: [(high_val_pretrained_path, 0.5),
-                                                            (low_val_pretrained_path, 0.2)]}}
+        high_val_broken0_pretrained_path = 'high_val_b0'
+        low_val__broken0_pretrained_path = 'low_val_b0'
+        high_val_broken1_pretrained_path = 'high_val_b1'
+        low_val__broken1_pretrained_path = 'low_val_b1'
+        mock_pretraining.return_value = {broken[0]: {0.01: [(high_val_broken0_pretrained_path, 0.5),
+                                                            (low_val__broken0_pretrained_path, 0.2)]},
+                                         broken[1]: {0.01: [(high_val_broken1_pretrained_path, 0.5),
+                                                            (low_val__broken1_pretrained_path, 0.2)]}}
 
         run_complete.run(source, target, broken, domain_tradeoff, dropout,
                          record_embeddings, pretraining_reps, best_only, gpu)
@@ -170,12 +174,12 @@ class TestRunComplete(unittest.TestCase):
         mock_pretraining.assert_called_with(source, target, broken, domain_tradeoff, dropout,
                                             record_embeddings, pretraining_reps, gpu)
         dann_calls = [mock.call(source, target, broken[0], 1.0, record_embeddings, 1343278, gpu,
-                                low_val_pretrained_path),
+                                low_val__broken0_pretrained_path),
                       mock.call(source, target, broken[0], 1.0, record_embeddings, 9525887, gpu,
-                                low_val_pretrained_path),
+                                low_val__broken0_pretrained_path),
                       mock.call(source, target, broken[1], 1.0, record_embeddings, 1343278, gpu,
-                                low_val_pretrained_path),
+                                low_val__broken1_pretrained_path),
                       mock.call(source, target, broken[1], 1.0, record_embeddings, 9525887, gpu,
-                                low_val_pretrained_path)
+                                low_val__broken1_pretrained_path)
                       ]
         mock_dann.assert_has_calls(dann_calls)
