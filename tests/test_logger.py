@@ -2,6 +2,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 import pytorch_lightning as pl
 
@@ -44,3 +45,23 @@ class TestMLTBLogger(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.logdir)
+
+
+class TestMinEpochModelCheckpoint(unittest.TestCase):
+    @mock.patch('pytorch_lightning.callbacks.ModelCheckpoint.save_checkpoint')
+    def test_min_epoch(self, mock_super_save_checkpoint):
+        mock_trainer = mock.MagicMock('trainer')
+        mock_pl_module = mock.MagicMock('pl_module')
+
+        min_epoch = 1
+        checkpoint_callback = loggers.MinEpochModelCheckpoint('val/test_metric', min_epochs_before_saving=min_epoch)
+
+        with self.subTest(case='before_min_epoch'):
+            mock_trainer.current_epoch = 0
+            checkpoint_callback.save_checkpoint(mock_trainer, mock_pl_module)
+            mock_super_save_checkpoint.assert_not_called()
+
+        with self.subTest(case='after_min_epoch'):
+            mock_trainer.current_epoch = 2
+            checkpoint_callback.save_checkpoint(mock_trainer, mock_pl_module)
+            mock_super_save_checkpoint.assert_called_with(mock_trainer, mock_pl_module)

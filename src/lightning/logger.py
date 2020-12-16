@@ -1,7 +1,9 @@
 import os
 import tempfile
+from typing import Optional
 
 import pytorch_lightning.loggers as loggers
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 ExperimentNaming = {1: 'one',
                     2: 'two',
@@ -114,3 +116,26 @@ class MLTBLogger(loggers.LoggerCollection):
         figure.savefig(tmp_file)
         self.mlflow_experiment.log_artifact(self._mlflow_logger.run_id, tmp_file, f'{tag}_{step:05}')
         self.tf_experiment.add_figure(tag, figure, step)
+
+
+class MinEpochModelCheckpoint(ModelCheckpoint):
+    """Checkpoints models only after training for a minimum of epochs."""
+
+    def __init__(self,
+                 filepath: Optional[str] = None,
+                 monitor: Optional[str] = None,
+                 verbose: bool = False,
+                 save_last: Optional[bool] = None,
+                 save_top_k: Optional[int] = None,
+                 save_weights_only: bool = False,
+                 mode: str = "auto",
+                 period: int = 1,
+                 prefix: str = "",
+                 min_epochs_before_saving: int = 0):
+        super().__init__(filepath, monitor, verbose, save_last, save_top_k, save_weights_only, mode, period, prefix)
+
+        self.min_epochs_before_saving = min_epochs_before_saving
+
+    def save_checkpoint(self, trainer, pl_module):
+        if trainer.current_epoch > self.min_epochs_before_saving:
+            super().save_checkpoint(trainer, pl_module)
