@@ -13,7 +13,7 @@ def run(source, target, percent_broken, domain_tradeoff, dropout,
     for broken, checkpoint_per_tradeoff in pretrained_checkpoints.items():
         for _, checkpoints in checkpoint_per_tradeoff.items():
             for pretrained_checkpoint, s in zip(checkpoints, seeds):
-                run_daan(source, target, [broken], [1.0], record_embeddings, s, gpu, pretrained_checkpoint)
+                run_daan(source, target, broken, 1.0, record_embeddings, s, gpu, pretrained_checkpoint)
 
 
 if __name__ == '__main__':
