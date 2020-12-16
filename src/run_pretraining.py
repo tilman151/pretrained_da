@@ -13,9 +13,11 @@ def run(source, target, percent_broken, domain_tradeoff, dropout, record_embeddi
     pl.trainer.seed_everything(seed)
     logger = loggers.MLTBLogger(_get_logdir(), loggers.pretraining_experiment_name(source, target),
                                 tensorboard_struct={'pb': percent_broken, 'dt': domain_tradeoff})
+    checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor='val/checkpoint_score')
     trainer = pl.Trainer(gpus=[gpu], max_epochs=100, logger=logger,
-                         deterministic=True, log_every_n_steps=10)
-    data = _build_datamodule(percent_broken, source, target)
+                         deterministic=True, log_every_n_steps=10, checkpoint_callback=checkpoint_callback)
+    truncate_val = not record_embeddings
+    data = _build_datamodule(percent_broken, source, target, truncate_val)
     model = pretraining.UnsupervisedPretraining(in_channels=14,
                                                 seq_len=30,
                                                 num_layers=4,
@@ -35,14 +37,15 @@ def run(source, target, percent_broken, domain_tradeoff, dropout, record_embeddi
     return _get_checkpoint_path(logger)
 
 
-def _build_datamodule(percent_broken, source, target):
+def _build_datamodule(percent_broken, source, target, truncate_val):
     if target is None:
         return datasets.PretrainingBaselineDataModule(fd_source=source,
                                                       num_samples=25000,
                                                       batch_size=512,
                                                       window_size=30,
                                                       min_distance=1,
-                                                      percent_broken=percent_broken)
+                                                      percent_broken=percent_broken,
+                                                      truncate_val=truncate_val)
     else:
         return datasets.PretrainingAdaptionDataModule(fd_source=source,
                                                       fd_target=target,
@@ -50,7 +53,8 @@ def _build_datamodule(percent_broken, source, target):
                                                       batch_size=512,
                                                       window_size=30,
                                                       min_distance=1,
-                                                      percent_broken=percent_broken)
+                                                      percent_broken=percent_broken,
+                                                      truncate_target_val=truncate_val)
 
 
 def _get_logdir():
