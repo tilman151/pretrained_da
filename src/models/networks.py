@@ -39,7 +39,7 @@ class Encoder(nn.Module):
     def forward(self, inputs):
         outputs = self.layers(inputs)
         if self.norm_outputs:
-            outputs /= torch.norm(outputs, dim=1, keepdim=True)
+            outputs = outputs / torch.norm(outputs, dim=1, keepdim=True)
 
         return outputs
 
