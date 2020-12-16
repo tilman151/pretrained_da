@@ -34,7 +34,7 @@ def run(source, target, percent_broken, domain_tradeoff, dropout, record_embeddi
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
 
-    return _get_checkpoint_path(logger)
+    return _get_checkpoint_path(logger), checkpoint_callback.best_model_score
 
 
 def _build_datamodule(percent_broken, source, target, truncate_val):
