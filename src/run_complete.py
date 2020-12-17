@@ -1,6 +1,6 @@
 import random
 
-from run_daan import run as run_daan
+from run_dann import run as run_dann
 from run_pretraining import run_multiple as run_pretraining
 
 
@@ -20,7 +20,7 @@ def _adapt_with_all_pretrained(source, target, pretrained_checkpoints, record_em
     for broken, checkpoint_per_tradeoff in pretrained_checkpoints.items():
         for checkpoints in checkpoint_per_tradeoff.values():
             for (pretrained_checkpoint, best_val_score), s in zip(checkpoints, seeds):
-                run_daan(source, target, broken, 1.0, record_embeddings, s, gpu, pretrained_checkpoint)
+                run_dann(source, target, broken, 1.0, record_embeddings, s, gpu, pretrained_checkpoint)
 
 
 def _adapt_with_best_pretrained(source, target, pretrained_checkpoints, record_embeddings, seeds, gpu):
@@ -29,7 +29,7 @@ def _adapt_with_best_pretrained(source, target, pretrained_checkpoints, record_e
             sorted_checkpoints = sorted(checkpoints, key=lambda x: x[1])  # sort by val loss
             best_pretrained_path = sorted_checkpoints[0][0]
             for s in seeds:
-                run_daan(source, target, broken, 1.0, record_embeddings, s, gpu, best_pretrained_path)
+                run_dann(source, target, broken, 1.0, record_embeddings, s, gpu, best_pretrained_path)
 
 
 if __name__ == '__main__':

@@ -7,7 +7,7 @@ from lightning.mixins import DataHparamsMixin, LoadEncoderMixin
 from models import networks
 
 
-class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
+class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
     def __init__(self,
                  in_channels,
                  seq_len,

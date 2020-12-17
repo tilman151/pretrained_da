@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 import sklearn.model_selection
 
 import datasets
-from lightning import daan
+from lightning import dann
 from lightning import logger as loggers
 
 
@@ -26,14 +26,14 @@ def run(source, target, percent_broken, domain_tradeoff, record_embeddings, seed
     data = datasets.DomainAdaptionDataModule(fd_source=source,
                                              fd_target=target,
                                              batch_size=512,
-                                             window_size=15,
                                              percent_broken=percent_broken)
-    model = daan.DAAN(in_channels=14,
+    model = dann.DANN(in_channels=14,
                       seq_len=data.window_size,
                       num_layers=6,
                       kernel_size=3,
                       base_filters=16,
                       latent_dim=64,
+                      dropout=0.1,
                       domain_trade_off=domain_tradeoff,
                       domain_disc_dim=16,
                       num_disc_layers=2,

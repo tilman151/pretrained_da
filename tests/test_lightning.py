@@ -3,18 +3,19 @@ from unittest import mock
 
 import torch
 
-from lightning import baseline, daan, pretraining
+from lightning import baseline, dann, pretraining
 
 
 class TestDAAN(unittest.TestCase):
     def setUp(self):
         self.trade_off = 0.5
-        self.net = daan.DAAN(in_channels=14,
+        self.net = dann.DANN(in_channels=14,
                              seq_len=30,
                              num_layers=4,
                              kernel_size=3,
                              base_filters=16,
                              latent_dim=64,
+                             dropout=0.1,
                              domain_trade_off=self.trade_off,
                              domain_disc_dim=32,
                              num_disc_layers=2,
@@ -210,6 +211,8 @@ class TestUnsupervisedPretraining(unittest.TestCase):
                                                        latent_dim=64,
                                                        dropout=0.1,
                                                        domain_tradeoff=0.001,
+                                                       domain_disc_dim=32,
+                                                       num_disc_layers=2,
                                                        weight_decay=0,
                                                        lr=0.01)
 
