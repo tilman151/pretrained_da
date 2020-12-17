@@ -10,11 +10,16 @@ from torch.utils.data import DataLoader, TensorDataset, IterableDataset
 
 
 class CMAPSSDataModule(pl.LightningDataModule):
+    WINDOW_SIZES = {1: 30,
+                    2: 20,
+                    3: 30,
+                    4: 15}
+
     def __init__(self,
                  fd,
                  batch_size,
                  max_rul=125,
-                 window_size=30,
+                 window_size=None,
                  percent_fail_runs=None,
                  percent_broken=None,
                  feature_select=None,
@@ -28,7 +33,7 @@ class CMAPSSDataModule(pl.LightningDataModule):
 
         self.fd = fd
         self.batch_size = batch_size
-        self.window_size = window_size
+        self.window_size = window_size or self.WINDOW_SIZES[self.fd]
         self.max_rul = max_rul
         self.percent_broken = percent_broken
         self.percent_fail_runs = percent_fail_runs
@@ -245,6 +250,10 @@ class PairedCMAPSS(IterableDataset):
         self.min_distance = min_distance
         self.num_samples = num_samples
         self.deterministic = deterministic
+
+        if not all(d.window_size == self.datasets[0].window_size for d in self.datasets):
+            window_sizes = [d.window_size for d in self.datasets]
+            raise ValueError(f'Datasets to be paired do not have the same window size, but {window_sizes}')
 
         run_lengths = [(length, domain_idx)
                        for domain_idx, dataset in enumerate(self.datasets)

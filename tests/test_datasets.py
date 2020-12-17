@@ -13,17 +13,30 @@ from datasets.cmapss import PairedCMAPSS
 
 
 class TestCMAPSS(unittest.TestCase):
-    def test__data(self):
-        for n, win in enumerate([30, 20, 30, 15], start=1):
-            dataset = cmapss.CMAPSSDataModule(n, batch_size=16, window_size=win)
+    def test_data(self):
+        window_sizes = [30, 20, 30, 15]
+        for n, win in enumerate(window_sizes, start=1):
+            dataset = cmapss.CMAPSSDataModule(n, batch_size=16)
             dataset.prepare_data()
             dataset.setup()
             for split in ['dev', 'val', 'test']:
-                with self.subTest(fd=n, win=win, split=split):
+                with self.subTest(fd=n, split=split):
                     features, targets = dataset.data[split]
+                    self.assertEqual(win, features.shape[2])
                     self.assertEqual(len(features), len(targets))
                     self.assertEqual(torch.float32, features.dtype)
                     self.assertEqual(torch.float32, targets.dtype)
+
+    def test_override_window_size(self):
+        window_size = 40
+        for n in range(1, 5):
+            dataset = cmapss.CMAPSSDataModule(n, batch_size=16, window_size=window_size)
+            dataset.prepare_data()
+            dataset.setup()
+            for split in ['dev', 'val', 'test']:
+                with self.subTest(fd=n, split=split):
+                    features, targets = dataset.data[split]
+                    self.assertEqual(window_size, features.shape[2])
 
     def test_feature_select(self):
         dataset = cmapss.CMAPSSDataModule(1, batch_size=16, window_size=30, feature_select=[4, 9, 10, 13, 14, 15, 22])
@@ -132,9 +145,35 @@ class TestCMAPSS(unittest.TestCase):
 
 class TestCMAPSSAdaption(unittest.TestCase):
     def setUp(self):
-        self.dataset = datasets.DomainAdaptionDataModule(3, 1, batch_size=16, window_size=30)
+        self.dataset = datasets.DomainAdaptionDataModule(3, 2, batch_size=16)
         self.dataset.prepare_data()
         self.dataset.setup()
+
+    def test_window_size(self):
+        with self.subTest(case='bigger2smaller'):
+            train_loader = self.dataset.train_dataloader()
+            source, _, target = next(iter(train_loader))
+            self.assertEqual(datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[2], source.shape[2])
+            self.assertEqual(datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[2], target.shape[2])
+
+        with self.subTest(case='smaller2bigger'):
+            dataset = datasets.DomainAdaptionDataModule(2, 3, batch_size=16)
+            dataset.prepare_data()
+            dataset.setup()
+            train_loader = dataset.train_dataloader()
+            source, _, target = next(iter(train_loader))
+            self.assertEqual(datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[3], source.shape[2])
+            self.assertEqual(datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[3], target.shape[2])
+
+    def test_override_window_size(self):
+        dataset = datasets.DomainAdaptionDataModule(3, 2, batch_size=16, window_size=40)
+        dataset.prepare_data()
+        dataset.setup()
+        train_loader = dataset.train_dataloader()
+
+        source, _, target = next(iter(train_loader))
+        self.assertEqual(40, source.shape[2])
+        self.assertEqual(40, target.shape[2])
 
     def test_train_length_equal(self):
         train_loader = self.dataset.train_dataloader()
@@ -164,12 +203,13 @@ class TestCMAPSSAdaption(unittest.TestCase):
             self.assertEqual(0, torch.sum(baseline - inner))
 
     def test_train_batch_structure(self):
+        window_size = datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[self.dataset.fd_target]
         train_loader = self.dataset.train_dataloader()
         batch = next(iter(train_loader))
         self.assertEqual(3, len(batch))
         source, source_labels, target = batch
-        self.assertEqual(torch.Size((16, 14, 30)), source.shape)
-        self.assertEqual(torch.Size((16, 14, 30)), target.shape)
+        self.assertEqual(torch.Size((16, 14, window_size)), source.shape)
+        self.assertEqual(torch.Size((16, 14, window_size)), target.shape)
         self.assertEqual(torch.Size((16,)), source_labels.shape)
 
     def test_val_batch_structure(self):
@@ -183,18 +223,28 @@ class TestCMAPSSAdaption(unittest.TestCase):
         self._assert_val_test_batch_structure(test_target_loader)
 
     def _assert_val_test_batch_structure(self, loader):
+        window_size = datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[self.dataset.fd_target]
         batch = next(iter(loader))
         self.assertEqual(2, len(batch))
         features, labels = batch
-        self.assertEqual(torch.Size((16, 14, 30)), features.shape)
+        self.assertEqual(torch.Size((16, 14, window_size)), features.shape)
         self.assertEqual(torch.Size((16,)), labels.shape)
 
 
 class TestCMAPSSBaseline(unittest.TestCase):
     def setUp(self):
-        self.dataset = datasets.BaselineDataModule(3, batch_size=16, window_size=30, percent_fail_runs=0.8)
+        self.dataset = datasets.BaselineDataModule(3, batch_size=16, percent_fail_runs=0.8)
         self.dataset.prepare_data()
         self.dataset.setup()
+
+    def test_override_window_size(self):
+        dataset = datasets.BaselineDataModule(3, batch_size=16, percent_fail_runs=0.8, window_size=40)
+        dataset.prepare_data()
+        dataset.setup()
+        train_loader = dataset.train_dataloader()
+
+        batch, _ = next(iter(train_loader))
+        self.assertEqual(40, batch.shape[2])
 
     def test_train_batch_structure(self):
         train_loader = self.dataset.train_dataloader()
@@ -207,14 +257,15 @@ class TestCMAPSSBaseline(unittest.TestCase):
         self._assert_train_val_batch_structure(val_loader)
 
     def test_test_batch_structure(self):
+        window_size = datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[self.dataset.fd_source]
         test_loaders = self.dataset.test_dataloader()
         for test_loader in test_loaders:
             self.assertIsInstance(test_loader.sampler, SequentialSampler)
             batch = next(iter(test_loader))
             self.assertEqual(4, len(batch))
             source, source_labels, target, target_labels = batch
-            self.assertEqual(torch.Size((16, 14, 30)), source.shape)
-            self.assertEqual(torch.Size((16, 14, 30)), target.shape)
+            self.assertEqual(torch.Size((16, 14, window_size)), source.shape)
+            self.assertEqual(torch.Size((16, 14, window_size)), target.shape)
             self.assertEqual(torch.Size((16,)), source_labels.shape)
             self.assertEqual(torch.Size((16,)), target_labels.shape)
 
@@ -301,7 +352,7 @@ class PretrainingDataModuleTemplate:
         return np.sum(run_start_idx[:, None] <= pairs[:, 0], axis=0) - 1
 
     def test_min_distance(self):
-        dataset = datasets.PretrainingAdaptionDataModule(3, 1, num_samples=10000, min_distance=30, batch_size=16, window_size=30)
+        dataset = datasets.PretrainingAdaptionDataModule(3, 1, num_samples=10000, min_distance=30, batch_size=16)
         dataset.prepare_data()
         dataset.setup()
 
@@ -336,8 +387,8 @@ class PretrainingDataModuleTemplate:
 
     def _check_paired_shapes(self, data):
         for anchors, queries, distances, domain_labels in data:
-            self.assertEqual(torch.Size((14, 30)), anchors.shape)
-            self.assertEqual(torch.Size((14, 30)), queries.shape)
+            self.assertEqual(torch.Size((14, self.window_size)), anchors.shape)
+            self.assertEqual(torch.Size((14, self.window_size)), queries.shape)
             self.assertEqual(torch.Size(()), distances.shape)
             self.assertEqual(torch.Size(()), domain_labels.shape)
 
@@ -348,7 +399,7 @@ class PretrainingDataModuleTemplate:
     def _check_cmapss_shapes(self, data):
         for i in range(len(data)):
             features, labels = data[i]
-            self.assertEqual(torch.Size((14, 30)), features.shape)
+            self.assertEqual(torch.Size((14, self.window_size)), features.shape)
             self.assertEqual(torch.Size(()), labels.shape)
 
     def test_distances(self):
@@ -378,8 +429,8 @@ class PretrainingDataModuleTemplate:
                 self.assertEqual(0., torch.sum(one - another))
 
     def _run_epoch(self, loader):
-        anchors = torch.empty((len(loader.dataset), 14, 30))
-        queries = torch.empty((len(loader.dataset), 14, 30))
+        anchors = torch.empty((len(loader.dataset), 14, self.window_size))
+        queries = torch.empty((len(loader.dataset), 14, self.window_size))
         distances = torch.empty(len(loader.dataset))
         domain_labels = torch.empty(len(loader.dataset))
 
@@ -398,57 +449,81 @@ class PretrainingDataModuleTemplate:
 
 class TestPretrainingDataModuleFullData(unittest.TestCase, PretrainingDataModuleTemplate):
     def setUp(self):
-        self.dataset = datasets.PretrainingAdaptionDataModule(3, 1, num_samples=10000, batch_size=16, window_size=30)
+        self.dataset = datasets.PretrainingAdaptionDataModule(3, 2, num_samples=10000, batch_size=16)
         self.dataset.prepare_data()
         self.dataset.setup()
 
         self.expected_num_val_loaders = 3
+        self.window_size = datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[self.dataset.fd_target]
 
     def test_target_val_truncation(self):
         with self.subTest(truncation=False):
-            dataset = datasets.PretrainingAdaptionDataModule(3, 1, num_samples=10000, batch_size=16, window_size=30)
+            dataset = datasets.PretrainingAdaptionDataModule(3, 2, num_samples=10000, batch_size=16)
             self.assertFalse(dataset.target.truncate_val)
 
         with self.subTest(truncation=True):
-            dataset = datasets.PretrainingAdaptionDataModule(3, 1, num_samples=10000, batch_size=16, window_size=30,
+            dataset = datasets.PretrainingAdaptionDataModule(3, 2, num_samples=10000, batch_size=16,
                                                              truncate_target_val=True)
             self.assertTrue(dataset.target.truncate_val)
+
+    def test_override_window_size(self):
+        dataset = datasets.PretrainingAdaptionDataModule(3, 2, num_samples=10000, batch_size=16, window_size=40)
+        dataset.prepare_data()
+        dataset.setup()
+        train_loader = dataset.train_dataloader()
+
+        anchors, queries, _, _ = next(iter(train_loader))
+        self.assertEqual(40, anchors.shape[2])
+        self.assertEqual(40, queries.shape[2])
 
 
 class TestPretrainingDataModuleLowData(unittest.TestCase, PretrainingDataModuleTemplate):
     def setUp(self):
-        self.dataset = datasets.PretrainingAdaptionDataModule(3, 1, percent_broken=0.2, num_samples=10000,
-                                                              batch_size=16, window_size=30)
+        self.dataset = datasets.PretrainingAdaptionDataModule(3, 2, percent_broken=0.2, num_samples=10000,
+                                                              batch_size=16)
         self.dataset.prepare_data()
         self.dataset.setup()
 
         self.expected_num_val_loaders = 3
+        self.window_size = datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[self.dataset.fd_target]
 
 
 class TestPretrainingBaselineDataModuleFullData(unittest.TestCase, PretrainingDataModuleTemplate):
     def setUp(self):
-        self.dataset = datasets.PretrainingBaselineDataModule(3, num_samples=10000, batch_size=16, window_size=30)
+        self.dataset = datasets.PretrainingBaselineDataModule(3, num_samples=10000, batch_size=16)
         self.dataset.prepare_data()
         self.dataset.setup()
 
         self.expected_num_val_loaders = 2
+        self.window_size = datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[self.dataset.fd_source]
 
     def test_val_truncation(self):
         with self.subTest(truncation=False):
-            dataset = datasets.PretrainingBaselineDataModule(3, num_samples=10000, batch_size=16, window_size=30)
+            dataset = datasets.PretrainingBaselineDataModule(3, num_samples=10000, batch_size=16)
             self.assertFalse(dataset.source.truncate_val)
 
         with self.subTest(truncation=True):
-            dataset = datasets.PretrainingBaselineDataModule(3, num_samples=10000, batch_size=16, window_size=30,
+            dataset = datasets.PretrainingBaselineDataModule(3, num_samples=10000, batch_size=16,
                                                              truncate_val=True)
             self.assertTrue(dataset.source.truncate_val)
+
+    def test_override_window_size(self):
+        dataset = datasets.PretrainingBaselineDataModule(3, num_samples=10000, batch_size=16, window_size=40)
+        dataset.prepare_data()
+        dataset.setup()
+        train_loader = dataset.train_dataloader()
+
+        anchors, queries, _, _ = next(iter(train_loader))
+        self.assertEqual(40, anchors.shape[2])
+        self.assertEqual(40, queries.shape[2])
 
 
 class TestPretrainingBaselineDataModuleLowData(unittest.TestCase, PretrainingDataModuleTemplate):
     def setUp(self):
         self.dataset = datasets.PretrainingBaselineDataModule(3, percent_broken=0.2, num_samples=10000,
-                                                              batch_size=16, window_size=30)
+                                                              batch_size=16)
         self.dataset.prepare_data()
         self.dataset.setup()
 
         self.expected_num_val_loaders = 2
+        self.window_size = datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[self.dataset.fd_source]

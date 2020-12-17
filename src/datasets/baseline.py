@@ -12,7 +12,7 @@ class BaselineDataModule(pl.LightningDataModule):
                  fd_source,
                  batch_size,
                  max_rul=125,
-                 window_size=30,
+                 window_size=None,
                  percent_fail_runs=None,
                  feature_select=None):
         super().__init__()
@@ -20,7 +20,7 @@ class BaselineDataModule(pl.LightningDataModule):
         self.fd_source = fd_source
         self.batch_size = batch_size
         self.max_rul = max_rul
-        self.window_size = window_size
+        self.window_size = window_size or CMAPSSDataModule.WINDOW_SIZES[self.fd_source]
         self.percent_fail_runs = percent_fail_runs
         self.feature_select = feature_select
 
@@ -32,8 +32,8 @@ class BaselineDataModule(pl.LightningDataModule):
 
         self.cmapss = {}
         for fd in range(1, 5):
-            self.cmapss[fd] = CMAPSSDataModule(fd, batch_size, max_rul, window_size,
-                                               percent_fail_runs, None, feature_select)
+            self.cmapss[fd] = CMAPSSDataModule(fd, self.batch_size, self.max_rul, self.window_size,
+                                               self.percent_fail_runs, None, self.feature_select)
 
     def prepare_data(self, *args, **kwargs):
         for cmapss_fd in self.cmapss.values():
@@ -98,7 +98,7 @@ class PretrainingBaselineDataModule(pl.LightningDataModule):
         self.fd_source = fd_source
         self.num_samples = num_samples
         self.batch_size = batch_size
-        self.window_size = window_size
+        self.window_size = window_size or CMAPSSDataModule.WINDOW_SIZES[self.fd_source]
         self.min_distance = min_distance
         self.max_rul = max_rul
         self.percent_broken = percent_broken
