@@ -15,6 +15,7 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
                  kernel_size,
                  base_filters,
                  latent_dim,
+                 dropout,
                  domain_trade_off,
                  domain_disc_dim,
                  num_disc_layers,
@@ -29,6 +30,7 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         self.kernel_size = kernel_size
         self.base_filters = base_filters
         self.latent_dim = latent_dim
+        self.dropout = dropout
         self.domain_trade_off = domain_trade_off
         self.domain_disc_dim = domain_disc_dim
         self.num_disc_layers = num_disc_layers
@@ -37,7 +39,9 @@ class DAAN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         self.record_embeddings = record_embeddings
 
         self.encoder = networks.Encoder(self.in_channels, self.base_filters, self.kernel_size,
-                                        self.num_layers, self.latent_dim, self.seq_len, dropout=0, norm_outputs=False)
+                                        self.num_layers, self.latent_dim, self.seq_len,
+                                        dropout=self.dropout,
+                                        norm_outputs=False)
         self.domain_disc = networks.DomainDiscriminator(self.latent_dim, self.num_disc_layers, self.domain_disc_dim)
         self.regressor = networks.Regressor(latent_dim)
 

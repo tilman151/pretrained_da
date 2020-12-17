@@ -17,6 +17,8 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
                  latent_dim,
                  dropout,
                  domain_tradeoff,
+                 domain_disc_dim,
+                 num_disc_layers,
                  lr,
                  weight_decay,
                  record_embeddings=False):
@@ -30,6 +32,8 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         self.latent_dim = latent_dim
         self.dropout = dropout
         self.domain_tradeoff = domain_tradeoff
+        self.domain_disc_dim = domain_disc_dim
+        self.num_disc_layers = num_disc_layers
         self.lr = lr
         self.weight_decay = weight_decay
         self.record_embeddings = record_embeddings
@@ -37,7 +41,8 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         self.encoder = networks.Encoder(self.in_channels, self.base_filters, self.kernel_size,
                                         self.num_layers, self.latent_dim, self.seq_len, self.dropout, norm_outputs=True)
         if self.domain_tradeoff > 0:
-            self.domain_disc = networks.DomainDiscriminator(self.latent_dim, num_layers=2, hidden_dim=self.latent_dim // 2)
+            self.domain_disc = networks.DomainDiscriminator(self.latent_dim, num_layers=self.num_disc_layers,
+                                                            hidden_dim=self.domain_disc_dim)
         else:
             self.domain_disc = None
         self.criterion_regression = nn.MSELoss()
