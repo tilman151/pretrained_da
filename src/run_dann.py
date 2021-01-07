@@ -4,7 +4,7 @@ import random
 import sklearn.model_selection
 
 from building.build import build_transfer
-from lightning import logger as loggers
+from lightning import loggers as loggers
 
 
 def run(

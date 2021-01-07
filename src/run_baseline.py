@@ -12,13 +12,6 @@ def run(source, fails, seed, gpu, pretrained_encoder_path):
     trainer.test(datamodule=data)
 
 
-def _get_logdir():
-    script_path = os.path.dirname(__file__)
-    log_dir = os.path.normpath(os.path.join(script_path, ".."))
-
-    return log_dir
-
-
 def run_multiple(source, fails, replications, gpu, pretrained_encoder_path):
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]

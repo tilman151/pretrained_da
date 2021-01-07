@@ -1,11 +1,9 @@
 import os
 import random
 
-import pytorch_lightning as pl
 import sklearn
 
-import datasets
-from lightning import logger as loggers, pretraining
+from building.build import build_pretraining
 
 
 def run(
@@ -18,76 +16,23 @@ def run(
     seed,
     gpu,
 ):
-    pl.trainer.seed_everything(seed)
-    logger = loggers.MLTBLogger(
-        _get_logdir(),
-        loggers.pretraining_experiment_name(source, target),
-        tensorboard_struct={"pb": percent_broken, "dt": domain_tradeoff},
+    trainer, data, model = build_pretraining(
+        source,
+        target,
+        domain_tradeoff,
+        dropout,
+        percent_broken,
+        record_embeddings,
+        gpu,
+        seed,
     )
-    checkpoint_callback = loggers.MinEpochModelCheckpoint(
-        monitor="val/checkpoint_score", min_epochs_before_saving=1
-    )
-    trainer = pl.Trainer(
-        gpus=[gpu],
-        max_epochs=100,
-        logger=logger,
-        deterministic=True,
-        log_every_n_steps=10,
-        checkpoint_callback=checkpoint_callback,
-        gradient_clip_val=1.0,
-    )
-    truncate_val = not record_embeddings
-    data = _build_datamodule(percent_broken, source, target, truncate_val)
-    model = pretraining.UnsupervisedPretraining(
-        in_channels=14,
-        seq_len=data.window_size,
-        num_layers=6,
-        kernel_size=3,
-        base_filters=16,
-        latent_dim=64,
-        dropout=dropout,
-        domain_tradeoff=domain_tradeoff,
-        domain_disc_dim=16,
-        num_disc_layers=2,
-        lr=0.01,
-        weight_decay=0,
-        record_embeddings=record_embeddings,
-    )
-    model.add_data_hparams(data)
-    model.hparams.update({"seed": seed})
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
 
-    return _get_checkpoint_path(logger), checkpoint_callback.best_model_score
+    checkpoint_path = _get_checkpoint_path(trainer.logger)
+    best_score = trainer.checkpoint_callback.best_model_score
 
-
-def _build_datamodule(percent_broken, source, target, truncate_val):
-    if target is None:
-        return datasets.PretrainingBaselineDataModule(
-            fd_source=source,
-            num_samples=25000,
-            batch_size=512,
-            min_distance=1,
-            percent_broken=percent_broken,
-            truncate_val=truncate_val,
-        )
-    else:
-        return datasets.PretrainingAdaptionDataModule(
-            fd_source=source,
-            fd_target=target,
-            num_samples=50000,
-            batch_size=512,
-            min_distance=1,
-            percent_broken=percent_broken,
-            truncate_target_val=truncate_val,
-        )
-
-
-def _get_logdir():
-    script_path = os.path.dirname(__file__)
-    log_dir = os.path.normpath(os.path.join(script_path, ".."))
-
-    return log_dir
+    return checkpoint_path, best_score
 
 
 def _get_checkpoint_path(logger):

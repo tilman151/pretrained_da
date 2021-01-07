@@ -1,8 +1,9 @@
+import os
+
 import pytorch_lightning as pl
 
 import datasets
-from lightning import baseline, dann, logger as loggers
-from run_baseline import _get_logdir
+from lightning import baseline, dann, loggers, pretraining
 
 
 def build_transfer(
@@ -105,6 +106,77 @@ def build_trainer(logger, checkpoint_callback, max_epochs, val_interval, gpu, se
     return trainer
 
 
+def build_pretraining(
+    source, target, domain_tradeoff, dropout, percent_broken, record_embeddings, gpu, seed
+):
+    pl.trainer.seed_everything(seed)
+    logger = loggers.MLTBLogger(
+        _get_logdir(),
+        loggers.pretraining_experiment_name(source, target),
+        tensorboard_struct={"pb": percent_broken, "dt": domain_tradeoff},
+    )
+    checkpoint_callback = loggers.MinEpochModelCheckpoint(
+        monitor="val/checkpoint_score", min_epochs_before_saving=1
+    )
+    trainer = build_trainer(
+        logger,
+        checkpoint_callback,
+        max_epochs=100,
+        val_interval=1.0,
+        gpu=gpu,
+        seed=seed,
+    )
+    truncate_val = not record_embeddings
+    data = _build_datamodule(percent_broken, source, target, truncate_val)
+    model = pretraining.UnsupervisedPretraining(
+        in_channels=14,
+        seq_len=data.window_size,
+        num_layers=6,
+        kernel_size=3,
+        base_filters=16,
+        latent_dim=64,
+        dropout=dropout,
+        domain_tradeoff=domain_tradeoff,
+        domain_disc_dim=16,
+        num_disc_layers=2,
+        lr=0.01,
+        weight_decay=0,
+        record_embeddings=record_embeddings,
+    )
+    add_hparams(model, data, seed)
+
+    return trainer, data, model
+
+
+def _build_datamodule(percent_broken, source, target, truncate_val):
+    if target is None:
+        return datasets.PretrainingBaselineDataModule(
+            fd_source=source,
+            num_samples=25000,
+            batch_size=512,
+            min_distance=1,
+            percent_broken=percent_broken,
+            truncate_val=truncate_val,
+        )
+    else:
+        return datasets.PretrainingAdaptionDataModule(
+            fd_source=source,
+            fd_target=target,
+            num_samples=50000,
+            batch_size=512,
+            min_distance=1,
+            percent_broken=percent_broken,
+            truncate_target_val=truncate_val,
+        )
+
+
 def add_hparams(model, data, seed):
     model.add_data_hparams(data)
     model.hparams.update({"seed": seed})
+
+
+def _get_logdir():
+    script_path = os.path.dirname(__file__)
+    log_dir = os.path.normpath(os.path.join(script_path, ".."))
+
+    return log_dir
