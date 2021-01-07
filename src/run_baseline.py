@@ -1,42 +1,13 @@
 import os
 import random
 
-import pytorch_lightning as pl
-
-import datasets
-from lightning import baseline, logger as loggers
+from building.build import build_baseline
 
 
 def run(source, fails, seed, gpu, pretrained_encoder_path):
-    pl.trainer.seed_everything(seed)
-    logger = loggers.MLTBLogger(_get_logdir(), loggers.baseline_experiment_name(source))
-    checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor="val/regression_loss")
-    trainer = pl.Trainer(
-        gpus=[gpu],
-        max_epochs=100,
-        logger=logger,
-        checkpoint_callback=checkpoint_callback,
-        deterministic=True,
-        log_every_n_steps=10,
+    trainer, data, model = build_baseline(
+        source, fails, pretrained_encoder_path, gpu, seed
     )
-    data = datasets.BaselineDataModule(
-        fd_source=source, batch_size=512, window_size=30, percent_fail_runs=fails
-    )
-    model = baseline.Baseline(
-        in_channels=14,
-        seq_len=30,
-        num_layers=4,
-        kernel_size=3,
-        base_filters=16,
-        latent_dim=128,
-        optim_type="adam",
-        lr=0.01,
-        record_embeddings=False,
-    )
-    if pretrained_encoder_path is not None:
-        model.load_encoder(pretrained_encoder_path)
-    model.add_data_hparams(data)
-    model.hparams.update({"seed": seed})
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
 
