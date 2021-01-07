@@ -90,22 +90,6 @@ def build_baseline(source, fails, pretrained_encoder_path, gpu, seed):
     return trainer, data, model
 
 
-def build_trainer(logger, checkpoint_callback, max_epochs, val_interval, gpu, seed):
-    pl.trainer.seed_everything(seed)
-    trainer = pl.Trainer(
-        gpus=[gpu],
-        max_epochs=max_epochs,
-        logger=logger,
-        deterministic=True,
-        log_every_n_steps=10,
-        checkpoint_callback=checkpoint_callback,
-        gradient_clip_val=1.0,
-        val_check_interval=val_interval,
-    )
-
-    return trainer
-
-
 def build_pretraining(
     source, target, domain_tradeoff, dropout, percent_broken, record_embeddings, gpu, seed
 ):
@@ -146,6 +130,22 @@ def build_pretraining(
     add_hparams(model, data, seed)
 
     return trainer, data, model
+
+
+def build_trainer(logger, checkpoint_callback, max_epochs, val_interval, gpu, seed):
+    pl.trainer.seed_everything(seed)
+    trainer = pl.Trainer(
+        gpus=[gpu],
+        max_epochs=max_epochs,
+        logger=logger,
+        deterministic=True,
+        log_every_n_steps=10,
+        checkpoint_callback=checkpoint_callback,
+        gradient_clip_val=1.0,
+        val_check_interval=val_interval,
+    )
+
+    return trainer
 
 
 def _build_datamodule(percent_broken, source, target, truncate_val):
