@@ -5,21 +5,18 @@ from typing import Optional
 import pytorch_lightning.loggers as loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-ExperimentNaming = {1: 'one',
-                    2: 'two',
-                    3: 'three',
-                    4: 'four'}
+ExperimentNaming = {1: "one", 2: "two", 3: "three", 4: "four"}
 
 
 def baseline_experiment_name(source):
-    assert source in ExperimentNaming, f'Unknown FD number {source}.'
-    return f'cmapss_{ExperimentNaming[source]}_baseline'
+    assert source in ExperimentNaming, f"Unknown FD number {source}."
+    return f"cmapss_{ExperimentNaming[source]}_baseline"
 
 
 def transfer_experiment_name(source, target):
-    assert source in ExperimentNaming, f'Unknown source FD number {source}.'
-    assert target in ExperimentNaming, f'Unknown target FD number {target}.'
-    return f'{ExperimentNaming[source]}2{ExperimentNaming[target]}'
+    assert source in ExperimentNaming, f"Unknown source FD number {source}."
+    assert target in ExperimentNaming, f"Unknown target FD number {target}."
+    return f"{ExperimentNaming[source]}2{ExperimentNaming[target]}"
 
 
 def pretraining_experiment_name(source, target):
@@ -30,16 +27,16 @@ def pretraining_experiment_name(source, target):
 
 
 def pretraining_baseline_experiment_name(dataset):
-    assert dataset in ExperimentNaming, f'Unknown dataset FD number {dataset}.'
+    assert dataset in ExperimentNaming, f"Unknown dataset FD number {dataset}."
 
-    return f'pretraining_{ExperimentNaming[dataset]}'
+    return f"pretraining_{ExperimentNaming[dataset]}"
 
 
 def pretraining_adaption_experiment_name(source, target):
-    assert source in ExperimentNaming, f'Unknown source FD number {source}.'
-    assert target in ExperimentNaming, f'Unknown target FD number {target}.'
+    assert source in ExperimentNaming, f"Unknown source FD number {source}."
+    assert target in ExperimentNaming, f"Unknown target FD number {target}."
 
-    return f'pretraining_{ExperimentNaming[source]}&{ExperimentNaming[target]}'
+    return f"pretraining_{ExperimentNaming[source]}&{ExperimentNaming[target]}"
 
 
 class MLTBLogger(loggers.LoggerCollection):
@@ -61,12 +58,14 @@ class MLTBLogger(loggers.LoggerCollection):
         :param experiment_name: name for the experiment
         :param tensorboard_struct: dictionary containing information to refine the tensorboard directory structure
         """
-        tensorboard_path = os.path.join(log_dir, 'tensorboard', experiment_name)
+        tensorboard_path = os.path.join(log_dir, "tensorboard", experiment_name)
         sub_dirs = self._dirs_from_dict(tensorboard_struct)
         self._tf_logger = loggers.TensorBoardLogger(tensorboard_path, name=sub_dirs)
 
-        mlflow_path = 'file:' + os.path.normpath(os.path.join(log_dir, 'mlruns'))
-        self._mlflow_logger = loggers.MLFlowLogger(experiment_name, tracking_uri=mlflow_path)
+        mlflow_path = "file:" + os.path.normpath(os.path.join(log_dir, "mlruns"))
+        self._mlflow_logger = loggers.MLFlowLogger(
+            experiment_name, tracking_uri=mlflow_path
+        )
 
         super().__init__([self._tf_logger, self._mlflow_logger])
 
@@ -76,14 +75,14 @@ class MLTBLogger(loggers.LoggerCollection):
             dirs = []
             for key, value in tensorboard_struct.items():
                 if isinstance(value, float) and value >= 0.1:
-                    dirs.append(f'{value:.1f}{key}')
+                    dirs.append(f"{value:.1f}{key}")
                 elif isinstance(value, str):
-                    dirs.append(f'{key}:{value}')
+                    dirs.append(f"{key}:{value}")
                 else:
-                    dirs.append(f'{value}{key}')
+                    dirs.append(f"{value}{key}")
             dirs = os.path.join(*dirs)
         else:
-            dirs = ''
+            dirs = ""
 
         return dirs
 
@@ -93,7 +92,7 @@ class MLTBLogger(loggers.LoggerCollection):
 
     @property
     def version(self) -> str:
-        return os.path.join(self._mlflow_logger.version, 'artifacts')
+        return os.path.join(self._mlflow_logger.version, "artifacts")
 
     @property
     def save_dir(self):
@@ -101,7 +100,7 @@ class MLTBLogger(loggers.LoggerCollection):
 
     @property
     def checkpoint_path(self):
-        return os.path.join(self.save_dir, self.name, self.version, 'checkpoints')
+        return os.path.join(self.save_dir, self.name, self.version, "checkpoints")
 
     @property
     def tf_experiment(self):
@@ -112,27 +111,41 @@ class MLTBLogger(loggers.LoggerCollection):
         return self._mlflow_logger.experiment
 
     def log_figure(self, tag, figure, step):
-        tmp_file = tempfile.mktemp() + '.png'
+        tmp_file = tempfile.mktemp() + ".png"
         figure.savefig(tmp_file)
-        self.mlflow_experiment.log_artifact(self._mlflow_logger.run_id, tmp_file, f'{tag}_{step:05}')
+        self.mlflow_experiment.log_artifact(
+            self._mlflow_logger.run_id, tmp_file, f"{tag}_{step:05}"
+        )
         self.tf_experiment.add_figure(tag, figure, step)
 
 
 class MinEpochModelCheckpoint(ModelCheckpoint):
     """Checkpoints models only after training for a minimum of epochs."""
 
-    def __init__(self,
-                 filepath: Optional[str] = None,
-                 monitor: Optional[str] = None,
-                 verbose: bool = False,
-                 save_last: Optional[bool] = None,
-                 save_top_k: Optional[int] = None,
-                 save_weights_only: bool = False,
-                 mode: str = "auto",
-                 period: int = 1,
-                 prefix: str = "",
-                 min_epochs_before_saving: int = 0):
-        super().__init__(filepath, monitor, verbose, save_last, save_top_k, save_weights_only, mode, period, prefix)
+    def __init__(
+        self,
+        filepath: Optional[str] = None,
+        monitor: Optional[str] = None,
+        verbose: bool = False,
+        save_last: Optional[bool] = None,
+        save_top_k: Optional[int] = None,
+        save_weights_only: bool = False,
+        mode: str = "auto",
+        period: int = 1,
+        prefix: str = "",
+        min_epochs_before_saving: int = 0,
+    ):
+        super().__init__(
+            filepath,
+            monitor,
+            verbose,
+            save_last,
+            save_top_k,
+            save_weights_only,
+            mode,
+            period,
+            prefix,
+        )
 
         self.min_epochs_before_saving = min_epochs_before_saving
 

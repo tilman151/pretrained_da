@@ -8,20 +8,22 @@ from models import networks
 
 
 class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
-    def __init__(self,
-                 in_channels,
-                 seq_len,
-                 num_layers,
-                 kernel_size,
-                 base_filters,
-                 latent_dim,
-                 dropout,
-                 domain_trade_off,
-                 domain_disc_dim,
-                 num_disc_layers,
-                 optim_type,
-                 lr,
-                 record_embeddings=False):
+    def __init__(
+        self,
+        in_channels,
+        seq_len,
+        num_layers,
+        kernel_size,
+        base_filters,
+        latent_dim,
+        dropout,
+        domain_trade_off,
+        domain_disc_dim,
+        num_disc_layers,
+        optim_type,
+        lr,
+        record_embeddings=False,
+    ):
         super().__init__()
 
         self.in_channels = in_channels
@@ -38,11 +40,19 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         self.lr = lr
         self.record_embeddings = record_embeddings
 
-        self.encoder = networks.Encoder(self.in_channels, self.base_filters, self.kernel_size,
-                                        self.num_layers, self.latent_dim, self.seq_len,
-                                        dropout=self.dropout,
-                                        norm_outputs=False)
-        self.domain_disc = networks.DomainDiscriminator(self.latent_dim, self.num_disc_layers, self.domain_disc_dim)
+        self.encoder = networks.Encoder(
+            self.in_channels,
+            self.base_filters,
+            self.kernel_size,
+            self.num_layers,
+            self.latent_dim,
+            self.seq_len,
+            dropout=self.dropout,
+            norm_outputs=False,
+        )
+        self.domain_disc = networks.DomainDiscriminator(
+            self.latent_dim, self.num_disc_layers, self.domain_disc_dim
+        )
         self.regressor = networks.Regressor(latent_dim)
 
         self.criterion_recon = nn.MSELoss()
@@ -61,14 +71,18 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         return common
 
     def configure_optimizers(self):
-        encoder_lr = self.lr if 'pretrained_checkpoint' in self.hparams else self.lr
-        param_groups = [{'params': self.encoder.parameters(), 'lr': encoder_lr},
-                        {'params': self.regressor.parameters()},
-                        {'params': self.domain_disc.parameters()}]
-        if self.optim_type == 'adam':
+        encoder_lr = self.lr if "pretrained_checkpoint" in self.hparams else self.lr
+        param_groups = [
+            {"params": self.encoder.parameters(), "lr": encoder_lr},
+            {"params": self.regressor.parameters()},
+            {"params": self.domain_disc.parameters()},
+        ]
+        if self.optim_type == "adam":
             return torch.optim.Adam(param_groups, lr=self.lr)
         else:
-            return torch.optim.SGD(param_groups, lr=self.lr, momentum=0.9, weight_decay=0.01)
+            return torch.optim.SGD(
+                param_groups, lr=self.lr, momentum=0.9, weight_decay=0.01
+            )
 
     def forward(self, inputs):
         latent_code = self.encoder(inputs)
@@ -78,22 +92,29 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
 
     def training_step(self, batch, batch_idx):
         source, source_labels, target = batch
-        domain_labels = torch.cat([torch.ones_like(source_labels),
-                                   torch.zeros_like(source_labels)])
+        domain_labels = torch.cat(
+            [torch.ones_like(source_labels), torch.zeros_like(source_labels)]
+        )
         # Predict on source and reconstruct/domain classify both
-        loss, regression_loss, domain_loss = self._train(source, source_labels, target, domain_labels)
+        loss, regression_loss, domain_loss = self._train(
+            source, source_labels, target, domain_labels
+        )
 
-        self.log('train/loss', loss)
-        self.log('train/regression_loss', regression_loss)
-        self.log('train/domain_loss', domain_loss)
+        self.log("train/loss", loss)
+        self.log("train/regression_loss", regression_loss)
+        self.log("train/domain_loss", domain_loss)
 
         return loss
 
-    def _train(self, regressor_features, regressor_labels, auxiliary_features, domain_labels):
+    def _train(
+        self, regressor_features, regressor_labels, auxiliary_features, domain_labels
+    ):
         common = torch.cat([regressor_features, auxiliary_features])
         domain_prediction, prediction = self._complete_forward(common)
 
-        regression_loss = self.criterion_regression(prediction.squeeze(), regressor_labels)
+        regression_loss = self.criterion_regression(
+            prediction.squeeze(), regressor_labels
+        )
         domain_loss = self.criterion_domain(domain_prediction.squeeze(), domain_labels)
         loss = regression_loss + self.domain_trade_off * domain_loss
 
@@ -101,17 +122,23 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
 
     def validation_step(self, batch, batch_idx, dataloader_idx):
         features, labels = batch
-        domain_labels = torch.ones_like(labels) if dataloader_idx == 0 else torch.zeros_like(labels)
-        regression_loss, domain_loss, rul_score, batch_size = self._evaluate(features, labels, domain_labels,
-                                                                             record_embeddings=self.record_embeddings)
+        domain_labels = (
+            torch.ones_like(labels) if dataloader_idx == 0 else torch.zeros_like(labels)
+        )
+        regression_loss, domain_loss, rul_score, batch_size = self._evaluate(
+            features, labels, domain_labels, record_embeddings=self.record_embeddings
+        )
 
         return regression_loss, domain_loss, rul_score, batch_size
 
     def test_step(self, batch, batch_idx, dataloader_idx):
         features, labels = batch
-        domain_labels = torch.ones_like(labels) if dataloader_idx == 0 else torch.zeros_like(labels)
-        regression_loss, domain_loss, rul_score, batch_size = self._evaluate(features, labels, domain_labels,
-                                                                             record_embeddings=False)
+        domain_labels = (
+            torch.ones_like(labels) if dataloader_idx == 0 else torch.zeros_like(labels)
+        )
+        regression_loss, domain_loss, rul_score, batch_size = self._evaluate(
+            features, labels, domain_labels, record_embeddings=False
+        )
 
         return regression_loss, domain_loss, rul_score, batch_size
 
@@ -134,33 +161,57 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
     def validation_epoch_end(self, outputs):
         if self.record_embeddings:
             embedding_fig = self.embedding_metric.compute()
-            self.logger.log_figure('val/embeddings', embedding_fig, self.global_step)
+            self.logger.log_figure("val/embeddings", embedding_fig, self.global_step)
             self.embedding_metric.reset()
 
-        regression_loss, source_regression_loss, domain_loss, _ = self._reduce_metrics(outputs)
-        self.log('val/regression_loss', regression_loss)
-        self.log('val/source_regression_loss', source_regression_loss)
-        self.log('val/domain_loss', domain_loss)
+        regression_loss, source_regression_loss, domain_loss, _ = self._reduce_metrics(
+            outputs
+        )
+        self.log("val/regression_loss", regression_loss)
+        self.log("val/source_regression_loss", source_regression_loss)
+        self.log("val/domain_loss", domain_loss)
 
     def test_epoch_end(self, outputs):
-        regression_loss, source_regression_loss, domain_loss, rul_score = self._reduce_metrics(outputs)
-        self.log(f'test/regression_loss', regression_loss)
-        self.log(f'test/domain_loss', domain_loss)
-        self.log('test/rul_score', rul_score)
+        (
+            regression_loss,
+            source_regression_loss,
+            domain_loss,
+            rul_score,
+        ) = self._reduce_metrics(outputs)
+        self.log(f"test/regression_loss", regression_loss)
+        self.log(f"test/domain_loss", domain_loss)
+        self.log("test/rul_score", rul_score)
 
     def _reduce_metrics(self, outputs):
         source_outputs, target_outputs = outputs
 
-        source_domain_loss, source_regression_loss, _, source_num_samples = self.__reduce_metrics(source_outputs)
-        target_domain_loss, regression_loss, rul_score, target_num_samples = self.__reduce_metrics(target_outputs)
-        domain_loss = (source_domain_loss + target_domain_loss) / (source_num_samples + target_num_samples)
+        (
+            source_domain_loss,
+            source_regression_loss,
+            _,
+            source_num_samples,
+        ) = self.__reduce_metrics(source_outputs)
+        (
+            target_domain_loss,
+            regression_loss,
+            rul_score,
+            target_num_samples,
+        ) = self.__reduce_metrics(target_outputs)
+        domain_loss = (source_domain_loss + target_domain_loss) / (
+            source_num_samples + target_num_samples
+        )
 
         return regression_loss, source_regression_loss, domain_loss, rul_score
 
     def __reduce_metrics(self, outputs):
-        regression_loss, domain_loss, rul_score, batch_size = zip(*outputs)  # separate output parts
+        regression_loss, domain_loss, rul_score, batch_size = zip(
+            *outputs
+        )  # separate output parts
         num_samples = sum(batch_size)
-        regression_loss = torch.sqrt(sum(b * (loss ** 2) for b, loss in zip(batch_size, regression_loss)) / num_samples)
+        regression_loss = torch.sqrt(
+            sum(b * (loss ** 2) for b, loss in zip(batch_size, regression_loss))
+            / num_samples
+        )
         summed_domain_loss = sum(b * loss for b, loss in zip(batch_size, domain_loss))
         rul_score = sum(rul_score)
         return summed_domain_loss, regression_loss, rul_score, num_samples

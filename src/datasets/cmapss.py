@@ -1,31 +1,32 @@
 import os
 import warnings
-from typing import Union, List, Optional
+from typing import List, Optional, Union
 
 import numpy as np
 import pytorch_lightning as pl
 import sklearn.preprocessing as scalers
 import torch
-from torch.utils.data import DataLoader, TensorDataset, IterableDataset
+from torch.utils.data import DataLoader, IterableDataset, TensorDataset
 
 
 class CMAPSSDataModule(pl.LightningDataModule):
-    WINDOW_SIZES = {1: 30,
-                    2: 20,
-                    3: 30,
-                    4: 15}
+    WINDOW_SIZES = {1: 30, 2: 20, 3: 30, 4: 15}
 
-    def __init__(self,
-                 fd,
-                 batch_size,
-                 max_rul=125,
-                 window_size=None,
-                 percent_fail_runs=None,
-                 percent_broken=None,
-                 feature_select=None,
-                 truncate_val=False):
+    def __init__(
+        self,
+        fd,
+        batch_size,
+        max_rul=125,
+        window_size=None,
+        percent_fail_runs=None,
+        percent_broken=None,
+        feature_select=None,
+        truncate_val=False,
+    ):
         super().__init__()
-        self.DATA_ROOT = os.path.join(os.path.dirname(__file__), '../..', 'data', 'CMAPSS')
+        self.DATA_ROOT = os.path.join(
+            os.path.dirname(__file__), "../..", "data", "CMAPSS"
+        )
 
         # Select features according to https://doi.org/10.1016/j.ress.2017.11.021
         if feature_select is None:
@@ -40,13 +41,15 @@ class CMAPSSDataModule(pl.LightningDataModule):
         self.feature_select = feature_select
         self.truncate_val = truncate_val
 
-        self.hparams = {'fd': self.fd,
-                        'batch_size': self.batch_size,
-                        'window_size': self.window_size,
-                        'max_rul': self.max_rul,
-                        'percent_broken': self.percent_broken,
-                        'percent_fail_runs': self.percent_fail_runs,
-                        'truncate_val': self.truncate_val}
+        self.hparams = {
+            "fd": self.fd,
+            "batch_size": self.batch_size,
+            "window_size": self.window_size,
+            "max_rul": self.max_rul,
+            "percent_broken": self.percent_broken,
+            "percent_fail_runs": self.percent_fail_runs,
+            "truncate_val": self.truncate_val,
+        }
 
         self.data = {}
         self.lengths = {}
@@ -55,19 +58,23 @@ class CMAPSSDataModule(pl.LightningDataModule):
         return os.path.join(self.DATA_ROOT, self._file_name(split))
 
     def _file_name(self, split):
-        return f'{split}_FD{self.fd:03d}.txt'
+        return f"{split}_FD{self.fd:03d}.txt"
 
     def prepare_data(self, *args, **kwargs):
         # Check if training data was already split
-        dev_path = self._file_path('dev')
+        dev_path = self._file_path("dev")
         if not os.path.exists(dev_path):
-            warnings.warn(f'Training data for FD{self.fd:03d} not yet split into dev and val. Splitting now.')
-            self._split_fd_train(self._file_path('train'))
+            warnings.warn(
+                f"Training data for FD{self.fd:03d} not yet split into dev and val. Splitting now."
+            )
+            self._split_fd_train(self._file_path("train"))
 
     def _split_fd_train(self, train_path):
         train_percentage = 0.8
-        fmt = '%d %d %.4f %.4f %.1f %.2f %.2f %.2f %.2f %.2f %.2f %.2f ' \
-              '%.2f %.2f %.2f %.2f %.2f %.2f %.2f %.4f %.2f %d %d %.2f %.2f %.4f'
+        fmt = (
+            "%d %d %.4f %.4f %.1f %.2f %.2f %.2f %.2f %.2f %.2f %.2f "
+            "%.2f %.2f %.2f %.2f %.2f %.2f %.2f %.4f %.2f %d %d %.2f %.2f %.4f"
+        )
 
         train_data = np.loadtxt(train_path)
 
@@ -81,28 +88,28 @@ class CMAPSSDataModule(pl.LightningDataModule):
         val_data = np.concatenate(train_data[split_idx:])
 
         data_root, train_file = os.path.split(train_path)
-        dev_file = train_file.replace('train_', 'dev_')
+        dev_file = train_file.replace("train_", "dev_")
         dev_file = os.path.join(data_root, dev_file)
         np.savetxt(dev_file, dev_data, fmt=fmt)
-        val_file = train_file.replace('train_', 'val_')
+        val_file = train_file.replace("train_", "val_")
         val_file = os.path.join(data_root, val_file)
         np.savetxt(val_file, val_data, fmt=fmt)
 
     def setup(self, stage: Optional[str] = None):
-        *self.data['dev'], self.lengths['dev'] = self._setup_split('dev')
-        *self.data['val'], self.lengths['val'] = self._setup_split('val')
-        *self.data['test'], self.lengths['test'] = self._setup_split('test')
+        *self.data["dev"], self.lengths["dev"] = self._setup_split("dev")
+        *self.data["val"], self.lengths["val"] = self._setup_split("val")
+        *self.data["test"], self.lengths["test"] = self._setup_split("test")
 
     def _setup_split(self, split):
         file_path = self._file_path(split)
 
         features = self._load_features(file_path)
-        if split == 'dev' or (split == 'val' and self.truncate_val):
+        if split == "dev" or (split == "val" and self.truncate_val):
             features = self._truncate_features(features)
         features = self._normalize(features)
         features, time_steps = self._remove_time_steps_from_features(features)
 
-        if split == 'dev' or split == 'val':
+        if split == "dev" or split == "val":
             # Build targets from time steps on training
             targets = self._generate_targets(time_steps)
             # Window data to get uniform sequence lengths
@@ -143,7 +150,9 @@ class CMAPSSDataModule(pl.LightningDataModule):
         if self.percent_broken is not None and self.percent_broken < 1:
             for i, run in enumerate(features):
                 num_cycles = int(self.percent_broken * len(run))
-                run[:, 1] += len(run) - num_cycles - 1  # Adjust targets to truncated length
+                run[:, 1] += (
+                    len(run) - num_cycles - 1
+                )  # Adjust targets to truncated length
                 features[i] = run[:num_cycles]
 
         return features
@@ -151,7 +160,7 @@ class CMAPSSDataModule(pl.LightningDataModule):
     def _normalize(self, features):
         """Normalize features with sklearn transform."""
         # Fit scaler on corresponding training split
-        train_file = self._file_path('dev')
+        train_file = self._file_path("dev")
         train_features = self._load_features(train_file)
         full_features = np.concatenate(train_features, axis=0)
         scaler = scalers.MinMaxScaler(feature_range=(-1, 1))
@@ -180,7 +189,7 @@ class CMAPSSDataModule(pl.LightningDataModule):
 
     def _load_targets(self):
         """Load target file."""
-        file_name = f'RUL_FD{self.fd:03d}.txt'
+        file_name = f"RUL_FD{self.fd:03d}.txt"
         file_path = os.path.join(self.DATA_ROOT, file_name)
         targets = np.loadtxt(file_path)
 
@@ -195,7 +204,9 @@ class CMAPSSDataModule(pl.LightningDataModule):
         for seq, target in zip(features, targets):
             num_frames = seq.shape[0]
             seq = np.concatenate([np.zeros((self.window_size - 1, seq.shape[1])), seq])
-            feature_windows = [seq[i:(i+self.window_size)] for i in range(0, num_frames)]
+            feature_windows = [
+                seq[i : (i + self.window_size)] for i in range(0, num_frames)
+            ]
             new_features.extend(feature_windows)
             new_targets.append(target)
 
@@ -212,7 +223,7 @@ class CMAPSSDataModule(pl.LightningDataModule):
                 pad = (self.window_size - seq.shape[0], seq.shape[1])
                 features[i] = np.concatenate([np.zeros(pad), seq])
             else:
-                features[i] = seq[-self.window_size:]
+                features[i] = seq[-self.window_size :]
 
         features = np.stack(features, axis=0)
         lengths = [1] * len(features)
@@ -220,22 +231,28 @@ class CMAPSSDataModule(pl.LightningDataModule):
         return features, lengths
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
-        return DataLoader(self._to_dataset(*self.data['dev']),
-                          batch_size=self.batch_size,
-                          shuffle=True,
-                          pin_memory=True)
+        return DataLoader(
+            self._to_dataset(*self.data["dev"]),
+            batch_size=self.batch_size,
+            shuffle=True,
+            pin_memory=True,
+        )
 
     def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        return DataLoader(self._to_dataset(*self.data['val']),
-                          batch_size=self.batch_size,
-                          shuffle=False,
-                          pin_memory=True)
+        return DataLoader(
+            self._to_dataset(*self.data["val"]),
+            batch_size=self.batch_size,
+            shuffle=False,
+            pin_memory=True,
+        )
 
     def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        return DataLoader(self._to_dataset(*self.data['test']),
-                          batch_size=self.batch_size,
-                          shuffle=False,
-                          pin_memory=True)
+        return DataLoader(
+            self._to_dataset(*self.data["test"]),
+            batch_size=self.batch_size,
+            shuffle=False,
+            pin_memory=True,
+        )
 
     def _to_dataset(self, features, targets):
         return TensorDataset(features, targets)
@@ -251,18 +268,28 @@ class PairedCMAPSS(IterableDataset):
         self.num_samples = num_samples
         self.deterministic = deterministic
 
-        if not all(d.window_size == self.datasets[0].window_size for d in self.datasets):
+        if not all(
+            d.window_size == self.datasets[0].window_size for d in self.datasets
+        ):
             window_sizes = [d.window_size for d in self.datasets]
-            raise ValueError(f'Datasets to be paired do not have the same window size, but {window_sizes}')
+            raise ValueError(
+                f"Datasets to be paired do not have the same window size, but {window_sizes}"
+            )
 
-        run_lengths = [(length, domain_idx)
-                       for domain_idx, dataset in enumerate(self.datasets)
-                       for length in dataset.lengths[self.split]]
-        self._run_start_idx = np.cumsum([length for length, _ in run_lengths if length > self.min_distance])
+        run_lengths = [
+            (length, domain_idx)
+            for domain_idx, dataset in enumerate(self.datasets)
+            for length in dataset.lengths[self.split]
+        ]
+        self._run_start_idx = np.cumsum(
+            [length for length, _ in run_lengths if length > self.min_distance]
+        )
         self._run_idx = np.arange(len(self._run_start_idx) - 1)
         self._run_domain_idx = [domain_idx for _, domain_idx in run_lengths]
 
-        self._features = torch.cat([dataset.data[self.split][0] for dataset in self.datasets])
+        self._features = torch.cat(
+            [dataset.data[self.split][0] for dataset in self.datasets]
+        )
         self._max_rul = max(dataset.max_rul for dataset in self.datasets)
 
         self._current_iteration = 0
@@ -292,10 +319,14 @@ class PairedCMAPSS(IterableDataset):
     def _get_pair_idx(self):
         chosen_run_idx = self._rng.choice(self._run_idx)
         domain_label = self._run_domain_idx[chosen_run_idx]
-        anchor_idx = self._rng.integers(low=self._run_start_idx[chosen_run_idx],
-                                        high=self._run_start_idx[chosen_run_idx + 1] - self.min_distance)
-        query_idx = self._rng.integers(low=anchor_idx + self.min_distance,
-                                       high=self._run_start_idx[chosen_run_idx + 1])
+        anchor_idx = self._rng.integers(
+            low=self._run_start_idx[chosen_run_idx],
+            high=self._run_start_idx[chosen_run_idx + 1] - self.min_distance,
+        )
+        query_idx = self._rng.integers(
+            low=anchor_idx + self.min_distance,
+            high=self._run_start_idx[chosen_run_idx + 1],
+        )
 
         return anchor_idx, query_idx, domain_label
 
@@ -303,9 +334,9 @@ class PairedCMAPSS(IterableDataset):
         anchors = self._features[pair_idx[0]]
         queries = self._features[pair_idx[1]]
         domain_label = torch.tensor(pair_idx[2], dtype=torch.float)
-        distances = torch.tensor(pair_idx[1] - pair_idx[0], dtype=torch.float) / self._max_rul
+        distances = (
+            torch.tensor(pair_idx[1] - pair_idx[0], dtype=torch.float) / self._max_rul
+        )
         distances = torch.clamp_max(distances, max=1)  # max distance is max_rul
 
         return anchors, queries, distances, domain_label
-
-

@@ -13,13 +13,17 @@ class EmbeddingViz(pl.metrics.Metric):
         self.num_elements = num_elements
         self.embedding_size = embedding_size
 
-        self.add_state('embeddings', default=torch.zeros(num_elements, embedding_size), dist_reduce_fx=None)
-        self.add_state('labels', default=torch.zeros(num_elements), dist_reduce_fx=None)
-        self.add_state('ruls', default=torch.zeros(num_elements), dist_reduce_fx=None)
-        self.add_state('sample_counter', default=torch.tensor(0), dist_reduce_fx=None)
+        self.add_state(
+            "embeddings",
+            default=torch.zeros(num_elements, embedding_size),
+            dist_reduce_fx=None,
+        )
+        self.add_state("labels", default=torch.zeros(num_elements), dist_reduce_fx=None)
+        self.add_state("ruls", default=torch.zeros(num_elements), dist_reduce_fx=None)
+        self.add_state("sample_counter", default=torch.tensor(0), dist_reduce_fx=None)
 
-        self.class_cm = plt.get_cmap('tab10')
-        self.rul_cm = plt.get_cmap('viridis')
+        self.class_cm = plt.get_cmap("tab10")
+        self.rul_cm = plt.get_cmap("viridis")
 
     def update(self, embeddings, labels, ruls):
         """
@@ -39,21 +43,39 @@ class EmbeddingViz(pl.metrics.Metric):
 
     def compute(self):
         """Compute UMAP and plot points to 2d scatter plot."""
-        logged_embeddings = self.embeddings[:self.sample_counter].detach().cpu().numpy()
-        logged_labels = self.labels[:self.sample_counter].detach().cpu().int()
-        logged_ruls = self.ruls[:self.sample_counter].detach().cpu()
+        logged_embeddings = (
+            self.embeddings[: self.sample_counter].detach().cpu().numpy()
+        )
+        logged_labels = self.labels[: self.sample_counter].detach().cpu().int()
+        logged_ruls = self.ruls[: self.sample_counter].detach().cpu()
         viz_embeddings = umap.UMAP(random_state=42).fit_transform(logged_embeddings)
 
-        fig, (ax_class, ax_rul) = plt.subplots(1, 2, sharex='all', sharey='all', figsize=(20, 10))
+        fig, (ax_class, ax_rul) = plt.subplots(
+            1, 2, sharex="all", sharey="all", figsize=(20, 10)
+        )
 
         class_colors = [self.class_cm.colors[c] for c in logged_labels]
-        ax_class.scatter(viz_embeddings[:, 0], viz_embeddings[:, 1],
-                         c=class_colors, alpha=0.4, edgecolors='none', s=[4])
-        ax_class.legend(['Source', 'Target'], loc='lower left')
+        ax_class.scatter(
+            viz_embeddings[:, 0],
+            viz_embeddings[:, 1],
+            c=class_colors,
+            alpha=0.4,
+            edgecolors="none",
+            s=[4],
+        )
+        ax_class.legend(["Source", "Target"], loc="lower left")
 
-        ax_rul.scatter(viz_embeddings[:, 0], viz_embeddings[:, 1],
-                       c=logged_ruls, alpha=0.4, edgecolors='none', s=[4])
-        color_bar = plt.cm.ScalarMappable(mplcolors.Normalize(logged_ruls.min(), logged_ruls.max()), self.rul_cm)
+        ax_rul.scatter(
+            viz_embeddings[:, 0],
+            viz_embeddings[:, 1],
+            c=logged_ruls,
+            alpha=0.4,
+            edgecolors="none",
+            s=[4],
+        )
+        color_bar = plt.cm.ScalarMappable(
+            mplcolors.Normalize(logged_ruls.min(), logged_ruls.max()), self.rul_cm
+        )
         color_bar.set_array(logged_ruls)
         plt.colorbar(color_bar)
 

@@ -1,4 +1,4 @@
-from typing import Optional, Union, List
+from typing import List, Optional, Union
 
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader, TensorDataset
@@ -7,15 +7,17 @@ from datasets.cmapss import CMAPSSDataModule, PairedCMAPSS
 
 
 class DomainAdaptionDataModule(pl.LightningDataModule):
-    def __init__(self,
-                 fd_source,
-                 fd_target,
-                 batch_size,
-                 max_rul=125,
-                 window_size=None,
-                 percent_fail_runs=None,
-                 percent_broken=None,
-                 feature_select=None):
+    def __init__(
+        self,
+        fd_source,
+        fd_target,
+        batch_size,
+        max_rul=125,
+        window_size=None,
+        percent_fail_runs=None,
+        percent_broken=None,
+        feature_select=None,
+    ):
         super().__init__()
 
         self.fd_source = fd_source
@@ -27,18 +29,34 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
         self.percent_fail_runs = percent_fail_runs
         self.feature_select = feature_select
 
-        self.hparams = {'fd_source': self.fd_source,
-                        'fd_target': self.fd_target,
-                        'batch_size': self.batch_size,
-                        'window_size': self.window_size,
-                        'max_rul': self.max_rul,
-                        'percent_broken': self.percent_broken,
-                        'percent_fail_runs': self.percent_fail_runs}
+        self.hparams = {
+            "fd_source": self.fd_source,
+            "fd_target": self.fd_target,
+            "batch_size": self.batch_size,
+            "window_size": self.window_size,
+            "max_rul": self.max_rul,
+            "percent_broken": self.percent_broken,
+            "percent_fail_runs": self.percent_fail_runs,
+        }
 
-        self.source = CMAPSSDataModule(self.fd_source, self.batch_size, self.max_rul, self.window_size,
-                                       None, None, self.feature_select)
-        self.target = CMAPSSDataModule(self.fd_target, self.batch_size, self.max_rul, self.window_size,
-                                       self.percent_fail_runs, self.percent_broken, self.feature_select)
+        self.source = CMAPSSDataModule(
+            self.fd_source,
+            self.batch_size,
+            self.max_rul,
+            self.window_size,
+            None,
+            None,
+            self.feature_select,
+        )
+        self.target = CMAPSSDataModule(
+            self.fd_target,
+            self.batch_size,
+            self.max_rul,
+            self.window_size,
+            self.percent_fail_runs,
+            self.percent_broken,
+            self.feature_select,
+        )
 
     def prepare_data(self, *args, **kwargs):
         self.source.prepare_data(*args, **kwargs)
@@ -49,25 +67,32 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
         self.target.setup(stage)
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
-        return DataLoader(self._to_dataset('dev', use_target_labels=False),
-                          batch_size=self.batch_size,
-                          shuffle=True,
-                          pin_memory=True)
+        return DataLoader(
+            self._to_dataset("dev", use_target_labels=False),
+            batch_size=self.batch_size,
+            shuffle=True,
+            pin_memory=True,
+        )
 
     def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        return [self.source.val_dataloader(*args, **kwargs), self.target.val_dataloader(*args, **kwargs)]
+        return [
+            self.source.val_dataloader(*args, **kwargs),
+            self.target.val_dataloader(*args, **kwargs),
+        ]
 
     def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        return [self.source.test_dataloader(*args, **kwargs), self.target.test_dataloader(*args, **kwargs)]
+        return [
+            self.source.test_dataloader(*args, **kwargs),
+            self.target.test_dataloader(*args, **kwargs),
+        ]
 
     def _to_dataset(self, split, use_target_labels):
         source, source_labels = self.source.data[split]
         target, target_labels = self.target.data[split]
 
-        source, source_labels, target, target_labels = _unify_source_and_target_length(source,
-                                                                                       source_labels,
-                                                                                       target,
-                                                                                       target_labels)
+        source, source_labels, target, target_labels = _unify_source_and_target_length(
+            source, source_labels, target, target_labels
+        )
 
         if use_target_labels:
             dataset = TensorDataset(source, source_labels, target, target_labels)
@@ -78,18 +103,20 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
 
 
 class PretrainingAdaptionDataModule(pl.LightningDataModule):
-    def __init__(self,
-                 fd_source,
-                 fd_target,
-                 num_samples,
-                 batch_size,
-                 max_rul=125,
-                 window_size=None,
-                 min_distance=1,
-                 percent_fail_runs=None,
-                 percent_broken=None,
-                 feature_select=None,
-                 truncate_target_val=False):
+    def __init__(
+        self,
+        fd_source,
+        fd_target,
+        num_samples,
+        batch_size,
+        max_rul=125,
+        window_size=None,
+        min_distance=1,
+        percent_fail_runs=None,
+        percent_broken=None,
+        feature_select=None,
+        truncate_target_val=False,
+    ):
         super().__init__()
 
         self.fd_source = fd_source
@@ -104,22 +131,38 @@ class PretrainingAdaptionDataModule(pl.LightningDataModule):
         self.feature_select = feature_select
         self.truncate_target_val = truncate_target_val
 
-        self.hparams = {'fd_source': self.fd_source,
-                        'fd_target': self.fd_target,
-                        'num_samples': self.num_samples,
-                        'batch_size': self.batch_size,
-                        'window_size': self.window_size,
-                        'max_rul': self.max_rul,
-                        'min_distance': self.min_distance,
-                        'percent_broken': self.percent_broken,
-                        'percent_fail_runs': self.percent_fail_runs,
-                        'truncate_target_val': self.truncate_target_val}
+        self.hparams = {
+            "fd_source": self.fd_source,
+            "fd_target": self.fd_target,
+            "num_samples": self.num_samples,
+            "batch_size": self.batch_size,
+            "window_size": self.window_size,
+            "max_rul": self.max_rul,
+            "min_distance": self.min_distance,
+            "percent_broken": self.percent_broken,
+            "percent_fail_runs": self.percent_fail_runs,
+            "truncate_target_val": self.truncate_target_val,
+        }
 
-        self.source = CMAPSSDataModule(self.fd_source, self.batch_size, self.max_rul, self.window_size,
-                                       None, None, self.feature_select)
-        self.target = CMAPSSDataModule(self.fd_target, self.batch_size, self.max_rul, self.window_size,
-                                       self.percent_fail_runs, self.percent_broken, self.feature_select,
-                                       self.truncate_target_val)
+        self.source = CMAPSSDataModule(
+            self.fd_source,
+            self.batch_size,
+            self.max_rul,
+            self.window_size,
+            None,
+            None,
+            self.feature_select,
+        )
+        self.target = CMAPSSDataModule(
+            self.fd_target,
+            self.batch_size,
+            self.max_rul,
+            self.window_size,
+            self.percent_fail_runs,
+            self.percent_broken,
+            self.feature_select,
+            self.truncate_target_val,
+        )
 
     def prepare_data(self, *args, **kwargs):
         self.source.prepare_data(*args, **kwargs)
@@ -130,23 +173,29 @@ class PretrainingAdaptionDataModule(pl.LightningDataModule):
         self.target.setup(stage)
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
-        return DataLoader(self._get_paired_dataset('dev'),
-                          batch_size=self.batch_size,
-                          pin_memory=True)
+        return DataLoader(
+            self._get_paired_dataset("dev"), batch_size=self.batch_size, pin_memory=True
+        )
 
     def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        combined_loader = DataLoader(self._get_paired_dataset('val'),
-                                     batch_size=self.batch_size,
-                                     pin_memory=True)
+        combined_loader = DataLoader(
+            self._get_paired_dataset("val"), batch_size=self.batch_size, pin_memory=True
+        )
         source_loader = self.source.val_dataloader()
         target_loader = self.target.val_dataloader()
 
         return [combined_loader, source_loader, target_loader]
 
     def _get_paired_dataset(self, split):
-        deterministic = split == 'val'
-        num_samples = 50000 if split == 'val' else self.num_samples
-        paired = PairedCMAPSS([self.source, self.target], split, num_samples, self.min_distance, deterministic)
+        deterministic = split == "val"
+        num_samples = 50000 if split == "val" else self.num_samples
+        paired = PairedCMAPSS(
+            [self.source, self.target],
+            split,
+            num_samples,
+            self.min_distance,
+            deterministic,
+        )
 
         return paired
 

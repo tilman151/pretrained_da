@@ -7,16 +7,18 @@ from models import networks
 
 
 class Baseline(pl.LightningModule, LoadEncoderMixin):
-    def __init__(self,
-                 in_channels,
-                 seq_len,
-                 num_layers,
-                 kernel_size,
-                 base_filters,
-                 latent_dim,
-                 optim_type,
-                 lr,
-                 record_embeddings=False):
+    def __init__(
+        self,
+        in_channels,
+        seq_len,
+        num_layers,
+        kernel_size,
+        base_filters,
+        latent_dim,
+        optim_type,
+        lr,
+        record_embeddings=False,
+    ):
         super().__init__()
 
         self.in_channels = in_channels
@@ -29,8 +31,16 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         self.lr = lr
         self.record_embeddings = record_embeddings
 
-        self.encoder = networks.Encoder(self.in_channels, self.base_filters, self.kernel_size,
-                                        self.num_layers, self.latent_dim, self.seq_len, dropout=0, norm_outputs=False)
+        self.encoder = networks.Encoder(
+            self.in_channels,
+            self.base_filters,
+            self.kernel_size,
+            self.num_layers,
+            self.latent_dim,
+            self.seq_len,
+            dropout=0,
+            norm_outputs=False,
+        )
         self.regressor = networks.Regressor(latent_dim)
 
         self.criterion_regression = metrics.RMSELoss()
@@ -49,12 +59,16 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         return common
 
     def configure_optimizers(self):
-        param_groups = [{'params': self.encoder.parameters()},
-                        {'params': self.regressor.parameters()}]
-        if self.optim_type == 'adam':
+        param_groups = [
+            {"params": self.encoder.parameters()},
+            {"params": self.regressor.parameters()},
+        ]
+        if self.optim_type == "adam":
             return torch.optim.Adam(param_groups, lr=self.lr)
         else:
-            return torch.optim.SGD(param_groups, lr=self.lr, momentum=0.9, weight_decay=0.01)
+            return torch.optim.SGD(
+                param_groups, lr=self.lr, momentum=0.9, weight_decay=0.01
+            )
 
     def forward(self, inputs):
         latent_code = self.encoder(inputs)
@@ -67,7 +81,7 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         predictions = self(source)
         loss = self.criterion_regression(predictions.squeeze(), source_labels)
 
-        self.log('train/regression_loss', loss)
+        self.log("train/regression_loss", loss)
 
         return loss
 
@@ -82,8 +96,9 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         regression_loss, batch_size = self._evaluate(target, target_labels)
 
         if self.record_embeddings:
-            domain_labels = torch.cat([torch.zeros_like(source_labels),
-                                       torch.ones_like(source_labels)])
+            domain_labels = torch.cat(
+                [torch.zeros_like(source_labels), torch.ones_like(source_labels)]
+            )
             latent_code = self.encoder(torch.cat([source, target]))
             ruls = torch.cat([source_labels, target_labels])
             self.embedding_metric.update(latent_code, domain_labels, ruls)
@@ -99,20 +114,25 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
 
     def validation_epoch_end(self, outputs):
         regression_loss = self._reduce_metrics(outputs)
-        self.log('val/regression_loss', regression_loss)
+        self.log("val/regression_loss", regression_loss)
 
     def test_epoch_end(self, outputs):
         if self.record_embeddings:
-            self.logger.experiment.add_figure('test/embeddings', self.embedding_metric.compute(), self.global_step)
+            self.logger.experiment.add_figure(
+                "test/embeddings", self.embedding_metric.compute(), self.global_step
+            )
             self.embedding_metric.reset()
 
         for fd, out in enumerate(outputs, start=1):
             regression_loss = self._reduce_metrics(out)
-            self.log(f'test/regression_loss_fd{fd}', regression_loss)
+            self.log(f"test/regression_loss_fd{fd}", regression_loss)
 
     def _reduce_metrics(self, outputs):
         regression_loss, batch_size = zip(*outputs)
         num_samples = sum(batch_size)
-        regression_loss = torch.sqrt(sum(b * (loss ** 2) for b, loss in zip(batch_size, regression_loss)) / num_samples)
+        regression_loss = torch.sqrt(
+            sum(b * (loss ** 2) for b, loss in zip(batch_size, regression_loss))
+            / num_samples
+        )
 
         return regression_loss
