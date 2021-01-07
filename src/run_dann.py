@@ -1,11 +1,10 @@
 import os
 import random
 
-import pytorch_lightning as pl
 import sklearn.model_selection
 
-import datasets
-from lightning import dann, logger as loggers
+from building.build import build_transfer
+from lightning import logger as loggers
 
 
 def run(
@@ -18,51 +17,22 @@ def run(
     gpu,
     pretrained_encoder_path,
 ):
-    pl.trainer.seed_everything(seed)
     logger = loggers.MLTBLogger(
         _get_logdir(),
         loggers.transfer_experiment_name(source, target),
         tensorboard_struct={"pb": percent_broken, "dt": domain_tradeoff},
     )
-    checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        monitor="val/source_regression_loss"
+    trainer, data, model = build_transfer(
+        source,
+        target,
+        percent_broken,
+        pretrained_encoder_path,
+        record_embeddings,
+        domain_tradeoff,
+        logger,
+        gpu,
+        seed,
     )
-    trainer = pl.Trainer(
-        gpus=[gpu],
-        max_epochs=200 if pretrained_encoder_path is None else 10,
-        logger=logger,
-        deterministic=True,
-        log_every_n_steps=10,
-        checkpoint_callback=checkpoint_callback,
-        gradient_clip_val=1.0,
-        val_check_interval=1.0 if pretrained_encoder_path is None else 0.1,
-    )
-    data = datasets.DomainAdaptionDataModule(
-        fd_source=source,
-        fd_target=target,
-        batch_size=512,
-        percent_broken=percent_broken,
-    )
-    model = dann.DANN(
-        in_channels=14,
-        seq_len=data.window_size,
-        num_layers=6,
-        kernel_size=3,
-        base_filters=16,
-        latent_dim=64,
-        dropout=0.1,
-        domain_trade_off=domain_tradeoff,
-        domain_disc_dim=16,
-        num_disc_layers=2,
-        optim_type="adam",
-        lr=0.01,
-        record_embeddings=record_embeddings,
-    )
-
-    if pretrained_encoder_path is not None:
-        model.load_encoder(pretrained_encoder_path, load_disc=True)
-    model.add_data_hparams(data)
-    model.hparams.update({"seed": seed})
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
 
