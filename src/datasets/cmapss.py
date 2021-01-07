@@ -268,9 +268,7 @@ class PairedCMAPSS(IterableDataset):
         self.num_samples = num_samples
         self.deterministic = deterministic
 
-        if not all(
-            d.window_size == self.datasets[0].window_size for d in self.datasets
-        ):
+        if not all(d.window_size == self.datasets[0].window_size for d in self.datasets):
             window_sizes = [d.window_size for d in self.datasets]
             raise ValueError(
                 f"Datasets to be paired do not have the same window size, but {window_sizes}"

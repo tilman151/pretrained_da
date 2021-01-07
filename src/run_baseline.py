@@ -76,6 +76,4 @@ if __name__ == "__main__":
     parser.add_argument("--gpu", type=int, default=0, help="id of GPU to use")
     opt = parser.parse_args()
 
-    run_multiple(
-        opt.source, opt.fails, opt.replications, opt.gpu, opt.pretrained_encoder
-    )
+    run_multiple(opt.source, opt.fails, opt.replications, opt.gpu, opt.pretrained_encoder)
