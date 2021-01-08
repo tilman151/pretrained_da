@@ -100,7 +100,7 @@ def tune_loop(source, target, percent_broken, num_trials):
         num_samples=num_trials,
         scheduler=scheduler,
         progress_reporter=reporter,
-        name="tune_mnist_asha",
+        name="tune_transfer_asha",
     )
 
     print("Best hyperparameters found were: ", analysis.best_config)
