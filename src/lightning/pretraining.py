@@ -134,9 +134,7 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
 
         self.log("val/regression_loss", regression_loss)
         self.log("val/domain_loss", domain_loss)
-        self.log(
-            "val/checkpoint_score", regression_loss - self.domain_tradeoff * domain_loss
-        )
+        self.log("val/checkpoint_score", regression_loss - 0.1 * domain_loss)
 
     def _get_losses(self, batch):
         anchors, queries, true_distances, domain_labels = batch
