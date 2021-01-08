@@ -69,7 +69,7 @@ def _get_hyperopt_logdir():
     return log_dir
 
 
-def tune_loop(source, target, percent_broken, num_trials):
+def optimize_transfer(source, target, percent_broken, num_trials):
     config = {
         "num_layers": tune.choice([4, 6, 8]),
         "base_filters": tune.choice([16, 32, 64]),
@@ -105,6 +105,8 @@ def tune_loop(source, target, percent_broken, num_trials):
 
     print("Best hyperparameters found were: ", analysis.best_config)
 
+    return analysis.best_config
+
 
 if __name__ == "__main__":
     import argparse
@@ -120,4 +122,4 @@ if __name__ == "__main__":
     )
     opt = parser.parse_args()
 
-    tune_loop(opt.source, opt.target, opt.percent_broken, opt.num_trials)
+    optimize_transfer(opt.source, opt.target, opt.percent_broken, opt.num_trials)

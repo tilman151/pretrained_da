@@ -1,4 +1,6 @@
+import json
 import os
+from functools import partial
 
 import pytorch_lightning as pl
 from ray import tune
@@ -69,13 +71,7 @@ def _get_hyperopt_logdir():
     return log_dir
 
 
-def tune_loop(source, target, percent_broken, num_trials):
-    arch_config = {
-        "num_layers": 8,
-        "base_filters": 16,
-        "latent_dim": 16,
-        "num_disc_layers": 1,
-    }
+def optimize_pretraining(source, target, percent_broken, arch_config, num_trials):
     config = {
         "domain_tradeoff": tune.loguniform(1e-3, 10),
         "dropout": tune.choice([0.0, 0.1, 0.3, 0.5]),
@@ -88,24 +84,38 @@ def tune_loop(source, target, percent_broken, num_trials):
     )
     reporter = tune.CLIReporter(
         parameter_columns=list(config.keys()),
-        metric_columns=["source_reg_loss", "target_loss", "domain_loss"],
+        metric_columns=["checkpoint_score", "target_loss", "domain_loss"],
     )
 
+    tune_func = partial(
+        tune_pretraining,
+        arch_config=arch_config,
+        source=source,
+        target=target,
+        percent_broken=percent_broken,
+    )
     analysis = tune.run(
-        lambda c: tune_pretraining(
-            c, arch_config, source=source, target=target, percent_broken=percent_broken
-        ),
+        tune_func,
         resources_per_trial={"cpu": 6, "gpu": 1},
-        metric="source_reg_loss",
+        metric="checkpoint_score",
         mode="min",
         config=config,
         num_samples=num_trials,
         scheduler=scheduler,
         progress_reporter=reporter,
-        name="tune_mnist_asha",
+        name="tune_pretraining_asha",
     )
 
     print("Best hyperparameters found were: ", analysis.best_config)
+
+    return analysis.best_config
+
+
+def _load_arch_config(config_path):
+    with open(config_path, mode="rt") as f:
+        _arch_config = json.load(f)
+
+    return _arch_config
 
 
 if __name__ == "__main__":
@@ -120,8 +130,14 @@ if __name__ == "__main__":
         "--percent_broken", type=float, required=True, help="degradation in [0, 1]"
     )
     parser.add_argument(
+        "arch_config_path", required=True, help="path to architecture config JSON"
+    )
+    parser.add_argument(
         "--num_trials", type=int, required=True, help="number of hyperopt trials"
     )
     opt = parser.parse_args()
 
-    tune_loop(opt.source, opt.target, opt.percent_broken, opt.num_trials)
+    arch_config = _load_arch_config(opt.arch_config_path)
+    optimize_pretraining(
+        opt.source, opt.target, opt.percent_broken, arch_config, opt.num_trials
+    )
