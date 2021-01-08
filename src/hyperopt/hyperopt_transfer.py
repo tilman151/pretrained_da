@@ -1,0 +1,123 @@
+import os
+
+import pytorch_lightning as pl
+from ray import tune
+from ray.tune.integration.pytorch_lightning import TuneReportCallback
+
+import datasets
+from lightning import dann, loggers
+import building.build as build
+
+
+def tune_transfer(config, source, target, percent_broken):
+    logger = loggers.MLTBLogger(
+        _get_hyperopt_logdir(),
+        loggers.transfer_hyperopt_name(source, target, percent_broken),
+    )
+    checkpoint_callback = pl.callbacks.ModelCheckpoint(
+        monitor="val/source_regression_loss"
+    )
+    tune_callback = TuneReportCallback(
+        {
+            "source_reg_loss": "val/source_regression_loss",
+            "target_loss": "val/regression_loss",
+            "domain_loss": "val/domain_loss",
+        },
+        on="validation_end",
+    )
+    trainer = build.build_trainer(
+        logger,
+        checkpoint_callback,
+        max_epochs=200,
+        val_interval=1.0,
+        gpu=1,
+        seed=42,
+        callbacks=[tune_callback],
+        check_sanity=False,
+    )
+
+    data = datasets.DomainAdaptionDataModule(
+        fd_source=source,
+        fd_target=target,
+        batch_size=config["batch_size"],
+        percent_broken=percent_broken,
+    )
+    model = dann.DANN(
+        in_channels=14,
+        seq_len=data.window_size,
+        num_layers=config["num_layers"],
+        kernel_size=3,
+        base_filters=config["base_filters"],
+        latent_dim=config["latent_dim"],
+        dropout=config["dropout"],
+        domain_trade_off=config["domain_tradeoff"],
+        domain_disc_dim=config["latent_dim"],
+        num_disc_layers=config["num_disc_layers"],
+        optim_type="adam",
+        lr=config["lr"],
+        record_embeddings=False,
+    )
+    build.add_hparams(model, data, 42)
+
+    trainer.fit(model, datamodule=data)
+
+
+def _get_hyperopt_logdir():
+    script_path = os.path.dirname(__file__)
+    log_dir = os.path.normpath(os.path.join(script_path, "..", "hyperopt"))
+
+    return log_dir
+
+
+def tune_loop(source, target, percent_broken, num_trials):
+    config = {
+        "num_layers": tune.choice([4, 6, 8]),
+        "base_filters": tune.choice([16, 32, 64]),
+        "domain_tradeoff": tune.choice([0.5, 1.0, 2.0]),
+        "latent_dim": tune.choice([16, 32, 64, 128]),
+        "dropout": tune.choice([0.0, 0.1, 0.3, 0.5]),
+        "num_disc_layers": tune.choice([1, 2]),
+        "lr": tune.loguniform(1e-4, 1e-1),
+        "batch_size": tune.choice([256, 512]),
+    }
+
+    scheduler = tune.schedulers.ASHAScheduler(
+        max_t=200, grace_period=1, reduction_factor=2
+    )
+    reporter = tune.CLIReporter(
+        parameter_columns=list(config.keys()),
+        metric_columns=["source_reg_loss", "target_loss", "domain_loss"],
+    )
+
+    analysis = tune.run(
+        lambda c: tune_transfer(
+            c, source=source, target=target, percent_broken=percent_broken
+        ),
+        resources_per_trial={"cpu": 6, "gpu": 1},
+        metric="source_reg_loss",
+        mode="min",
+        config=config,
+        num_samples=num_trials,
+        scheduler=scheduler,
+        progress_reporter=reporter,
+        name="tune_mnist_asha",
+    )
+
+    print("Best hyperparameters found were: ", analysis.best_config)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Hyperparameter optimization for DANN")
+    parser.add_argument("--source", type=int, required=True, help="source FD number")
+    parser.add_argument("--target", type=int, required=True, help="target FD number")
+    parser.add_argument(
+        "--percent_broken", type=float, required=True, help="degradation in [0, 1]"
+    )
+    parser.add_argument(
+        "--num_trials", type=int, required=True, help="number of hyperopt trials"
+    )
+    opt = parser.parse_args()
+
+    tune_loop(opt.source, opt.target, opt.percent_broken, opt.num_trials)
