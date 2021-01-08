@@ -39,6 +39,14 @@ def pretraining_adaption_experiment_name(source, target):
     return f"pretraining_{ExperimentNaming[source]}&{ExperimentNaming[target]}"
 
 
+def transfer_hyperopt_name(source, target, percent_broken):
+    assert source in ExperimentNaming, f"Unknown source FD number {source}."
+    assert target in ExperimentNaming, f"Unknown target FD number {target}."
+    assert 0 <= percent_broken <= 1, f"Invalid percent broken {percent_broken}."
+
+    return f"hyperopt_{ExperimentNaming[source]}&{ExperimentNaming[target]}@{percent_broken:.2f}"
+
+
 class MLTBLogger(loggers.LoggerCollection):
     """Combined MlFlow and Tensorboard logger that saves models as MlFlow artifacts."""
 
