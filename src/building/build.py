@@ -132,9 +132,19 @@ def build_pretraining(
     return trainer, data, model
 
 
-def build_trainer(logger, checkpoint_callback, max_epochs, val_interval, gpu, seed):
+def build_trainer(
+    logger,
+    checkpoint_callback,
+    max_epochs,
+    val_interval,
+    gpu,
+    seed,
+    callbacks=None,
+    check_sanity=True,
+):
     pl.trainer.seed_everything(seed)
     trainer = pl.Trainer(
+        num_sanity_val_steps=2 if check_sanity else 0,
         gpus=[gpu],
         max_epochs=max_epochs,
         logger=logger,
@@ -143,6 +153,7 @@ def build_trainer(logger, checkpoint_callback, max_epochs, val_interval, gpu, se
         checkpoint_callback=checkpoint_callback,
         gradient_clip_val=1.0,
         val_check_interval=val_interval,
+        callbacks=callbacks,
     )
 
     return trainer
