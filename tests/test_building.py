@@ -158,3 +158,79 @@ class TestBuildingFunctions(unittest.TestCase):
             weight_decay=0.0,
             record_embeddings=False,
         )
+
+    @mock.patch("pytorch_lightning.callbacks.ModelCheckpoint")
+    @mock.patch("lightning.loggers.MLTBLogger")
+    @mock.patch("building.build.build_baseline_from_config")
+    @mock.patch("datasets.BaselineDataModule")
+    @mock.patch("building.build.build_trainer")
+    def test_build_baseline(
+        self,
+        mock_build_trainer,
+        mock_datamodule,
+        mock_baseline_from_config,
+        mock_logger,
+        mock_checkpoint,
+    ):
+        mock_logger.return_value = "mock_logger"
+        mock_checkpoint.return_value = "mock_checkpoint"
+        with self.subTest("no_encoder"):
+            build.build_baseline(2, 1.0, self.config, None, 1, 42)
+            mock_build_trainer.assert_called_with(
+                "mock_logger",
+                "mock_checkpoint",
+                max_epochs=100,
+                val_interval=1.0,
+                gpu=1,
+                seed=42,
+            )
+            mock_datamodule.assert_called_with(
+                fd_source=2, percent_fail_runs=1.0, batch_size=self.config["batch_size"]
+            )
+            mock_baseline_from_config.assert_called_with(
+                self.config,
+                mock_datamodule().window_size,
+                None,
+            )
+        with self.subTest("with_encoder"):
+            build.build_baseline(2, 1.0, self.config, "encoder_path", 1, 42)
+            mock_build_trainer.assert_called_with(
+                "mock_logger",
+                "mock_checkpoint",
+                max_epochs=100,
+                val_interval=1.0,
+                gpu=1,
+                seed=42,
+            )
+            mock_datamodule.assert_called_with(
+                fd_source=2, percent_fail_runs=1.0, batch_size=self.config["batch_size"]
+            )
+            mock_baseline_from_config.assert_called_with(
+                self.config,
+                mock_datamodule().window_size,
+                "encoder_path",
+            )
+
+    @mock.patch("lightning.baseline.Baseline")
+    def test_build_baseline_from_config(self, mock_baseline):
+        with self.subTest("no_encoder"):
+            build.build_baseline_from_config(self.config, 30, None)
+            self._assert_baseline_build_correctly(mock_baseline)
+            mock_baseline().load_encoder.assert_not_called()
+        with self.subTest("with_encoder"):
+            build.build_baseline_from_config(self.config, 30, "encoder_path")
+            self._assert_baseline_build_correctly(mock_baseline)
+            mock_baseline().load_encoder.assert_called_with("encoder_path")
+
+    def _assert_baseline_build_correctly(self, mock_baseline):
+        mock_baseline.assert_called_with(
+            in_channels=14,
+            seq_len=30,
+            num_layers=self.config["num_layers"],
+            kernel_size=3,
+            base_filters=self.config["base_filters"],
+            latent_dim=self.config["latent_dim"],
+            optim_type="adam",
+            lr=self.config["lr"],
+            record_embeddings=False,
+        )

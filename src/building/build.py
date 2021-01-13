@@ -65,7 +65,7 @@ def build_dann_from_config(config, seq_len, pretrained_encoder_path, record_embe
     return model
 
 
-def build_baseline(source, fails, pretrained_encoder_path, gpu, seed):
+def build_baseline(source, fails, config, pretrained_encoder_path, gpu, seed):
     logger = loggers.MLTBLogger(get_logdir(), loggers.baseline_experiment_name(source))
     checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor="val/regression_loss")
     trainer = build_trainer(
@@ -77,24 +77,32 @@ def build_baseline(source, fails, pretrained_encoder_path, gpu, seed):
         seed=seed,
     )
     data = datasets.BaselineDataModule(
-        fd_source=source, batch_size=512, window_size=30, percent_fail_runs=fails
+        fd_source=source,
+        batch_size=config["batch_size"],
+        percent_fail_runs=fails,
     )
+    model = build_baseline_from_config(config, data.window_size, pretrained_encoder_path)
+    add_hparams(model, data, seed)
+
+    return trainer, data, model
+
+
+def build_baseline_from_config(config, seq_len, pretrained_encoder_path):
     model = baseline.Baseline(
         in_channels=14,
-        seq_len=30,
-        num_layers=4,
+        seq_len=seq_len,
+        num_layers=config["num_layers"],
         kernel_size=3,
-        base_filters=16,
-        latent_dim=128,
+        base_filters=config["base_filters"],
+        latent_dim=config["latent_dim"],
         optim_type="adam",
-        lr=0.01,
+        lr=config["lr"],
         record_embeddings=False,
     )
     if pretrained_encoder_path is not None:
         model.load_encoder(pretrained_encoder_path)
-    add_hparams(model, data, seed)
 
-    return trainer, data, model
+    return model
 
 
 def build_pretraining(

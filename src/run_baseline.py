@@ -1,23 +1,23 @@
 import random
 
-from building import build_baseline
+import building
 
 
-def run(source, fails, seed, gpu, pretrained_encoder_path):
-    trainer, data, model = build_baseline(
-        source, fails, pretrained_encoder_path, gpu, seed
+def run(source, fails, config, seed, gpu, pretrained_encoder_path):
+    trainer, data, model = building.build_baseline(
+        source, fails, config, pretrained_encoder_path, gpu, seed
     )
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
 
 
-def run_multiple(source, fails, replications, gpu, pretrained_encoder_path):
+def run_multiple(source, fails, config, replications, gpu, pretrained_encoder_path):
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
 
     for f in fails:
         for s in seeds:
-            run(source, f, s, gpu, pretrained_encoder_path)
+            run(source, f, config, s, gpu, pretrained_encoder_path)
 
 
 if __name__ == "__main__":
@@ -28,6 +28,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-f", "--fails", nargs="+", type=float, help="percent fail runs to use"
     )
+    parser.add_argument("--config", required=True, help="path to config file")
     parser.add_argument(
         "--pretrained_encoder",
         default=None,
@@ -39,4 +40,12 @@ if __name__ == "__main__":
     parser.add_argument("--gpu", type=int, default=0, help="id of GPU to use")
     opt = parser.parse_args()
 
-    run_multiple(opt.source, opt.fails, opt.replications, opt.gpu, opt.pretrained_encoder)
+    _config = building.load_config(opt.config)
+    run_multiple(
+        opt.source,
+        opt.fails,
+        _config,
+        opt.replications,
+        opt.gpu,
+        opt.pretrained_encoder,
+    )
