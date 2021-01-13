@@ -1,4 +1,5 @@
 import os
+from functools import partial
 
 import pytorch_lightning as pl
 from ray import tune
@@ -77,10 +78,15 @@ def optimize_transfer(source, target, percent_broken, num_trials):
         metric_columns=["source_reg_loss", "target_loss", "domain_loss"],
     )
 
+    tune_func = partial(
+        tune_transfer,
+        config=config,
+        source=source,
+        target=target,
+        percent_broken=percent_broken,
+    )
     analysis = tune.run(
-        lambda c: tune_transfer(
-            c, source=source, target=target, percent_broken=percent_broken
-        ),
+        tune_func,
         resources_per_trial={"cpu": 6, "gpu": 1},
         metric="source_reg_loss",
         mode="min",
