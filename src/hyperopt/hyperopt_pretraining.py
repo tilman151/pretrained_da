@@ -43,20 +43,8 @@ def tune_pretraining(config, arch_config, source, target, percent_broken):
         percent_broken=percent_broken,
         truncate_target_val=True,
     )
-    model = pretraining.UnsupervisedPretraining(
-        in_channels=14,
-        seq_len=data.window_size,
-        num_layers=arch_config["num_layers"],
-        kernel_size=3,
-        base_filters=arch_config["base_filters"],
-        latent_dim=arch_config["latent_dim"],
-        dropout=config["dropout"],
-        domain_tradeoff=config["domain_tradeoff"],
-        domain_disc_dim=arch_config["latent_dim"],
-        num_disc_layers=arch_config["num_disc_layers"],
-        lr=config["lr"],
-        record_embeddings=False,
-        weight_decay=0.0,
+    model = building.build_pretraining_from_config(
+        arch_config, config, data.window_size, record_embeddings=False
     )
     building.add_hparams(model, data, 42)
 

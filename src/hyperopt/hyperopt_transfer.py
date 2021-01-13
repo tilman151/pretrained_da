@@ -42,20 +42,8 @@ def tune_transfer(config, source, target, percent_broken):
         batch_size=config["batch_size"],
         percent_broken=percent_broken,
     )
-    model = dann.DANN(
-        in_channels=14,
-        seq_len=data.window_size,
-        num_layers=config["num_layers"],
-        kernel_size=3,
-        base_filters=config["base_filters"],
-        latent_dim=config["latent_dim"],
-        dropout=config["dropout"],
-        domain_trade_off=config["domain_tradeoff"],
-        domain_disc_dim=config["latent_dim"],
-        num_disc_layers=config["num_disc_layers"],
-        optim_type="adam",
-        lr=config["lr"],
-        record_embeddings=False,
+    model = building.build_dann_from_config(
+        config, data.window_size, pretrained_encoder_path=None, record_embeddings=False
     )
     building.add_hparams(model, data, 42)
 
