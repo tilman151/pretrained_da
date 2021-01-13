@@ -1,5 +1,6 @@
 import random
 
+from building import load_config
 from run_dann import run as run_dann
 from run_pretraining import run_multiple as run_pretraining
 
@@ -8,8 +9,8 @@ def run(
     source,
     target,
     percent_broken,
-    domain_tradeoff,
-    dropout,
+    arch_config,
+    pre_config,
     record_embeddings,
     pretraining_reps,
     best_only,
@@ -19,8 +20,8 @@ def run(
         source,
         target,
         percent_broken,
-        domain_tradeoff,
-        dropout,
+        arch_config,
+        pre_config,
         record_embeddings,
         pretraining_reps,
         gpu,
@@ -29,52 +30,66 @@ def run(
     seeds = [random.randint(0, 9999999) for _ in range(pretraining_reps)]
     if best_only:
         _adapt_with_best_pretrained(
-            source, target, pretrained_checkpoints, record_embeddings, seeds, gpu
+            source,
+            target,
+            arch_config,
+            pretrained_checkpoints,
+            record_embeddings,
+            seeds,
+            gpu,
         )
     else:
         _adapt_with_all_pretrained(
-            source, target, pretrained_checkpoints, record_embeddings, seeds, gpu
+            source,
+            target,
+            arch_config,
+            pretrained_checkpoints,
+            record_embeddings,
+            seeds,
+            gpu,
         )
 
 
 def _adapt_with_all_pretrained(
-    source, target, pretrained_checkpoints, record_embeddings, seeds, gpu
+    source, target, arch_config, pretrained_checkpoints, record_embeddings, seeds, gpu
 ):
-    for broken, checkpoint_per_tradeoff in pretrained_checkpoints.items():
-        for checkpoints in checkpoint_per_tradeoff.values():
-            for (pretrained_checkpoint, best_val_score), s in zip(checkpoints, seeds):
-                run_dann(
-                    source,
-                    target,
-                    broken,
-                    1.0,
-                    record_embeddings,
-                    s,
-                    gpu,
-                    pretrained_checkpoint,
-                )
+    for broken, checkpoints in pretrained_checkpoints.items():
+        for (pretrained_checkpoint, best_val_score), s in zip(checkpoints, seeds):
+            run_dann(
+                source,
+                target,
+                broken,
+                arch_config,
+                record_embeddings,
+                s,
+                gpu,
+                pretrained_checkpoint,
+            )
 
 
 def _adapt_with_best_pretrained(
-    source, target, pretrained_checkpoints, record_embeddings, seeds, gpu
+    source, target, arch_config, pretrained_checkpoints, record_embeddings, seeds, gpu
 ):
-    for broken, checkpoint_per_tradeoff in pretrained_checkpoints.items():
-        for checkpoints in checkpoint_per_tradeoff.values():
-            sorted_checkpoints = sorted(
-                checkpoints, key=lambda x: x[1]
-            )  # sort by val loss
-            best_pretrained_path = sorted_checkpoints[0][0]
-            for s in seeds:
-                run_dann(
-                    source,
-                    target,
-                    broken,
-                    1.0,
-                    record_embeddings,
-                    s,
-                    gpu,
-                    best_pretrained_path,
-                )
+    for broken, checkpoints in pretrained_checkpoints.items():
+        best_pretrained_path = _get_best_pretrained_checkpoint(checkpoints)
+        for s in seeds:
+            run_dann(
+                source,
+                target,
+                broken,
+                arch_config,
+                record_embeddings,
+                s,
+                gpu,
+                best_pretrained_path,
+            )
+
+
+def _get_best_pretrained_checkpoint(checkpoints):
+    sorted_checkpoints = sorted(checkpoints, key=lambda x: x[1])  # sort by val loss
+    best_pretrained_path = sorted_checkpoints[0][0]
+
+    return best_pretrained_path
 
 
 if __name__ == "__main__":
@@ -93,14 +108,10 @@ if __name__ == "__main__":
         "-b", "--broken", nargs="*", type=float, help="percent broken to use"
     )
     parser.add_argument(
-        "--domain_tradeoff",
-        nargs="*",
-        type=float,
-        default=[0.01],
-        help="tradeoff for pre-training",
+        "--arch_config", required=True, help="path to architecture config file"
     )
     parser.add_argument(
-        "--dropout", type=int, default=0.1, help="dropout used after each conv layer"
+        "--pre_config", required=True, help="path to pretraining config file"
     )
     parser.add_argument(
         "-p",
@@ -120,12 +131,14 @@ if __name__ == "__main__":
     parser.add_argument("--gpu", type=int, default=0, help="id of GPU to use")
     opt = parser.parse_args()
 
+    _arch_config = load_config(opt.arch_config)
+    _pre_config = load_config(opt.pre_config)
     run(
         opt.source,
         opt.target,
         opt.broken,
-        opt.domain_tradeoff,
-        opt.dropout,
+        _arch_config,
+        _pre_config,
         opt.record_embeddings,
         opt.pretraining_reps,
         opt.best_only,
