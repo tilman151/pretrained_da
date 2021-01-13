@@ -80,7 +80,6 @@ def optimize_transfer(source, target, percent_broken, num_trials):
 
     tune_func = partial(
         tune_transfer,
-        config=config,
         source=source,
         target=target,
         percent_broken=percent_broken,
