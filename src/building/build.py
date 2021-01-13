@@ -10,9 +10,9 @@ def build_transfer(
     source,
     target,
     percent_broken,
+    config,
     pretrained_encoder_path,
     record_embeddings,
-    domain_tradeoff,
     logger,
     gpu,
     seed,
@@ -32,30 +32,38 @@ def build_transfer(
     data = datasets.DomainAdaptionDataModule(
         fd_source=source,
         fd_target=target,
-        batch_size=512,
+        batch_size=config["batch_size"],
         percent_broken=percent_broken,
     )
 
+    model = build_dann_from_config(
+        config, data.window_size, pretrained_encoder_path, record_embeddings
+    )
+    add_hparams(model, data, seed)
+
+    return trainer, data, model
+
+
+def build_dann_from_config(config, seq_len, pretrained_encoder_path, record_embeddings):
     model = dann.DANN(
         in_channels=14,
-        seq_len=data.window_size,
-        num_layers=6,
+        seq_len=seq_len,
+        num_layers=config["num_layers"],
         kernel_size=3,
-        base_filters=16,
-        latent_dim=64,
-        dropout=0.1,
-        domain_trade_off=domain_tradeoff,
-        domain_disc_dim=16,
-        num_disc_layers=2,
+        base_filters=config["base_filters"],
+        latent_dim=config["latent_dim"],
+        dropout=config["dropout"],
+        domain_trade_off=config["domain_tradeoff"],
+        domain_disc_dim=config["latent_dim"],
+        num_disc_layers=config["num_disc_layers"],
         optim_type="adam",
-        lr=0.01,
+        lr=config["lr"],
         record_embeddings=record_embeddings,
     )
     if pretrained_encoder_path is not None:
         model.load_encoder(pretrained_encoder_path, load_disc=True)
-    add_hparams(model, data, seed)
 
-    return trainer, data, model
+    return model
 
 
 def build_baseline(source, fails, pretrained_encoder_path, gpu, seed):

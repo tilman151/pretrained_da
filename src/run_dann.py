@@ -1,8 +1,6 @@
 import os
 import random
 
-import sklearn.model_selection
-
 from building.build import build_transfer
 from lightning import loggers as loggers
 
@@ -11,7 +9,7 @@ def run(
     source,
     target,
     percent_broken,
-    domain_tradeoff,
+    config,
     record_embeddings,
     seed,
     gpu,
@@ -20,15 +18,15 @@ def run(
     logger = loggers.MLTBLogger(
         _get_logdir(),
         loggers.transfer_experiment_name(source, target),
-        tensorboard_struct={"pb": percent_broken, "dt": domain_tradeoff},
+        tensorboard_struct={"pb": percent_broken, "dt": config["domain_tradeoff"]},
     )
     trainer, data, model = build_transfer(
         source,
         target,
         percent_broken,
+        config,
         pretrained_encoder_path,
         record_embeddings,
-        domain_tradeoff,
         logger,
         gpu,
         seed,
@@ -48,7 +46,7 @@ def run_multiple(
     source,
     target,
     broken,
-    domain_tradeoff,
+    config,
     record_embeddings,
     replications,
     gpu,
@@ -58,15 +56,13 @@ def run_multiple(
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
 
-    parameter_grid = {"domain_tradeoff": domain_tradeoff, "broken": broken}
-
-    for params in sklearn.model_selection.ParameterGrid(parameter_grid):
+    for b in broken:
         for s in seeds:
             run(
                 source,
                 target,
-                params["broken"],
-                params["domain_tradeoff"],
+                b,
+                config,
                 record_embeddings,
                 s,
                 gpu,
@@ -88,12 +84,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-b", "--broken", nargs="*", type=float, help="percent broken to use"
     )
-    parser.add_argument(
-        "--domain_tradeoff",
-        nargs="*",
-        type=float,
-        help="tradeoff for domain classification",
-    )
+    parser.add_argument("--config", required=True, help="path to config file")
     parser.add_argument(
         "--record_embeddings",
         action="store_true",
@@ -109,7 +100,7 @@ if __name__ == "__main__":
         opt.source,
         opt.target,
         opt.broken,
-        opt.domain_tradeoff,
+        opt.config,
         opt.record_embeddings,
         opt.replications,
         opt.gpu,
