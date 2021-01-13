@@ -98,13 +98,13 @@ def build_baseline(source, fails, pretrained_encoder_path, gpu, seed):
 
 
 def build_pretraining(
-    source, target, domain_tradeoff, dropout, percent_broken, record_embeddings, gpu, seed
+    source, target, percent_broken, arch_config, config, record_embeddings, gpu, seed
 ):
     pl.trainer.seed_everything(seed)
     logger = loggers.MLTBLogger(
         get_logdir(),
         loggers.pretraining_experiment_name(source, target),
-        tensorboard_struct={"pb": percent_broken, "dt": domain_tradeoff},
+        tensorboard_struct={"pb": percent_broken, "dt": config["domain_tradeoff"]},
     )
     checkpoint_callback = loggers.MinEpochModelCheckpoint(
         monitor="val/checkpoint_score", min_epochs_before_saving=1
@@ -118,33 +118,23 @@ def build_pretraining(
         seed=seed,
     )
     truncate_val = not record_embeddings
-    data = _build_datamodule(percent_broken, source, target, truncate_val)
-    model = pretraining.UnsupervisedPretraining(
-        in_channels=14,
-        seq_len=data.window_size,
-        num_layers=6,
-        kernel_size=3,
-        base_filters=16,
-        latent_dim=64,
-        dropout=dropout,
-        domain_tradeoff=domain_tradeoff,
-        domain_disc_dim=16,
-        num_disc_layers=2,
-        lr=0.01,
-        weight_decay=0,
-        record_embeddings=record_embeddings,
+    data = _build_datamodule(
+        source, target, percent_broken, config["batch_size"], truncate_val
+    )
+    model = build_pretraining_from_config(
+        arch_config, config, data.window_size, record_embeddings
     )
     add_hparams(model, data, seed)
 
     return trainer, data, model
 
 
-def _build_datamodule(percent_broken, source, target, truncate_val):
+def _build_datamodule(source, target, percent_broken, batch_size, truncate_val):
     if target is None:
         return datasets.PretrainingBaselineDataModule(
             fd_source=source,
             num_samples=25000,
-            batch_size=512,
+            batch_size=batch_size,
             min_distance=1,
             percent_broken=percent_broken,
             truncate_val=truncate_val,
@@ -154,8 +144,28 @@ def _build_datamodule(percent_broken, source, target, truncate_val):
             fd_source=source,
             fd_target=target,
             num_samples=50000,
-            batch_size=512,
+            batch_size=batch_size,
             min_distance=1,
             percent_broken=percent_broken,
             truncate_target_val=truncate_val,
         )
+
+
+def build_pretraining_from_config(arch_config, config, seq_len, record_embeddings):
+    model = pretraining.UnsupervisedPretraining(
+        in_channels=14,
+        seq_len=seq_len,
+        num_layers=arch_config["num_layers"],
+        kernel_size=3,
+        base_filters=arch_config["base_filters"],
+        latent_dim=arch_config["latent_dim"],
+        dropout=config["dropout"],
+        domain_tradeoff=config["domain_tradeoff"],
+        domain_disc_dim=arch_config["latent_dim"],
+        num_disc_layers=arch_config["num_disc_layers"],
+        lr=config["lr"],
+        weight_decay=0.0,
+        record_embeddings=record_embeddings,
+    )
+
+    return model

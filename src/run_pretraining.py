@@ -10,8 +10,8 @@ def run(
     source,
     target,
     percent_broken,
-    domain_tradeoff,
-    dropout,
+    arch_config,
+    config,
     record_embeddings,
     seed,
     gpu,
@@ -19,9 +19,9 @@ def run(
     trainer, data, model = build_pretraining(
         source,
         target,
-        domain_tradeoff,
-        dropout,
         percent_broken,
+        arch_config,
+        config,
         record_embeddings,
         gpu,
         seed,
@@ -49,8 +49,8 @@ def run_multiple(
     source,
     target,
     broken,
-    domain_tradeoff,
-    dropout,
+    arch_config,
+    config,
     record_embeddings,
     replications,
     gpu,
@@ -59,24 +59,20 @@ def run_multiple(
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
 
-    parameter_grid = {"domain_tradeoff": domain_tradeoff, "broken": broken}
-
-    checkpoints = {b: {dt: [] for dt in domain_tradeoff} for b in broken}
-    for params in sklearn.model_selection.ParameterGrid(parameter_grid):
+    checkpoints = {b: [] for b in broken}
+    for b in broken:
         for s in seeds:
             checkpoint_path = run(
                 source,
                 target,
-                params["broken"],
-                params["domain_tradeoff"],
-                dropout,
+                b,
+                arch_config,
+                config,
                 record_embeddings,
                 s,
                 gpu,
             )
-            checkpoints[params["broken"]][params["domain_tradeoff"]].append(
-                checkpoint_path
-            )
+            checkpoints[b].append(checkpoint_path)
 
     return checkpoints
 
@@ -93,14 +89,11 @@ if __name__ == "__main__":
         "-b", "--broken", nargs="+", type=float, help="percent broken to use"
     )
     parser.add_argument(
-        "--domain_tradeoff",
-        nargs="+",
-        type=float,
-        help="tradeoff for domain classification",
+        "--arch_config",
+        required=True,
+        help="path to architecture config file",
     )
-    parser.add_argument(
-        "--dropout", type=int, default=0.1, help="dropout used after each conv layer"
-    )
+    parser.add_argument("--config", required=True, help="path to config file")
     parser.add_argument(
         "--record_embeddings",
         action="store_true",
@@ -116,8 +109,8 @@ if __name__ == "__main__":
         opt.source,
         opt.target,
         opt.broken,
-        opt.domain_tradeoff,
-        opt.dropout,
+        opt.arch_config,
+        opt.config,
         opt.record_embeddings,
         opt.replications,
         opt.gpu,
