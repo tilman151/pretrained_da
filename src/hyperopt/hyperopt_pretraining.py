@@ -7,7 +7,7 @@ from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
 import building
 import datasets
-from lightning import pretraining, loggers
+from lightning import loggers
 
 
 def tune_pretraining(config, arch_config, source, target, percent_broken):

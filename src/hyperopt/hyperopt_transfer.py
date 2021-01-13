@@ -6,7 +6,7 @@ from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
 import building
 import datasets
-from lightning import dann, loggers
+from lightning import loggers
 
 
 def tune_transfer(config, source, target, percent_broken):
