@@ -23,7 +23,7 @@ def build_transfer(
     trainer = build_trainer(
         logger,
         checkpoint_callback,
-        max_epochs=200 if pretrained_encoder_path is None else 10,
+        max_epochs=200 if pretrained_encoder_path is None else 20,
         val_interval=1.0 if pretrained_encoder_path is None else 0.1,
         gpu=gpu,
         seed=seed,
