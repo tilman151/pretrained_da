@@ -53,7 +53,7 @@ def tune_pretraining(config, arch_config, source, target, percent_broken):
 
 def _get_hyperopt_logdir():
     script_path = os.path.dirname(__file__)
-    log_dir = os.path.normpath(os.path.join(script_path, "..", "hyperopt"))
+    log_dir = os.path.normpath(os.path.join(script_path, "..", "..", "hyperopt"))
 
     return log_dir
 
