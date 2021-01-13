@@ -1,3 +1,4 @@
+import json
 import os
 
 import pytorch_lightning as pl
@@ -40,3 +41,10 @@ def get_logdir():
     log_dir = os.path.normpath(os.path.join(script_path, ".."))
 
     return log_dir
+
+
+def load_config(config_path):
+    with open(config_path, mode="rt") as f:
+        config = json.load(f)
+
+    return config

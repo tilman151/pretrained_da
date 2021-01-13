@@ -1,7 +1,7 @@
 import os
 import random
 
-from building.build import build_transfer
+import building
 from lightning import loggers as loggers
 
 
@@ -20,7 +20,7 @@ def run(
         loggers.transfer_experiment_name(source, target),
         tensorboard_struct={"pb": percent_broken, "dt": config["domain_tradeoff"]},
     )
-    trainer, data, model = build_transfer(
+    trainer, data, model = building.build_transfer(
         source,
         target,
         percent_broken,
@@ -96,11 +96,12 @@ if __name__ == "__main__":
     parser.add_argument("--gpu", type=int, default=0, help="id of GPU to use")
     opt = parser.parse_args()
 
+    _config = building.load_config(opt.config)
     run_multiple(
         opt.source,
         opt.target,
         opt.broken,
-        opt.config,
+        _config,
         opt.record_embeddings,
         opt.replications,
         opt.gpu,

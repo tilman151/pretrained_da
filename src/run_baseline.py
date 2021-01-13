@@ -1,7 +1,6 @@
-import os
 import random
 
-from building.build import build_baseline
+from building import build_baseline
 
 
 def run(source, fails, seed, gpu, pretrained_encoder_path):

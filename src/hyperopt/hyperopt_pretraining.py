@@ -1,4 +1,3 @@
-import json
 import os
 from functools import partial
 
@@ -6,7 +5,7 @@ import pytorch_lightning as pl
 from ray import tune
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
-import building.build_common as build_common
+import building
 import datasets
 from lightning import pretraining, loggers
 
@@ -25,7 +24,7 @@ def tune_pretraining(config, arch_config, source, target, percent_broken):
         },
         on="validation_end",
     )
-    trainer = build_common.build_trainer(
+    trainer = building.build_trainer(
         logger,
         checkpoint_callback,
         max_epochs=100,
@@ -59,7 +58,7 @@ def tune_pretraining(config, arch_config, source, target, percent_broken):
         record_embeddings=False,
         weight_decay=0.0,
     )
-    build_common.add_hparams(model, data, 42)
+    building.add_hparams(model, data, 42)
 
     trainer.fit(model, datamodule=data)
 
@@ -111,13 +110,6 @@ def optimize_pretraining(source, target, percent_broken, arch_config, num_trials
     return analysis.best_config
 
 
-def _load_arch_config(config_path):
-    with open(config_path, mode="rt") as f:
-        _arch_config = json.load(f)
-
-    return _arch_config
-
-
 if __name__ == "__main__":
     import argparse
 
@@ -137,7 +129,7 @@ if __name__ == "__main__":
     )
     opt = parser.parse_args()
 
-    arch_config = _load_arch_config(opt.arch_config_path)
+    arch_config = building.load_config(opt.arch_config_path)
     optimize_pretraining(
         opt.source, opt.target, opt.percent_broken, arch_config, opt.num_trials
     )

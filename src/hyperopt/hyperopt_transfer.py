@@ -4,7 +4,7 @@ import pytorch_lightning as pl
 from ray import tune
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
-import building.build_common as build_common
+import building
 import datasets
 from lightning import dann, loggers
 
@@ -25,7 +25,7 @@ def tune_transfer(config, source, target, percent_broken):
         },
         on="validation_end",
     )
-    trainer = build_common.build_trainer(
+    trainer = building.build_trainer(
         logger,
         checkpoint_callback,
         max_epochs=200,
@@ -57,7 +57,7 @@ def tune_transfer(config, source, target, percent_broken):
         lr=config["lr"],
         record_embeddings=False,
     )
-    build_common.add_hparams(model, data, 42)
+    building.add_hparams(model, data, 42)
 
     trainer.fit(model, datamodule=data)
 

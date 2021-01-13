@@ -1,9 +1,7 @@
 import os
 import random
 
-import sklearn
-
-from building.build import build_pretraining
+import building
 
 
 def run(
@@ -16,7 +14,7 @@ def run(
     seed,
     gpu,
 ):
-    trainer, data, model = build_pretraining(
+    trainer, data, model = building.build_pretraining(
         source,
         target,
         percent_broken,
@@ -105,12 +103,14 @@ if __name__ == "__main__":
     parser.add_argument("--gpu", type=int, default=0, help="id of GPU to use")
     opt = parser.parse_args()
 
+    _arch_config = building.load_config(opt.arch_config)
+    _config = building.load_config(opt.config)
     run_multiple(
         opt.source,
         opt.target,
         opt.broken,
-        opt.arch_config,
-        opt.config,
+        _arch_config,
+        _config,
         opt.record_embeddings,
         opt.replications,
         opt.gpu,
