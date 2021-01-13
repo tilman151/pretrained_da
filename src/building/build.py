@@ -1,8 +1,7 @@
-import os
-
 import pytorch_lightning as pl
 
 import datasets
+from building.build_common import get_logdir, add_hparams, build_trainer
 from lightning import baseline, dann, loggers, pretraining
 
 
@@ -67,7 +66,7 @@ def build_dann_from_config(config, seq_len, pretrained_encoder_path, record_embe
 
 
 def build_baseline(source, fails, pretrained_encoder_path, gpu, seed):
-    logger = loggers.MLTBLogger(_get_logdir(), loggers.baseline_experiment_name(source))
+    logger = loggers.MLTBLogger(get_logdir(), loggers.baseline_experiment_name(source))
     checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor="val/regression_loss")
     trainer = build_trainer(
         logger,
@@ -103,7 +102,7 @@ def build_pretraining(
 ):
     pl.trainer.seed_everything(seed)
     logger = loggers.MLTBLogger(
-        _get_logdir(),
+        get_logdir(),
         loggers.pretraining_experiment_name(source, target),
         tensorboard_struct={"pb": percent_broken, "dt": domain_tradeoff},
     )
@@ -140,33 +139,6 @@ def build_pretraining(
     return trainer, data, model
 
 
-def build_trainer(
-    logger,
-    checkpoint_callback,
-    max_epochs,
-    val_interval,
-    gpu,
-    seed,
-    callbacks=None,
-    check_sanity=True,
-):
-    pl.trainer.seed_everything(seed)
-    trainer = pl.Trainer(
-        num_sanity_val_steps=2 if check_sanity else 0,
-        gpus=[gpu],
-        max_epochs=max_epochs,
-        logger=logger,
-        deterministic=True,
-        log_every_n_steps=10,
-        checkpoint_callback=checkpoint_callback,
-        gradient_clip_val=1.0,
-        val_check_interval=val_interval,
-        callbacks=callbacks,
-    )
-
-    return trainer
-
-
 def _build_datamodule(percent_broken, source, target, truncate_val):
     if target is None:
         return datasets.PretrainingBaselineDataModule(
@@ -187,15 +159,3 @@ def _build_datamodule(percent_broken, source, target, truncate_val):
             percent_broken=percent_broken,
             truncate_target_val=truncate_val,
         )
-
-
-def add_hparams(model, data, seed):
-    model.add_data_hparams(data)
-    model.hparams.update({"seed": seed})
-
-
-def _get_logdir():
-    script_path = os.path.dirname(__file__)
-    log_dir = os.path.normpath(os.path.join(script_path, ".."))
-
-    return log_dir

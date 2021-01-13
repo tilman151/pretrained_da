@@ -6,9 +6,9 @@ import pytorch_lightning as pl
 from ray import tune
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
+import building.build_common as build_common
 import datasets
 from lightning import pretraining, loggers
-import building.build as build
 
 
 def tune_pretraining(config, arch_config, source, target, percent_broken):
@@ -25,7 +25,7 @@ def tune_pretraining(config, arch_config, source, target, percent_broken):
         },
         on="validation_end",
     )
-    trainer = build.build_trainer(
+    trainer = build_common.build_trainer(
         logger,
         checkpoint_callback,
         max_epochs=100,
@@ -59,7 +59,7 @@ def tune_pretraining(config, arch_config, source, target, percent_broken):
         record_embeddings=False,
         weight_decay=0.0,
     )
-    build.add_hparams(model, data, 42)
+    build_common.add_hparams(model, data, 42)
 
     trainer.fit(model, datamodule=data)
 
