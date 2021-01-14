@@ -67,7 +67,7 @@ def optimize_pretraining(source, target, percent_broken, arch_config, num_trials
     }
 
     scheduler = tune.schedulers.ASHAScheduler(
-        max_t=200, grace_period=1, reduction_factor=2
+        max_t=200, grace_period=10, reduction_factor=2
     )
     reporter = tune.CLIReporter(
         parameter_columns=list(config.keys()),
