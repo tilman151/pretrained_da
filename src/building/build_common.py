@@ -38,7 +38,7 @@ def add_hparams(model, data, seed):
 
 def get_logdir():
     script_path = os.path.dirname(__file__)
-    log_dir = os.path.normpath(os.path.join(script_path, ".."))
+    log_dir = os.path.normpath(os.path.join(script_path, "..", ".."))
 
     return log_dir
 

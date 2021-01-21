@@ -12,10 +12,14 @@ def build_transfer(
     config,
     pretrained_encoder_path,
     record_embeddings,
-    logger,
     gpu,
     seed,
 ):
+    logger = loggers.MLTBLogger(
+        get_logdir(),
+        loggers.transfer_experiment_name(source, target),
+        tensorboard_struct={"pb": percent_broken, "dt": config["domain_tradeoff"]},
+    )
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         monitor="val/source_regression_loss"
     )
