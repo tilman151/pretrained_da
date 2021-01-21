@@ -2,6 +2,7 @@ import os
 from functools import partial
 
 import pytorch_lightning as pl
+import pytorch_lightning.loggers as pl_loggers
 from ray import tune
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
@@ -11,7 +12,7 @@ from lightning import loggers
 
 
 def tune_pretraining(config, arch_config, source, target, percent_broken):
-    logger = loggers.MLTBLogger(
+    logger = pl_loggers.TensorBoardLogger(
         _get_hyperopt_logdir(),
         loggers.pretraining_hyperopt_name(source, target, percent_broken),
     )
