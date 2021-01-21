@@ -17,7 +17,7 @@ def run(
     best_only,
     gpu,
 ):
-    version = datetime.now()
+    version = datetime.now().timestamp()
 
     pretrained_checkpoints = run_pretraining(
         source,

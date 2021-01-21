@@ -18,7 +18,7 @@ def run_multiple(
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
     if version is None:
-        version = datetime.now()
+        version = datetime.now().timestamp()
 
     for f in fails:
         for s in seeds:
