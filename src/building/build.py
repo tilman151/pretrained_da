@@ -14,10 +14,12 @@ def build_transfer(
     record_embeddings,
     gpu,
     seed,
+    version,
 ):
     logger = loggers.MLTBLogger(
         get_logdir(),
         loggers.transfer_experiment_name(source, target),
+        tag=version,
         tensorboard_struct={"pb": percent_broken, "dt": config["domain_tradeoff"]},
     )
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
@@ -69,8 +71,10 @@ def build_dann_from_config(config, seq_len, pretrained_encoder_path, record_embe
     return model
 
 
-def build_baseline(source, fails, config, pretrained_encoder_path, gpu, seed):
-    logger = loggers.MLTBLogger(get_logdir(), loggers.baseline_experiment_name(source))
+def build_baseline(source, fails, config, pretrained_encoder_path, gpu, seed, version):
+    logger = loggers.MLTBLogger(
+        get_logdir(), loggers.baseline_experiment_name(source), tag=version
+    )
     checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor="val/regression_loss")
     trainer = build_trainer(
         logger,
@@ -110,12 +114,21 @@ def build_baseline_from_config(config, seq_len, pretrained_encoder_path):
 
 
 def build_pretraining(
-    source, target, percent_broken, arch_config, config, record_embeddings, gpu, seed
+    source,
+    target,
+    percent_broken,
+    arch_config,
+    config,
+    record_embeddings,
+    gpu,
+    seed,
+    version,
 ):
     pl.trainer.seed_everything(seed)
     logger = loggers.MLTBLogger(
         get_logdir(),
         loggers.pretraining_experiment_name(source, target),
+        tag=version,
         tensorboard_struct={"pb": percent_broken, "dt": config["domain_tradeoff"]},
     )
     checkpoint_callback = loggers.MinEpochModelCheckpoint(

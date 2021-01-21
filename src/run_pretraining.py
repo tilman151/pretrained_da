@@ -1,5 +1,6 @@
 import os
 import random
+from datetime import datetime
 
 import building
 
@@ -13,6 +14,7 @@ def run(
     record_embeddings,
     seed,
     gpu,
+    version,
 ):
     trainer, data, model = building.build_pretraining(
         source,
@@ -23,6 +25,7 @@ def run(
         record_embeddings,
         gpu,
         seed,
+        version,
     )
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
@@ -52,23 +55,19 @@ def run_multiple(
     record_embeddings,
     replications,
     gpu,
+    version=None,
 ):
     broken = broken if broken is not None else [1.0]
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
+    if version is None:
+        version = datetime.now()
 
     checkpoints = {b: [] for b in broken}
     for b in broken:
         for s in seeds:
             checkpoint_path = run(
-                source,
-                target,
-                b,
-                arch_config,
-                config,
-                record_embeddings,
-                s,
-                gpu,
+                source, target, b, arch_config, config, record_embeddings, s, gpu, version
             )
             checkpoints[b].append(checkpoint_path)
 

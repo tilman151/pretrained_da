@@ -14,7 +14,10 @@ from lightning import baseline
 class TestMLTBLogger(unittest.TestCase):
     def setUp(self):
         self.logdir = tempfile.mkdtemp()
-        self.logger = loggers.MLTBLogger(self.logdir, "Test", {"pb": 0.1, "foo": "bar"})
+        self.test_tag = "test_tag"
+        self.logger = loggers.MLTBLogger(
+            self.logdir, "Test", self.test_tag, {"pb": 0.1, "foo": "bar"}
+        )
 
     def test_save_path(self):
         self._run_dummy_training()
@@ -27,6 +30,12 @@ class TestMLTBLogger(unittest.TestCase):
             self.logdir, "tensorboard", "Test", "0.1pb", "foo:bar", "version_0"
         )
         self.assertTrue(os.path.exists(expected_tf_logdir))
+
+    def test_version_tag(self):
+        self._run_dummy_training()
+        run_id = self.logger._mlflow_logger.run_id
+        run = self.logger.mlflow_experiment.get_run(run_id)
+        self.assertDictEqual({"version": "test_tag"}, run.data.tags)
 
     def _run_dummy_training(self):
         trainer = pl.Trainer(

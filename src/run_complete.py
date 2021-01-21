@@ -1,4 +1,5 @@
 import random
+from datetime import datetime
 
 from building import load_config
 from run_dann import run as run_dann
@@ -16,6 +17,8 @@ def run(
     best_only,
     gpu,
 ):
+    version = datetime.now()
+
     pretrained_checkpoints = run_pretraining(
         source,
         target,
@@ -25,6 +28,7 @@ def run(
         record_embeddings,
         pretraining_reps,
         gpu,
+        version,
     )
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(pretraining_reps)]
@@ -37,6 +41,7 @@ def run(
             record_embeddings,
             seeds,
             gpu,
+            version,
         )
     else:
         _adapt_with_all_pretrained(
@@ -47,11 +52,19 @@ def run(
             record_embeddings,
             seeds,
             gpu,
+            version,
         )
 
 
 def _adapt_with_all_pretrained(
-    source, target, arch_config, pretrained_checkpoints, record_embeddings, seeds, gpu
+    source,
+    target,
+    arch_config,
+    pretrained_checkpoints,
+    record_embeddings,
+    seeds,
+    gpu,
+    version,
 ):
     for broken, checkpoints in pretrained_checkpoints.items():
         for (pretrained_checkpoint, best_val_score), s in zip(checkpoints, seeds):
@@ -64,11 +77,19 @@ def _adapt_with_all_pretrained(
                 s,
                 gpu,
                 pretrained_checkpoint,
+                version,
             )
 
 
 def _adapt_with_best_pretrained(
-    source, target, arch_config, pretrained_checkpoints, record_embeddings, seeds, gpu
+    source,
+    target,
+    arch_config,
+    pretrained_checkpoints,
+    record_embeddings,
+    seeds,
+    gpu,
+    version,
 ):
     for broken, checkpoints in pretrained_checkpoints.items():
         best_pretrained_path = _get_best_pretrained_checkpoint(checkpoints)
@@ -82,6 +103,7 @@ def _adapt_with_best_pretrained(
                 s,
                 gpu,
                 best_pretrained_path,
+                version,
             )
 
 

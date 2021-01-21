@@ -58,7 +58,7 @@ def pretraining_hyperopt_name(source, target, percent_broken):
 class MLTBLogger(loggers.LoggerCollection):
     """Combined MlFlow and Tensorboard logger that saves models as MlFlow artifacts."""
 
-    def __init__(self, log_dir, experiment_name, tensorboard_struct=None):
+    def __init__(self, log_dir, experiment_name, tag=None, tensorboard_struct=None):
         """
         This logger combines a MlFlow and Tensorboard logger.
         It creates a directory (mlruns/tensorboard) for each logger in log_dir.
@@ -80,7 +80,7 @@ class MLTBLogger(loggers.LoggerCollection):
 
         mlflow_path = "file:" + os.path.normpath(os.path.join(log_dir, "mlruns"))
         self._mlflow_logger = loggers.MLFlowLogger(
-            experiment_name, tracking_uri=mlflow_path
+            experiment_name, tracking_uri=mlflow_path, tags=self._build_tags(tag)
         )
 
         super().__init__([self._tf_logger, self._mlflow_logger])
@@ -101,6 +101,14 @@ class MLTBLogger(loggers.LoggerCollection):
             dirs = ""
 
         return dirs
+
+    def _build_tags(self, tag):
+        if tag is not None:
+            tags = {"version": tag}
+        else:
+            tags = None
+
+        return tags
 
     @property
     def name(self) -> str:

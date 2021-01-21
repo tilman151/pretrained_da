@@ -1,8 +1,7 @@
-import os
 import random
+from datetime import datetime
 
 import building
-from lightning import loggers as loggers
 
 
 def run(
@@ -14,6 +13,7 @@ def run(
     seed,
     gpu,
     pretrained_encoder_path,
+    version,
 ):
     trainer, data, model = building.build_transfer(
         source,
@@ -24,6 +24,7 @@ def run(
         record_embeddings,
         gpu,
         seed,
+        version,
     )
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
@@ -38,10 +39,13 @@ def run_multiple(
     replications,
     gpu,
     pretrained_encoder_path,
+    version=None,
 ):
     broken = broken if broken is not None else [1.0]
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
+    if version is None:
+        version = datetime.now()
 
     for b in broken:
         for s in seeds:
@@ -54,6 +58,7 @@ def run_multiple(
                 s,
                 gpu,
                 pretrained_encoder_path,
+                version,
             )
 
 

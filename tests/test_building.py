@@ -2,7 +2,8 @@ import unittest
 
 from unittest import mock
 
-from building import build
+from building import build, get_logdir
+from lightning import loggers
 
 
 class TestBuildingFunctions(unittest.TestCase):
@@ -25,18 +26,34 @@ class TestBuildingFunctions(unittest.TestCase):
         }
 
     @mock.patch("pytorch_lightning.callbacks.ModelCheckpoint")
+    @mock.patch("lightning.loggers.MLTBLogger")
     @mock.patch("building.build.build_dann_from_config")
     @mock.patch("datasets.DomainAdaptionDataModule")
     @mock.patch("building.build.build_trainer")
     def test_build_transfer(
-        self, mock_build_trainer, mock_datamodule, mock_dann_from_config, mock_checkpoint
+        self,
+        mock_build_trainer,
+        mock_datamodule,
+        mock_dann_from_config,
+        mock_logger,
+        mock_checkpoint,
     ):
         mock_checkpoint.return_value = "mock_checkpoint"
+        mock_logger.return_value = "logger"
 
         with self.subTest("no_encoder"):
-            build.build_transfer(2, 1, 0.8, self.config, None, False, None, 1, 42)
+            build.build_transfer(2, 1, 0.8, self.config, None, False, 1, 42, "version")
+            mock_logger.assert_called_with(
+                get_logdir(),
+                loggers.transfer_experiment_name(2, 1),
+                tag="version",
+                tensorboard_struct={
+                    "pb": 0.8,
+                    "dt": self.config["domain_tradeoff"],
+                },
+            )
             mock_build_trainer.assert_called_with(
-                None,
+                "logger",
                 "mock_checkpoint",
                 max_epochs=200,
                 val_interval=1.0,
@@ -54,10 +71,19 @@ class TestBuildingFunctions(unittest.TestCase):
             )
         with self.subTest("with_encoder"):
             build.build_transfer(
-                2, 1, 0.8, self.config, "encoder_path", False, None, 1, 42
+                2, 1, 0.8, self.config, "encoder_path", False, 1, 42, "version"
+            )
+            mock_logger.assert_called_with(
+                get_logdir(),
+                loggers.transfer_experiment_name(2, 1),
+                tag="version",
+                tensorboard_struct={
+                    "pb": 0.8,
+                    "dt": self.config["domain_tradeoff"],
+                },
             )
             mock_build_trainer.assert_called_with(
-                None,
+                "logger",
                 "mock_checkpoint",
                 max_epochs=20,
                 val_interval=0.1,
@@ -118,7 +144,16 @@ class TestBuildingFunctions(unittest.TestCase):
         mock_logger.return_value = "mock_logger"
         mock_checkpoint.return_value = "mock_checkpoint"
         build.build_pretraining(
-            2, 1, 0.8, self.config, self.pretraining_config, False, 1, 42
+            2, 1, 0.8, self.config, self.pretraining_config, False, 1, 42, "version"
+        )
+        mock_logger.assert_called_with(
+            get_logdir(),
+            loggers.pretraining_experiment_name(2, 1),
+            tag="version",
+            tensorboard_struct={
+                "pb": 0.8,
+                "dt": self.pretraining_config["domain_tradeoff"],
+            },
         )
         mock_build_trainer.assert_called_with(
             "mock_logger",
@@ -175,7 +210,12 @@ class TestBuildingFunctions(unittest.TestCase):
         mock_logger.return_value = "mock_logger"
         mock_checkpoint.return_value = "mock_checkpoint"
         with self.subTest("no_encoder"):
-            build.build_baseline(2, 1.0, self.config, None, 1, 42)
+            build.build_baseline(2, 1.0, self.config, None, 1, 42, "version")
+            mock_logger.assert_called_with(
+                get_logdir(),
+                loggers.baseline_experiment_name(2),
+                tag="version",
+            )
             mock_build_trainer.assert_called_with(
                 "mock_logger",
                 "mock_checkpoint",
@@ -193,7 +233,7 @@ class TestBuildingFunctions(unittest.TestCase):
                 None,
             )
         with self.subTest("with_encoder"):
-            build.build_baseline(2, 1.0, self.config, "encoder_path", 1, 42)
+            build.build_baseline(2, 1.0, self.config, "encoder_path", 1, 42, "version")
             mock_build_trainer.assert_called_with(
                 "mock_logger",
                 "mock_checkpoint",

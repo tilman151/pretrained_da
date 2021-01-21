@@ -1,23 +1,28 @@
 import random
+from datetime import datetime
 
 import building
 
 
-def run(source, fails, config, seed, gpu, pretrained_encoder_path):
+def run(source, fails, config, seed, gpu, pretrained_encoder_path, version):
     trainer, data, model = building.build_baseline(
-        source, fails, config, pretrained_encoder_path, gpu, seed
+        source, fails, config, pretrained_encoder_path, gpu, seed, version
     )
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
 
 
-def run_multiple(source, fails, config, replications, gpu, pretrained_encoder_path):
+def run_multiple(
+    source, fails, config, replications, gpu, pretrained_encoder_path, version=None
+):
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
+    if version is None:
+        version = datetime.now()
 
     for f in fails:
         for s in seeds:
-            run(source, f, config, s, gpu, pretrained_encoder_path)
+            run(source, f, config, s, gpu, pretrained_encoder_path, version)
 
 
 if __name__ == "__main__":
