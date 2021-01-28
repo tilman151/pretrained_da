@@ -93,7 +93,7 @@ def _runs_of_transfer(client, experiment):
             percent_fail_runs = 0.0
         version = run.data.tags["version"] if "version" in run.data.tags else ""
         if "pretrained_checkpoint" in run.data.params:
-            index = f"cmapss_{experiment.name}_dann_pre"
+            index = f"cmapss_{experiment.name}_dannPre"
         else:
             index = f"cmapss_{experiment.name}_dann"
         df.iloc[i] = [

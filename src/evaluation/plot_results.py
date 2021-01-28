@@ -241,9 +241,7 @@ def method_plot(df, baseline_rul, baseline_mse, method):
     method_df = df[df["method"] == method]
 
     method_df["percent_broken"] = method_df["percent_broken"].round().astype(np.int)
-    method_df["percent_fail_runs"] = (
-        method_df["percent_fail_runs"].round().astype(np.int)
-    )
+    method_df["percent_fail_runs"] = method_df["percent_fail_runs"].round().astype(np.int)
 
     if baseline_rul is not None:
         plotnine.ylim = (2, 10)
@@ -357,7 +355,7 @@ if __name__ == "__main__":
 
     transfer, base_rul, base_rmse = load_data(
         opt.result_dir,
-        filter_methods=["dann"],
+        filter_methods=["dann", "dannPre"],
         filter_outlier=opt.filter_outlier,
         split=opt.split,
     )
@@ -365,9 +363,9 @@ if __name__ == "__main__":
     # mixed_linear_plots(transfer, 'percent_fail_runs', 'Number of Systems in %')
     # mixed_linear_factors_plot(transfer, 'percent_fail_runs', 'percent_broken')
     # mixed_linear_factors_plot(transfer, 'percent_broken', 'percent_fail_runs')
-    for m in ["dann"]:
+    for m in ["dann", "dannPre"]:
         method_plot(transfer, base_rul, base_rmse, m)
-    for m in ["dann"]:
+    for m in ["dann", "dannPre"]:
         print("")
         print("#" * 18 + m + "#" * 18)
         print("")
