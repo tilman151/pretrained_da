@@ -50,9 +50,7 @@ def _runs_of_baseline(client, e):
         index=[e.name] * len(replications),
     )
     for i, run in enumerate(replications):
-        best_rmse = [
-            _get_test_value(client, f"regression_loss_fd{i}", run) for i in range(1, 5)
-        ]
+        best_rmse = [_get_test_value(f"regression_loss_fd{i}", run) for i in range(1, 5)]
         df.iloc[i] = best_rmse
     print("Return %d runs..." % len(df))
 
@@ -62,15 +60,23 @@ def _runs_of_baseline(client, e):
 def _runs_of_transfer(client, experiment):
     """Retrieve and evaluate RUL experiment."""
     replications = _get_replications(client, experiment)
-    replications = sorted(replications, key=lambda r: -r.info.start_time)[:50]
     df = pd.DataFrame(
-        np.zeros((len(replications), 4)),
-        columns=["percent_broken", "percent_fail_runs", "mse", "val_mse"],
-        index=[f"cmapss_{experiment.name}_dann"] * len(replications),
+        np.zeros((len(replications), 6)),
+        columns=[
+            "index",
+            "percent_broken",
+            "percent_fail_runs",
+            "mse",
+            "val_mse",
+            "version",
+        ],
     )
+
     for i, run in enumerate(replications):
-        test_rmse = _get_test_value(client, "regression_loss", run)
-        val_rmse = _get_val_value(client, "regression_loss", run)
+        test_rmse = _get_test_value("regression_loss", run)
+        val_rmse = _get_val_value(
+            client, "regression_loss", "source_regression_loss", run
+        )
         if (
             "percent_broken" in run.data.params
             and not run.data.params["percent_broken"] == "None"
@@ -85,8 +91,22 @@ def _runs_of_transfer(client, experiment):
             percent_fail_runs = run.data.params["percent_fail_runs"]
         else:
             percent_fail_runs = 0.0
-        df.iloc[i] = [percent_broken, percent_fail_runs, test_rmse, val_rmse]
+        version = run.data.tags["version"] if "version" in run.data.tags else ""
+        if "pretrained_checkpoint" in run.data.params:
+            index = f"cmapss_{experiment.name}_dann_pre"
+        else:
+            index = f"cmapss_{experiment.name}_dann"
+        df.iloc[i] = [
+            index,
+            percent_broken,
+            percent_fail_runs,
+            test_rmse,
+            val_rmse,
+            version,
+        ]
 
+    df = df[df["version"] != ""]
+    df = df.groupby("version").filter(lambda group: group["version"].count() == 50)
     df = df.sort_values(["percent_broken", "percent_fail_runs"])
     print("Return %d runs..." % len(df))
 
@@ -96,22 +116,32 @@ def _runs_of_transfer(client, experiment):
 def _get_replications(client, experiment):
     runs = client.search_runs(experiment_ids=experiment.experiment_id)
     print("Found %d top-level runs..." % len(runs))
-    print("Found %d replications each..." % len(runs))
 
     return runs
 
 
-def _get_test_value(client, metric, run):
+def _get_test_value(metric, run):
     """Return test value of selected metric."""
-    best_value = client.get_run(run.info.run_id).data.metrics[f"test/{metric}"]
+    test_metric = f"test/{metric}"
+    if test_metric in run.data.metrics:
+        best_value = run.data.metrics[test_metric]
+    else:
+        best_value = np.nan
 
     return best_value
 
 
-def _get_val_value(client, metric, run):
+def _get_val_value(client, metric, indicator_metric, run):
     """Return test value of selected metric."""
-    best_value = client.get_metric_history(run.info.run_id, f"val/{metric}")
-    best_value = best_value[-1].value
+    val_metric = f"val/{metric}"
+    val_indicator = f"val/{indicator_metric}"
+    if val_metric in run.data.metrics and val_indicator in run.data.metrics:
+        indicator_values = client.get_metric_history(run.info.run_id, val_indicator)
+        best_indicator_idx = np.argmin([m.value for m in indicator_values])
+        metric_value = client.get_metric_history(run.info.run_id, val_metric)
+        best_value = metric_value[best_indicator_idx].value
+    else:
+        best_value = np.nan
 
     return best_value
 
