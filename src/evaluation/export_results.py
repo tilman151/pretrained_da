@@ -108,6 +108,7 @@ def _runs_of_transfer(client, experiment):
     df = df[df["version"] != ""]
     df = df.groupby("version").filter(lambda group: group["version"].count() == 50)
     df = df.sort_values(["percent_broken", "percent_fail_runs"])
+    df = df.set_index("index")
     print("Return %d runs..." % len(df))
 
     return df
