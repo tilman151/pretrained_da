@@ -57,14 +57,26 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
             self.percent_broken,
             self.feature_select,
         )
+        self.target_truncated = CMAPSSDataModule(
+            self.fd_target,
+            self.batch_size,
+            self.max_rul,
+            self.window_size,
+            self.percent_fail_runs,
+            self.percent_broken,
+            self.feature_select,
+            truncate_val=True,
+        )
 
     def prepare_data(self, *args, **kwargs):
         self.source.prepare_data(*args, **kwargs)
         self.target.prepare_data(*args, **kwargs)
+        self.target_truncated.prepare_data(*args, **kwargs)
 
     def setup(self, stage: Optional[str] = None):
         self.source.setup(stage)
         self.target.setup(stage)
+        self.target_truncated.setup(stage)
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
         return DataLoader(
@@ -78,6 +90,9 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
         return [
             self.source.val_dataloader(*args, **kwargs),
             self.target.val_dataloader(*args, **kwargs),
+            DataLoader(
+                self._get_paired_dataset(), batch_size=self.batch_size, pin_memory=True
+            ),
         ]
 
     def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
@@ -100,6 +115,16 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
             dataset = TensorDataset(source, source_labels, target)
 
         return dataset
+
+    def _get_paired_dataset(self):
+        deterministic = True
+        num_samples = 25000
+        min_distance = 1
+        paired = PairedCMAPSS(
+            [self.target_truncated], "val", num_samples, min_distance, deterministic
+        )
+
+        return paired
 
 
 class PretrainingAdaptionDataModule(pl.LightningDataModule):
