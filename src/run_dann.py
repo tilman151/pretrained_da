@@ -3,7 +3,7 @@ from datetime import datetime
 
 import mlflow
 import numpy as np
-import pytorch_lightning as pl
+import re
 
 import building
 
@@ -37,16 +37,33 @@ def run(
 def _test_for_each_checkpoint_metric(data, trainer):
     metrics = ["regression_loss", "score", "source_regression_loss"]
     run_id = trainer.logger.run_id
-    mlflow_client = trainer.logger.mlflow_experiment
+    skip_epochs = trainer.checkpoint_callback.min_epochs_before_saving + 1
+    mlflow_client: mlflow.tracking.MlflowClient = trainer.logger.mlflow_experiment
     for metric in metrics:
         val_metric_name = f"val/{metric}"
         history = mlflow_client.get_metric_history(run_id, val_metric_name)
-        min_epoch = np.argmin([step.value for step in history]).squeeze()
-        checkpoint_path = sorted(trainer.checkpoint_callback.best_k_models.keys())[
-            min_epoch
-        ]
+        history = history[skip_epochs:]
+        min_epoch = np.argmin([step.value for step in history]).squeeze() + skip_epochs
+        checkpoint_path = _get_epoch2ckpt_dict(
+            trainer.checkpoint_callback.best_k_models.keys()
+        )[min_epoch]
         trainer.model.test_tag = metric
+        mlflow_client.set_tag(run_id, f"{metric}_epoch", min_epoch)
+        mlflow_client.set_tag(
+            run_id, f"{metric}_step", history[min_epoch - skip_epochs].step
+        )
         trainer.test(ckpt_path=checkpoint_path, test_dataloaders=data.val_dataloader())
+
+
+def _get_epoch2ckpt_dict(checkpoint_paths):
+    pattern = re.compile(r"epoch=(?P<epoch>\d+).ckpt")
+    d = {}
+    for ckpt_path in checkpoint_paths:
+        matcher = pattern.search(ckpt_path)
+        epoch = int(matcher.group("epoch"))
+        d[epoch] = ckpt_path
+
+    return d
 
 
 def run_multiple(
