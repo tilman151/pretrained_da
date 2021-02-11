@@ -40,6 +40,8 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         self.lr = lr
         self.record_embeddings = record_embeddings
 
+        self._test_tag = ""
+
         self.encoder = networks.Encoder(
             self.in_channels,
             self.base_filters,
@@ -65,15 +67,22 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         self.save_hyperparameters()
 
     @property
+    def test_tag(self):
+        return self._test_tag
+
+    @test_tag.setter
+    def test_tag(self, value):
+        self._test_tag = value
+
+    @property
     def example_input_array(self):
         common = torch.randn(16, self.in_channels, self.seq_len)
 
         return common
 
     def configure_optimizers(self):
-        encoder_lr = self.lr if "pretrained_checkpoint" in self.hparams else self.lr
         param_groups = [
-            {"params": self.encoder.parameters(), "lr": encoder_lr},
+            {"params": self.encoder.parameters()},
             {"params": self.regressor.parameters()},
             {"params": self.domain_disc.parameters()},
         ]
@@ -121,6 +130,12 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         return loss, regression_loss, domain_loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx):
+        return self._choose_step_by_dataloader(batch, dataloader_idx)
+
+    def test_step(self, batch, batch_idx, dataloader_idx):
+        return self._choose_step_by_dataloader(batch, dataloader_idx)
+
+    def _choose_step_by_dataloader(self, batch, dataloader_idx):
         if dataloader_idx < 2:
             features, labels = batch
             domain_labels = (
@@ -141,17 +156,6 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
             score = nn.functional.mse_loss(distances.squeeze(), true_distances * 125)
 
             return score, anchors.shape[0]
-
-    def test_step(self, batch, batch_idx, dataloader_idx):
-        features, labels = batch
-        domain_labels = (
-            torch.ones_like(labels) if dataloader_idx == 0 else torch.zeros_like(labels)
-        )
-        regression_loss, domain_loss, rul_score, batch_size = self._evaluate(
-            features, labels, domain_labels, record_embeddings=False
-        )
-
-        return regression_loss, domain_loss, rul_score, batch_size
 
     def _evaluate(self, features, labels, domain_labels, record_embeddings=False):
         batch_size = features.shape[0]
@@ -195,9 +199,10 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
             rul_score,
             _,
         ) = self._reduce_metrics(outputs)
-        self.log(f"test/regression_loss", regression_loss)
-        self.log(f"test/domain_loss", domain_loss)
-        self.log("test/rul_score", rul_score)
+        tag = f"test/{self.test_tag}" if self.test_tag else "test"
+        self.log(f"{tag}/regression_loss", regression_loss)
+        self.log(f"{tag}/domain_loss", domain_loss)
+        self.log(f"{tag}/rul_score", rul_score)
 
     def _reduce_metrics(self, outputs):
         source_outputs, target_outputs, *_ = outputs

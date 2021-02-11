@@ -1,6 +1,10 @@
 import random
 from datetime import datetime
 
+import mlflow
+import numpy as np
+import pytorch_lightning as pl
+
 import building
 
 
@@ -27,7 +31,22 @@ def run(
         version,
     )
     trainer.fit(model, datamodule=data)
-    trainer.test(datamodule=data)
+    _test_for_each_checkpoint_metric(data, trainer)
+
+
+def _test_for_each_checkpoint_metric(data, trainer):
+    metrics = ["regression_loss", "score", "source_regression_loss"]
+    run_id = trainer.logger.run_id
+    mlflow_client = trainer.logger.mlflow_experiment
+    for metric in metrics:
+        val_metric_name = f"val/{metric}"
+        history = mlflow_client.get_metric_history(run_id, val_metric_name)
+        min_epoch = np.argmin([step.value for step in history]).squeeze()
+        checkpoint_path = sorted(trainer.checkpoint_callback.best_k_models.keys())[
+            min_epoch
+        ]
+        trainer.model.test_tag = metric
+        trainer.test(ckpt_path=checkpoint_path, test_dataloaders=data.val_dataloader())
 
 
 def run_multiple(

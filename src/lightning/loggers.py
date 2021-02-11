@@ -134,6 +134,10 @@ class MLTBLogger(loggers.LoggerCollection):
     def mlflow_experiment(self):
         return self._mlflow_logger.experiment
 
+    @property
+    def run_id(self):
+        return self._mlflow_logger.run_id
+
     def log_figure(self, tag, figure, step):
         tmp_file = tempfile.mktemp() + ".png"
         figure.savefig(tmp_file)
