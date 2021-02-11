@@ -138,7 +138,7 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
             anchor_rul = self.forward(anchors)
             query_rul = self.forward(queries)
             distances = query_rul - anchor_rul
-            score = nn.functional.mse_loss(distances / 125, true_distances)
+            score = nn.functional.mse_loss(distances.squeeze(), true_distances * 125)
 
             return score, anchors.shape[0]
 
@@ -185,7 +185,7 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         self.log("val/regression_loss", regression_loss)
         self.log("val/source_regression_loss", source_regression_loss)
         self.log("val/domain_loss", domain_loss)
-        self.log("val/score", score)
+        self.log("val/score", torch.sqrt(score))
 
     def test_epoch_end(self, outputs):
         (
