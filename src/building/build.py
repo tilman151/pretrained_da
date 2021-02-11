@@ -23,7 +23,7 @@ def build_transfer(
         tensorboard_struct={"pb": percent_broken, "dt": config["domain_tradeoff"]},
     )
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        monitor="val/source_regression_loss"
+        monitor="val/source_regression_loss", save_top_k=-1
     )
     trainer = build_trainer(
         logger,
@@ -32,6 +32,7 @@ def build_transfer(
         val_interval=1.0,
         gpu=gpu,
         seed=seed,
+        check_sanity=False,
     )
 
     data = datasets.DomainAdaptionDataModule(
