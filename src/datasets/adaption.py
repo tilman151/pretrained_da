@@ -1,7 +1,8 @@
 from typing import List, Optional, Union
 
 import pytorch_lightning as pl
-from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
+from torch.utils.data import DataLoader, Dataset
 
 from datasets.cmapss import CMAPSSDataModule, PairedCMAPSS
 
@@ -104,15 +105,7 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
     def _to_dataset(self, split, use_target_labels):
         source, source_labels = self.source.data[split]
         target, target_labels = self.target.data[split]
-
-        source, source_labels, target, target_labels = _unify_source_and_target_length(
-            source, source_labels, target, target_labels
-        )
-
-        if use_target_labels:
-            dataset = TensorDataset(source, source_labels, target, target_labels)
-        else:
-            dataset = TensorDataset(source, source_labels, target)
+        dataset = AdaptionDataset(source, source_labels, target)
 
         return dataset
 
@@ -125,6 +118,30 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
         )
 
         return paired
+
+
+class AdaptionDataset(Dataset):
+    def __init__(self, source, source_labels, target):
+        self.source = source
+        self.source_labels = source_labels
+        self.target = target
+        self._target_len = target.shape[0]
+
+        self._rng = self._reset_rng()
+
+    def _reset_rng(self):
+        return np.random.default_rng(seed=42)
+
+    def __getitem__(self, idx):
+        target_idx = self._rng.integers(0, self._target_len)
+        source = self.source[idx]
+        source_label = self.source_labels[idx]
+        target = self.target[target_idx]
+
+        return source, source_label, target
+
+    def __len__(self):
+        return self.source.shape[0]
 
 
 class PretrainingAdaptionDataModule(pl.LightningDataModule):
