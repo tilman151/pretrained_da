@@ -22,8 +22,10 @@ def build_transfer(
         tag=version,
         tensorboard_struct={"pb": percent_broken, "dt": config["domain_tradeoff"]},
     )
-    checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        monitor="val/source_regression_loss", save_top_k=-1
+    checkpoint_callback = loggers.MinEpochModelCheckpoint(
+        monitor="val/source_regression_loss",
+        save_top_k=-1,
+        min_epochs_before_saving=5,
     )
     trainer = build_trainer(
         logger,
