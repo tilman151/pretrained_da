@@ -317,24 +317,31 @@ class PairedCMAPSS(IterableDataset):
     def _get_pair_idx(self):
         chosen_run_idx = self._rng.choice(self._run_idx)
         domain_label = self._run_domain_idx[chosen_run_idx]
+        middle_idx = (
+            self._run_start_idx[chosen_run_idx + 1] + self._run_start_idx[chosen_run_idx]
+        ) // 2
         anchor_idx = self._rng.integers(
             low=self._run_start_idx[chosen_run_idx],
             high=self._run_start_idx[chosen_run_idx + 1] - self.min_distance,
         )
+        end_idx = (
+            middle_idx + 1
+            if anchor_idx < middle_idx
+            else self._run_start_idx[chosen_run_idx + 1]
+        )
         query_idx = self._rng.integers(
             low=anchor_idx + self.min_distance,
-            high=self._run_start_idx[chosen_run_idx + 1],
+            high=end_idx,
         )
+        distance = query_idx - anchor_idx if anchor_idx > middle_idx else 0
 
-        return anchor_idx, query_idx, domain_label
+        return anchor_idx, query_idx, domain_label, distance
 
     def _build_pair(self, pair_idx):
         anchors = self._features[pair_idx[0]]
         queries = self._features[pair_idx[1]]
         domain_label = torch.tensor(pair_idx[2], dtype=torch.float)
-        distances = (
-            torch.tensor(pair_idx[1] - pair_idx[0], dtype=torch.float) / self._max_rul
-        )
+        distances = torch.tensor(pair_idx[3], dtype=torch.float) / self._max_rul
         distances = torch.clamp_max(distances, max=1)  # max distance is max_rul
 
         return anchors, queries, distances, domain_label
