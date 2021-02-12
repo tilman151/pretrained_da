@@ -13,19 +13,17 @@ def export_all(mlflow_uri):
     client = mlflow.tracking.MlflowClient(mlflow_uri)
 
     print("Export transfer experiments...")
-    df = _export_matching_experiments(client, ".+2.+$", _runs_of_transfer)
+    df = export_matching_experiments(client, ".+2.+$", _runs_of_transfer)
     if df is not None:
         df.to_csv("transfer.csv")
 
     print("Export baseline experiments...")
-    df = _export_matching_experiments(
-        client, "cmapss_.{3,5}_baseline$", _runs_of_baseline
-    )
+    df = export_matching_experiments(client, "cmapss_.{3,5}_baseline$", _runs_of_baseline)
     if df is not None:
         df.to_csv("baseline.csv")
 
 
-def _export_matching_experiments(client, exp_name_regex, func):
+def export_matching_experiments(client, exp_name_regex, func):
     regex = re.compile(exp_name_regex)
     experiments = client.list_experiments()
     filtered_experiments = [e for e in experiments if regex.match(e.name) is not None]
