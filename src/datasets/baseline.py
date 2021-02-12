@@ -107,7 +107,7 @@ class PretrainingBaselineDataModule(pl.LightningDataModule):
         num_samples,
         batch_size,
         max_rul=125,
-        window_size=30,
+        window_size=None,
         min_distance=1,
         percent_fail_runs=None,
         percent_broken=None,
