@@ -21,7 +21,7 @@ def plot_stopping_experiments(result_path):
             plotnine.aes(y="value", x="factor(percent_broken)", color="variable"),
         )
         + plotnine.scale_x_discrete(
-            labels=["0.2", "0.8"], name="Grade of Degradation in %"
+            labels=["0.2", "0.4", "0.6", "0.8", "1.0"], name="Grade of Degradation in %"
         )
         + plotnine.labs(color="Stopping Metric")
         + plotnine.ylab("RMSE")
@@ -35,7 +35,7 @@ def test_significance(result_path):
     df = df.groupby(by=["percent_broken", "index"]).mean()
 
     significances = pd.DataFrame(
-        np.zeros((2, 2)), columns=["stat", "p"], index=[0.2, 0.8]
+        np.zeros((5, 2)), columns=["stat", "p"], index=[0.2, 0.4, 0.6, 0.8, 1.0]
     )
     for idx in significances.index:
         score_perf = df.loc[idx, "score/mse"].values.squeeze()
