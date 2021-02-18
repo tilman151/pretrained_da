@@ -274,24 +274,37 @@ class PairedCMAPSS(IterableDataset):
                 f"Datasets to be paired do not have the same window size, but {window_sizes}"
             )
 
-        run_lengths = [
-            (length, domain_idx)
-            for domain_idx, dataset in enumerate(self.datasets)
-            for length in dataset.lengths[self.split]
-        ]
-        self._run_start_idx = np.cumsum(
-            [length for length, _ in run_lengths if length > self.min_distance]
-        )
-        self._run_idx = np.arange(len(self._run_start_idx) - 1)
-        self._run_domain_idx = [domain_idx for _, domain_idx in run_lengths]
+        self._run_start_idx = None
+        self._run_idx = None
+        self._run_domain_idx = None
+        self._features = None
+        self._labels = None
+        self._prepare_datasets()
 
-        self._features = torch.cat(
-            [dataset.data[self.split][0] for dataset in self.datasets]
-        )
         self._max_rul = max(dataset.max_rul for dataset in self.datasets)
-
         self._current_iteration = 0
         self._rng = self._reset_rng()
+
+    def _prepare_datasets(self):
+        run_start_idx = [0]
+        run_idx = []
+        run_domain_idx = []
+        features = []
+        labels = []
+        for domain_idx, dataset in enumerate(self.datasets):
+            for length in dataset.lengths[self.split]:
+                run_start_idx.append(run_start_idx[-1] + length)
+                run_idx.append(len(run_idx))
+                run_domain_idx.append(domain_idx)
+            run_features, run_labels = dataset.data[self.split]
+            features.append(run_features)
+            labels.append(run_labels)
+
+        self._run_start_idx = np.array(run_start_idx)
+        self._run_idx = np.array(run_idx)
+        self._run_domain_idx = np.array(run_domain_idx)
+        self._features = torch.cat(features)
+        self._labels = torch.cat(labels)
 
     def _reset_rng(self):
         return np.random.default_rng(seed=42)
@@ -325,8 +338,8 @@ class PairedCMAPSS(IterableDataset):
             high=self._run_start_idx[chosen_run_idx + 1] - self.min_distance,
         )
         end_idx = (
-            middle_idx + 1
-            if anchor_idx < middle_idx
+            middle_idx
+            if anchor_idx < (middle_idx - self.min_distance)
             else self._run_start_idx[chosen_run_idx + 1]
         )
         query_idx = self._rng.integers(
@@ -334,6 +347,22 @@ class PairedCMAPSS(IterableDataset):
             high=end_idx,
         )
         distance = query_idx - anchor_idx if anchor_idx > middle_idx else 0
+
+        return anchor_idx, query_idx, domain_label, distance
+
+    def _get_labeled_pair_idx(self):
+        chosen_run_idx = self._rng.choice(self._run_idx)
+        domain_label = self._run_domain_idx[chosen_run_idx]
+        anchor_idx = self._rng.integers(
+            low=self._run_start_idx[chosen_run_idx],
+            high=self._run_start_idx[chosen_run_idx + 1] - self.min_distance,
+        )
+        query_idx = self._rng.integers(
+            low=anchor_idx + self.min_distance,
+            high=self._run_start_idx[chosen_run_idx + 1],
+        )
+        # RUL label difference is negative time step difference
+        distance = self._labels[anchor_idx] - self._labels[query_idx]
 
         return anchor_idx, query_idx, domain_label, distance
 
