@@ -149,8 +149,9 @@ def build_pretraining(
     data = _build_datamodule(
         source, target, percent_broken, config["batch_size"], truncate_val
     )
+    use_adaption = target is not None
     model = build_pretraining_from_config(
-        arch_config, config, data.window_size, record_embeddings
+        arch_config, config, data.window_size, record_embeddings, use_adaption
     )
     add_hparams(model, data, seed)
 
@@ -179,7 +180,9 @@ def _build_datamodule(source, target, percent_broken, batch_size, truncate_val):
         )
 
 
-def build_pretraining_from_config(arch_config, config, seq_len, record_embeddings):
+def build_pretraining_from_config(
+    arch_config, config, seq_len, record_embeddings, use_adaption
+):
     model = pretraining.UnsupervisedPretraining(
         in_channels=14,
         seq_len=seq_len,
@@ -188,7 +191,7 @@ def build_pretraining_from_config(arch_config, config, seq_len, record_embedding
         base_filters=arch_config["base_filters"],
         latent_dim=arch_config["latent_dim"],
         dropout=config["dropout"],
-        domain_tradeoff=config["domain_tradeoff"],
+        domain_tradeoff=config["domain_tradeoff"] if use_adaption else 0.0,
         domain_disc_dim=arch_config["latent_dim"],
         num_disc_layers=arch_config["num_disc_layers"],
         lr=config["lr"],
