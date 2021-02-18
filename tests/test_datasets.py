@@ -697,3 +697,11 @@ class TestPairedDataset(unittest.TestCase):
                 self.assertEqual(0, distance)
             else:
                 self.assertLessEqual(0, distance)
+
+    def test_get_labeled_pair_idx(self):
+        data = datasets.cmapss.PairedCMAPSS([self.cmapss1], "dev", 512, 1, True)
+        for _ in range(512):
+            anchor_idx, query_idx, _, distance = data._get_labeled_pair_idx()
+            expected_distance = data._labels[anchor_idx] - data._labels[query_idx]
+            self.assertLessEqual(0, distance)
+            self.assertEqual(expected_distance, distance)
