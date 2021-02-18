@@ -259,7 +259,15 @@ class CMAPSSDataModule(pl.LightningDataModule):
 
 
 class PairedCMAPSS(IterableDataset):
-    def __init__(self, datasets, split, num_samples, min_distance, deterministic=False):
+    def __init__(
+        self,
+        datasets,
+        split,
+        num_samples,
+        min_distance,
+        deterministic=False,
+        labeled=False,
+    ):
         super().__init__()
 
         self.datasets = datasets
@@ -284,6 +292,9 @@ class PairedCMAPSS(IterableDataset):
         self._max_rul = max(dataset.max_rul for dataset in self.datasets)
         self._current_iteration = 0
         self._rng = self._reset_rng()
+        self._get_pair_func = (
+            self._get_labeled_pair_idx if labeled else self._get_pair_idx
+        )
 
     def _prepare_datasets(self):
         run_start_idx = [0]
@@ -322,7 +333,7 @@ class PairedCMAPSS(IterableDataset):
     def __next__(self):
         if self._current_iteration < self.num_samples:
             self._current_iteration += 1
-            pair_idx = self._get_pair_idx()
+            pair_idx = self._get_pair_func()
             return self._build_pair(pair_idx)
         else:
             raise StopIteration
