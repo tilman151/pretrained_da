@@ -303,13 +303,19 @@ class PairedCMAPSS(IterableDataset):
         features = []
         labels = []
         for domain_idx, dataset in enumerate(self.datasets):
-            for length in dataset.lengths[self.split]:
-                run_start_idx.append(run_start_idx[-1] + length)
-                run_idx.append(len(run_idx))
-                run_domain_idx.append(domain_idx)
             run_features, run_labels = dataset.data[self.split]
-            features.append(run_features)
-            labels.append(run_labels)
+            run_mask = torch.ones_like(run_labels, dtype=torch.bool)
+            for length in dataset.lengths[self.split]:
+                if length > self.min_distance:
+                    run_start_idx.append(run_start_idx[-1] + length)
+                    run_idx.append(len(run_idx))
+                    run_domain_idx.append(domain_idx)
+                else:
+                    start = run_start_idx[-1]
+                    end = start + length
+                    run_mask[start:end] = False
+            features.append(run_features[run_mask])
+            labels.append(run_labels[run_mask])
 
         self._run_start_idx = np.array(run_start_idx)
         self._run_idx = np.array(run_idx)
