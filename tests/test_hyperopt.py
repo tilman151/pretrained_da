@@ -6,6 +6,7 @@ import hyperopt.hyperopt_transfer as hyperopt_transfer
 import hyperopt.hyperopt_pretraining as hyperopt_pretraining
 
 
+@unittest.skip("Only for debugging purposes.")
 class TestTransferHyperopt(unittest.TestCase):
     def test_tune_function(self):
         config = {

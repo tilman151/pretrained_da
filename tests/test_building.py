@@ -25,7 +25,7 @@ class TestBuildingFunctions(unittest.TestCase):
             "batch_size": 256,
         }
 
-    @mock.patch("pytorch_lightning.callbacks.ModelCheckpoint")
+    @mock.patch("lightning.loggers.MinEpochModelCheckpoint")
     @mock.patch("lightning.loggers.MLTBLogger")
     @mock.patch("building.build.build_dann_from_config")
     @mock.patch("datasets.DomainAdaptionDataModule")
@@ -59,6 +59,7 @@ class TestBuildingFunctions(unittest.TestCase):
                 val_interval=1.0,
                 gpu=1,
                 seed=42,
+                check_sanity=False,
             )
             mock_datamodule.assert_called_with(
                 fd_source=2,
@@ -85,10 +86,11 @@ class TestBuildingFunctions(unittest.TestCase):
             mock_build_trainer.assert_called_with(
                 "logger",
                 "mock_checkpoint",
-                max_epochs=20,
-                val_interval=0.1,
+                max_epochs=200,
+                val_interval=1.0,
                 gpu=1,
                 seed=42,
+                check_sanity=False,
             )
             mock_datamodule.assert_called_with(
                 fd_source=2,
@@ -171,12 +173,13 @@ class TestBuildingFunctions(unittest.TestCase):
             self.pretraining_config,
             mock_datamodule().window_size,
             False,
+            True,
         )
 
     @mock.patch("lightning.pretraining.UnsupervisedPretraining")
     def test_build_pretraining_from_config(self, mock_pretraining):
         build.build_pretraining_from_config(
-            self.config, self.pretraining_config, 30, False
+            self.config, self.pretraining_config, 30, False, use_adaption=True
         )
         mock_pretraining.assert_called_with(
             in_channels=14,
@@ -187,6 +190,25 @@ class TestBuildingFunctions(unittest.TestCase):
             latent_dim=self.config["latent_dim"],
             dropout=self.pretraining_config["dropout"],
             domain_tradeoff=self.pretraining_config["domain_tradeoff"],
+            domain_disc_dim=self.config["latent_dim"],
+            num_disc_layers=self.config["num_disc_layers"],
+            lr=self.pretraining_config["lr"],
+            weight_decay=0.0,
+            record_embeddings=False,
+        )
+
+        build.build_pretraining_from_config(
+            self.config, self.pretraining_config, 30, False, use_adaption=False
+        )
+        mock_pretraining.assert_called_with(
+            in_channels=14,
+            seq_len=30,
+            num_layers=self.config["num_layers"],
+            kernel_size=3,
+            base_filters=self.config["base_filters"],
+            latent_dim=self.config["latent_dim"],
+            dropout=self.pretraining_config["dropout"],
+            domain_tradeoff=0.0,
             domain_disc_dim=self.config["latent_dim"],
             num_disc_layers=self.config["num_disc_layers"],
             lr=self.pretraining_config["lr"],

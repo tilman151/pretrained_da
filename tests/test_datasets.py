@@ -292,7 +292,7 @@ class TestCMAPSSAdaption(unittest.TestCase):
         self._assert_val_test_batch_structure(val_target_loader)
 
     def test_test_batch_structure(self):
-        test_source_loader, test_target_loader, _ = self.dataset.test_dataloader()
+        test_source_loader, test_target_loader = self.dataset.test_dataloader()
         self._assert_val_test_batch_structure(test_source_loader)
         self._assert_val_test_batch_structure(test_target_loader)
 
