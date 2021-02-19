@@ -175,9 +175,12 @@ class TestCMAPSS(unittest.TestCase):
                     expected_lenghts = (
                         [1] * len(raw_data)
                         if split == "test"
-                        else [len(f) - 29 for f in raw_data]
+                        else [len(f) for f in raw_data]
                     )
                     self.assertListEqual(expected_lenghts, dataset.lengths[split])
+                    self.assertEqual(
+                        len(dataset.data[split][0]), sum(dataset.lengths[split])
+                    )
 
     @mock.patch("datasets.cmapss.CMAPSSDataModule._truncate_features", wraps=lambda x: x)
     def test_val_truncation(self, mock_truncate):
@@ -242,14 +245,8 @@ class TestCMAPSSAdaption(unittest.TestCase):
         self.assertEqual(40, source.shape[2])
         self.assertEqual(40, target.shape[2])
 
-    def test_train_length_equal(self):
-        train_loader = self.dataset.train_dataloader()
-        source_length = len(self.dataset.source.train_dataloader())
-        target_length = len(self.dataset.target.train_dataloader())
-        self.assertEqual(max(source_length, target_length), len(train_loader))
-
     def test_val_source_target_order(self):
-        val_source_loader, val_target_loader = self.dataset.val_dataloader()
+        val_source_loader, val_target_loader, _ = self.dataset.val_dataloader()
         self._assert_datasets_equal(
             val_source_loader.dataset,
             self.dataset.source._to_dataset(*self.dataset.source.data["val"]),
@@ -290,12 +287,12 @@ class TestCMAPSSAdaption(unittest.TestCase):
         self.assertEqual(torch.Size((16,)), source_labels.shape)
 
     def test_val_batch_structure(self):
-        val_source_loader, val_target_loader = self.dataset.val_dataloader()
+        val_source_loader, val_target_loader, _ = self.dataset.val_dataloader()
         self._assert_val_test_batch_structure(val_source_loader)
         self._assert_val_test_batch_structure(val_target_loader)
 
     def test_test_batch_structure(self):
-        test_source_loader, test_target_loader = self.dataset.test_dataloader()
+        test_source_loader, test_target_loader, _ = self.dataset.test_dataloader()
         self._assert_val_test_batch_structure(test_source_loader)
         self._assert_val_test_batch_structure(test_target_loader)
 
@@ -688,7 +685,7 @@ class DummyCMAPSSShortRuns:
                     [
                         torch.ones(100, self.window_size, 5),  # normal run
                         torch.zeros(2, self.window_size, 5),  # too short run
-                        torch.ones(202, self.window_size, 5),  # normal run
+                        torch.ones(100, self.window_size, 5),  # normal run
                         torch.zeros(1, self.window_size, 5),  # empty run
                     ]
                 ),

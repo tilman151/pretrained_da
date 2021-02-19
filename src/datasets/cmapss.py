@@ -210,7 +210,7 @@ class CMAPSSDataModule(pl.LightningDataModule):
             new_features.extend(feature_windows)
             new_targets.append(target)
 
-        lengths = [len(f) - self.window_size + 1 for f in features]
+        lengths = [len(f) for f in features]
         features = np.stack(new_features, axis=0)
         targets = np.concatenate(new_targets)
 
@@ -304,18 +304,16 @@ class PairedCMAPSS(IterableDataset):
         labels = []
         for domain_idx, dataset in enumerate(self.datasets):
             run_features, run_labels = dataset.data[self.split]
-            run_mask = torch.ones_like(run_labels, dtype=torch.bool)
-            for length in dataset.lengths[self.split]:
+            run_lengths = dataset.lengths[self.split]
+            run_features = torch.split(run_features, run_lengths)
+            run_labels = torch.split(run_labels, run_lengths)
+            for i, length in enumerate(run_lengths):
                 if length > self.min_distance:
                     run_start_idx.append(run_start_idx[-1] + length)
                     run_idx.append(len(run_idx))
                     run_domain_idx.append(domain_idx)
-                else:
-                    start = run_start_idx[-1]
-                    end = start + length
-                    run_mask[start:end] = False
-            features.append(run_features[run_mask])
-            labels.append(run_labels[run_mask])
+                    features.append(run_features[i])
+                    labels.append(run_labels[i])
 
         self._run_start_idx = np.array(run_start_idx)
         self._run_idx = np.array(run_idx)
