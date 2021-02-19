@@ -315,7 +315,7 @@ class PairedCMAPSS(IterableDataset):
         self._run_idx = np.array(run_idx)
         self._run_domain_idx = np.array(run_domain_idx)
         self._features = torch.cat(features)
-        self._labels = torch.cat(labels)
+        self._labels = torch.cat(labels).numpy()
 
     def _reset_rng(self):
         return np.random.default_rng(seed=42)
