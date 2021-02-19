@@ -510,11 +510,11 @@ class PretrainingDataModuleTemplate:
     def test_distances(self):
         with self.subTest(split="dev"):
             _, _, distances, _ = self._run_epoch(self.dataset.train_dataloader())
-            self.assertTrue(torch.all(distances > 0))
+            self.assertTrue(torch.all(distances >= 0))
 
         with self.subTest(split="val"):
             _, _, distances, _ = self._run_epoch(self.dataset.val_dataloader()[0])
-            self.assertTrue(torch.all(distances > 0))
+            self.assertTrue(torch.all(distances >= 0))
 
     def test_determinism(self):
         with self.subTest(split="dev"):
@@ -594,7 +594,7 @@ class TestPretrainingDataModuleFullData(unittest.TestCase, PretrainingDataModule
 class TestPretrainingDataModuleLowData(unittest.TestCase, PretrainingDataModuleTemplate):
     def setUp(self):
         self.dataset = datasets.PretrainingAdaptionDataModule(
-            3, 2, percent_broken=0.2, num_samples=10000, batch_size=16
+            1, 3, percent_broken=0.2, num_samples=10000, batch_size=16
         )
         self.dataset.prepare_data()
         self.dataset.setup()
@@ -666,31 +666,52 @@ class DummyCMAPSS:
     def __init__(self, length):
         self.window_size = 30
         self.max_rul = 125
-        self.lengths = {"dev": [length], "val": [length], "test": [length]}
+        self.lengths = {"dev": [length]}
         self.data = {
             "dev": (
-                torch.zeros(length, self.window_size, 5),
-                torch.clamp_max(torch.arange(length, 0, step=-1), 125),
-            ),
-            "val": (
-                torch.zeros(length, self.window_size, 5),
-                torch.clamp_max(torch.arange(length, 0, step=-1), 125),
-            ),
-            "test": (
                 torch.zeros(length, self.window_size, 5),
                 torch.clamp_max(torch.arange(length, 0, step=-1), 125),
             ),
         }
 
 
+class DummyCMAPSSShortRuns:
+    """Contains runs that are too short with zero features to distinguish them."""
+
+    def __init__(self):
+        self.window_size = 30
+        self.max_rul = 125
+        self.lengths = {"dev": [100, 2, 100, 1, 0]}
+        self.data = {
+            "dev": (
+                torch.cat(
+                    [
+                        torch.ones(100, self.window_size, 5),  # normal run
+                        torch.zeros(2, self.window_size, 5),  # too short run
+                        torch.ones(202, self.window_size, 5),  # normal run
+                        torch.zeros(1, self.window_size, 5),  # empty run
+                    ]
+                ),
+                torch.cat(
+                    [
+                        torch.clamp_max(torch.arange(100, 0, step=-1), 125),
+                        torch.ones(2) * 500,
+                        torch.clamp_max(torch.arange(100, 0, step=-1), 125),
+                        torch.ones(1) * 500,
+                    ]
+                ),
+            ),
+        }
+
+
 class TestPairedDataset(unittest.TestCase):
     def setUp(self):
-        self.cmapss1 = DummyCMAPSS(300)
-        self.cmapss2 = DummyCMAPSS(200)
+        self.cmapss_normal = DummyCMAPSS(300)
+        self.cmapss_short = DummyCMAPSSShortRuns()
 
     def test_get_pair_idx(self):
-        data = datasets.cmapss.PairedCMAPSS([self.cmapss1], "dev", 512, 1, True)
-        middle_idx = self.cmapss1.lengths["dev"][0] // 2
+        data = datasets.cmapss.PairedCMAPSS([self.cmapss_normal], "dev", 512, 1, True)
+        middle_idx = self.cmapss_normal.lengths["dev"][0] // 2
         for _ in range(512):
             anchor_idx, query_idx, _, distance = data._get_pair_idx()
             if anchor_idx < middle_idx:
@@ -699,7 +720,7 @@ class TestPairedDataset(unittest.TestCase):
                 self.assertLessEqual(0, distance)
 
     def test_get_labeled_pair_idx(self):
-        data = datasets.cmapss.PairedCMAPSS([self.cmapss1], "dev", 512, 1, True)
+        data = datasets.cmapss.PairedCMAPSS([self.cmapss_normal], "dev", 512, 1, True)
         for _ in range(512):
             anchor_idx, query_idx, _, distance = data._get_labeled_pair_idx()
             expected_distance = data._labels[anchor_idx] - data._labels[query_idx]
@@ -708,15 +729,23 @@ class TestPairedDataset(unittest.TestCase):
 
     def test_pair_func_selection(self):
         with self.subTest("default"):
-            data = datasets.cmapss.PairedCMAPSS([self.cmapss1], "dev", 512, 1, True)
+            data = datasets.cmapss.PairedCMAPSS([self.cmapss_normal], "dev", 512, 1, True)
             self.assertEqual(data._get_pair_idx, data._get_pair_func)
         with self.subTest("False"):
             data = datasets.cmapss.PairedCMAPSS(
-                [self.cmapss1], "dev", 512, 1, True, labeled=False
+                [self.cmapss_normal], "dev", 512, 1, True, labeled=False
             )
             self.assertEqual(data._get_pair_idx, data._get_pair_func)
         with self.subTest("True"):
             data = datasets.cmapss.PairedCMAPSS(
-                [self.cmapss1], "dev", 512, 1, True, labeled=True
+                [self.cmapss_normal], "dev", 512, 1, True, labeled=True
             )
             self.assertEqual(data._get_labeled_pair_idx, data._get_pair_func)
+
+    def test_discarding_too_short_runs(self):
+        data = datasets.cmapss.PairedCMAPSS([self.cmapss_short], "dev", 512, 2)
+        self.assertTrue((data._features == 1).all())
+        self.assertTrue((data._labels < 500).all())
+        self.assertListEqual([0, 100, 200], data._run_start_idx.tolist())
+        self.assertListEqual([0, 1], data._run_idx.tolist())
+        self.assertListEqual([0, 0], data._run_domain_idx.tolist())
