@@ -45,7 +45,7 @@ def tune_pretraining(config, arch_config, source, target, percent_broken):
         truncate_target_val=True,
     )
     model = building.build_pretraining_from_config(
-        arch_config, config, data.window_size, record_embeddings=False
+        arch_config, config, data.window_size, record_embeddings=False, use_adaption=True
     )
     building.add_hparams(model, data, 42)
 
