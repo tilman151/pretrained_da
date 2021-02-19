@@ -307,6 +307,21 @@ class TestCMAPSSAdaption(unittest.TestCase):
         self.assertEqual(torch.Size((16,)), labels.shape)
 
 
+class TestAdaptionDataset(unittest.TestCase):
+    def setUp(self):
+        self.dataset = datasets.adaption.AdaptionDataset(
+            torch.arange(100), torch.arange(100), torch.arange(150)
+        )
+
+    def test_source_target_shuffeled(self):
+        for i in range(len(self.dataset)):
+            source_one, label_one, target_one = self.dataset[i]
+            source_another, label_another, target_another = self.dataset[i]
+            self.assertEqual(source_one, source_another)
+            self.assertEqual(label_one, label_another)
+            self.assertNotEqual(target_one, target_another)
+
+
 class TestCMAPSSBaseline(unittest.TestCase):
     def setUp(self):
         self.dataset = datasets.BaselineDataModule(
