@@ -26,12 +26,28 @@ class TestCMAPSS(unittest.TestCase):
         window_size = 40
         for n in range(1, 5):
             dataset = cmapss.CMAPSSDataModule(n, batch_size=16, window_size=window_size)
+            self.assertEqual(window_size, dataset.window_size)
             self.assertEqual(window_size, dataset._loader.window_size)
+
+    def test_default_window_size(self):
+        window_sizes = [30, 20, 30, 15]
+        for n, win in enumerate(window_sizes, start=1):
+            dataset = cmapss.CMAPSSDataModule(n, batch_size=16)
+            self.assertEqual(win, dataset.window_size)
+            self.assertEqual(win, dataset._loader.window_size)
 
     def test_feature_select(self):
         feature_idx = [4, 9, 10, 13, 14, 15, 22]
         dataset = cmapss.CMAPSSDataModule(1, batch_size=16, feature_select=feature_idx)
+        self.assertListEqual(feature_idx, dataset.feature_select)
         self.assertListEqual(feature_idx, dataset._loader.feature_select)
+
+    def test_default_feature_select(self):
+        dataset = cmapss.CMAPSSDataModule(1, batch_size=16)
+        self.assertListEqual(dataset._loader.DEFAULT_CHANNELS, dataset.feature_select)
+        self.assertListEqual(
+            dataset._loader.DEFAULT_CHANNELS, dataset._loader.feature_select
+        )
 
     def test_truncation_functions(self):
         full_dataset = cmapss.CMAPSSDataModule(fd=1, window_size=30, batch_size=4)

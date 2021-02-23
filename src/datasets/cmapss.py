@@ -23,14 +23,24 @@ class CMAPSSDataModule(pl.LightningDataModule):
     ):
         super().__init__()
 
-        self.fd = fd
+        self._loader = CMAPSSLoader(
+            fd,
+            window_size,
+            max_rul,
+            percent_broken,
+            percent_fail_runs,
+            feature_select,
+            truncate_val,
+        )
+
         self.batch_size = batch_size
-        self.window_size = window_size
-        self.max_rul = max_rul
-        self.percent_broken = percent_broken
-        self.percent_fail_runs = percent_fail_runs
-        self.feature_select = feature_select
-        self.truncate_val = truncate_val
+        self.fd = self._loader.fd
+        self.window_size = self._loader.window_size
+        self.max_rul = self._loader.max_rul
+        self.percent_broken = self._loader.percent_broken
+        self.percent_fail_runs = self._loader.percent_fail_runs
+        self.feature_select = self._loader.feature_select
+        self.truncate_val = self._loader.truncate_val
 
         self.hparams = {
             "fd": self.fd,
@@ -44,15 +54,6 @@ class CMAPSSDataModule(pl.LightningDataModule):
 
         self.data = {}
         self.lengths = {}
-        self._loader = CMAPSSLoader(
-            self.fd,
-            self.window_size,
-            self.max_rul,
-            self.percent_broken,
-            self.percent_fail_runs,
-            self.feature_select,
-            self.truncate_val,
-        )
 
     def prepare_data(self, *args, **kwargs):
         self._loader.prepare_data()
