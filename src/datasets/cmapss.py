@@ -1,10 +1,8 @@
 import os
-import warnings
 from typing import List, Optional, Union
 
 import numpy as np
 import pytorch_lightning as pl
-import sklearn.preprocessing as scalers
 import torch
 from torch.utils.data import DataLoader, IterableDataset, TensorDataset
 
@@ -75,9 +73,17 @@ class CMAPSSDataModule(pl.LightningDataModule):
         self._loader.prepare_data()
 
     def setup(self, stage: Optional[str] = None):
-        *self.data["dev"], self.lengths["dev"] = self._loader.load_split("dev")
-        *self.data["val"], self.lengths["val"] = self._loader.load_split("val")
-        *self.data["test"], self.lengths["test"] = self._loader.load_split("test")
+        *self.data["dev"], self.lengths["dev"] = self._setup_split("dev")
+        *self.data["val"], self.lengths["val"] = self._setup_split("val")
+        *self.data["test"], self.lengths["test"] = self._setup_split("test")
+
+    def _setup_split(self, split):
+        features, targets = self._loader.load_split(split)
+        lengths = [len(f) for f in features]
+        features = torch.cat(features)
+        targets = torch.cat(targets)
+
+        return features, targets, lengths
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
         return DataLoader(

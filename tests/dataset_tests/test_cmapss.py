@@ -182,10 +182,10 @@ class TestCMAPSS(unittest.TestCase):
         dataset = cmapss.CMAPSSDataModule(fd=1, window_size=30, batch_size=4)
         dataset.prepare_data()
         with self.subTest(truncate_val=False):
-            dataset._loader.load_split("dev")
+            dataset._setup_split("dev")
             mock_truncate.assert_called_once()
             mock_truncate.reset_mock()
-            dataset._loader.load_split("val")
+            dataset._setup_split("val")
             mock_truncate.assert_not_called()
 
         dataset = cmapss.CMAPSSDataModule(
@@ -193,10 +193,10 @@ class TestCMAPSS(unittest.TestCase):
         )
         dataset.prepare_data()
         with self.subTest(truncate_val=True):
-            dataset._loader.load_split("dev")
+            dataset._setup_split("dev")
             mock_truncate.assert_called_once()
             mock_truncate.reset_mock()
-            dataset._loader.load_split("val")
+            dataset._setup_split("val")
             mock_truncate.assert_called_once()
 
 
