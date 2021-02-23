@@ -93,7 +93,7 @@ class TestCMAPSS(unittest.TestCase):
         truncated_dataset.setup()
 
         features = [torch.randn(n, 30) for n in torch.randint(50, 200, (100,))]
-        truncated_features = truncated_dataset._truncate_features(
+        truncated_features = truncated_dataset._loader._truncate_features(
             features.copy()
         )  # pass copy to get a new list
 
@@ -165,7 +165,7 @@ class TestCMAPSS(unittest.TestCase):
             dataset.setup()
             for split in ["dev", "val", "test"]:
                 with self.subTest(fd=i, split=split):
-                    raw_data = dataset._load_features(dataset._file_path(split))
+                    raw_data = dataset._loader._load_features(dataset._file_path(split))
                     # lengths should be length of raw dataset_tests minus one less than window_size
                     expected_lenghts = (
                         [1] * len(raw_data)
@@ -177,15 +177,15 @@ class TestCMAPSS(unittest.TestCase):
                         len(dataset.data[split][0]), sum(dataset.lengths[split])
                     )
 
-    @mock.patch("datasets.cmapss.CMAPSSDataModule._truncate_features", wraps=lambda x: x)
+    @mock.patch("datasets.loader.CMAPSSLoader._truncate_features", wraps=lambda x: x)
     def test_val_truncation(self, mock_truncate):
         dataset = cmapss.CMAPSSDataModule(fd=1, window_size=30, batch_size=4)
         dataset.prepare_data()
         with self.subTest(truncate_val=False):
-            dataset._setup_split("dev")
+            dataset._loader.load_split("dev")
             mock_truncate.assert_called_once()
             mock_truncate.reset_mock()
-            dataset._setup_split("val")
+            dataset._loader.load_split("val")
             mock_truncate.assert_not_called()
 
         dataset = cmapss.CMAPSSDataModule(
@@ -193,10 +193,10 @@ class TestCMAPSS(unittest.TestCase):
         )
         dataset.prepare_data()
         with self.subTest(truncate_val=True):
-            dataset._setup_split("dev")
+            dataset._loader.load_split("dev")
             mock_truncate.assert_called_once()
             mock_truncate.reset_mock()
-            dataset._setup_split("val")
+            dataset._loader.load_split("val")
             mock_truncate.assert_called_once()
 
 
