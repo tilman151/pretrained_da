@@ -22,17 +22,22 @@ class CMAPSSLoader(AbstractLoader):
     )
     _TRAIN_PERCENTAGE = 0.8
     WINDOW_SIZES = {1: 30, 2: 20, 3: 30, 4: 15}
+    DEFAULT_CHANNELS = [4, 5, 6, 9, 10, 11, 13, 14, 15, 16, 17, 19, 22, 23]
 
     def __init__(
         self,
         fd: int,
-        window_size: int,
-        max_rul: int,
-        percent_broken: float,
-        percent_fail_runs: float,
-        feature_select: List[int],
-        truncate_val: bool,
+        window_size: int = None,
+        max_rul: int = 125,
+        percent_broken: float = None,
+        percent_fail_runs: float = None,
+        feature_select: List[int] = None,
+        truncate_val: bool = False,
     ):
+        # Select features according to https://doi.org/10.1016/j.ress.2017.11.021
+        if feature_select is None:
+            feature_select = self.DEFAULT_CHANNELS
+
         self.fd = fd
         self.window_size = window_size or self.WINDOW_SIZES[self.fd]
         self.max_rul = max_rul
@@ -84,14 +89,14 @@ class CMAPSSLoader(AbstractLoader):
         file_path = self._file_path(split)
 
         features = self._load_features(file_path)
-        if split == "dev" or (split == "val" and self.truncate_val):
-            features = self._truncate_features(features)
         features = self._normalize(features)
         features, time_steps = self._remove_time_steps_from_features(features)
 
         if split == "dev" or split == "val":
             # Build targets from time steps on training
             targets = self._generate_targets(time_steps)
+            if split == "dev" or self.truncate_val:
+                features, targets = self._truncate_runs(features, targets)
             # Window data to get uniform sequence lengths
             features, targets = self._window_data(features, targets)
         else:
@@ -117,22 +122,23 @@ class CMAPSSLoader(AbstractLoader):
 
         return features
 
-    def _truncate_features(self, features: List[np.ndarray]) -> List[np.ndarray]:
+    def _truncate_runs(
+        self, features: List[np.ndarray], targets: List[np.ndarray]
+    ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         # Truncate the number of runs to failure
         if self.percent_fail_runs is not None and self.percent_fail_runs < 1:
             num_runs = int(self.percent_fail_runs * len(features))
             features = features[:num_runs]
+            targets = targets[:num_runs]
 
         # Truncate the number of samples per run, starting at failure
         if self.percent_broken is not None and self.percent_broken < 1:
             for i, run in enumerate(features):
                 num_cycles = int(self.percent_broken * len(run))
-                run[:, 1] += (
-                    len(run) - num_cycles - 1
-                )  # Adjust targets to truncated length
                 features[i] = run[:num_cycles]
+                targets[i] = targets[i][:num_cycles]
 
-        return features
+        return features, targets
 
     def _normalize(self, features: List[np.ndarray]) -> List[np.ndarray]:
         """Normalize features with sklearn transform."""

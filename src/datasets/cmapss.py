@@ -10,8 +10,6 @@ from datasets.loader import CMAPSSLoader
 
 
 class CMAPSSDataModule(pl.LightningDataModule):
-    WINDOW_SIZES = {1: 30, 2: 20, 3: 30, 4: 15}
-
     def __init__(
         self,
         fd,
@@ -24,17 +22,10 @@ class CMAPSSDataModule(pl.LightningDataModule):
         truncate_val=False,
     ):
         super().__init__()
-        self.DATA_ROOT = os.path.join(
-            os.path.dirname(__file__), "../..", "data", "CMAPSS"
-        )
-
-        # Select features according to https://doi.org/10.1016/j.ress.2017.11.021
-        if feature_select is None:
-            feature_select = [4, 5, 6, 9, 10, 11, 13, 14, 15, 16, 17, 19, 22, 23]
 
         self.fd = fd
         self.batch_size = batch_size
-        self.window_size = window_size or self.WINDOW_SIZES[self.fd]
+        self.window_size = window_size
         self.max_rul = max_rul
         self.percent_broken = percent_broken
         self.percent_fail_runs = percent_fail_runs
@@ -62,12 +53,6 @@ class CMAPSSDataModule(pl.LightningDataModule):
             self.feature_select,
             self.truncate_val,
         )
-
-    def _file_path(self, split):
-        return os.path.join(self.DATA_ROOT, self._file_name(split))
-
-    def _file_name(self, split):
-        return f"{split}_FD{self.fd:03d}.txt"
 
     def prepare_data(self, *args, **kwargs):
         self._loader.prepare_data()
