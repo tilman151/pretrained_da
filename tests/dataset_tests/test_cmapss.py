@@ -1,11 +1,13 @@
 import unittest
 from unittest import mock
 
+import numpy as np
 import torch
 from torch.utils.data import TensorDataset
 
 import datasets
 from datasets import cmapss
+from datasets import loader
 
 
 class TestCMAPSS(unittest.TestCase):
@@ -51,12 +53,12 @@ class TestCMAPSS(unittest.TestCase):
         )
 
     def test_truncation_functions(self):
-        full_dataset = cmapss.CMAPSSDataModule(fd=1, window_size=30, batch_size=4)
+        full_dataset = cmapss.CMAPSSDataModule(fd=1, batch_size=4, window_size=30)
         full_dataset.prepare_data()
         full_dataset.setup()
 
         dataset = cmapss.CMAPSSDataModule(
-            fd=1, window_size=30, batch_size=4, percent_fail_runs=0.8
+            fd=1, batch_size=4, window_size=30, percent_fail_runs=0.8
         )
         dataset.prepare_data()
         dataset.setup()
@@ -65,7 +67,7 @@ class TestCMAPSS(unittest.TestCase):
         self.assertEqual(len(full_dataset.data["test"][0]), len(dataset.data["test"][0]))
 
         dataset = cmapss.CMAPSSDataModule(
-            fd=1, window_size=30, batch_size=4, percent_broken=0.2
+            fd=1, batch_size=4, window_size=30, percent_broken=0.2
         )
         dataset.prepare_data()
         dataset.setup()
@@ -90,7 +92,7 @@ class TestCMAPSS(unittest.TestCase):
 
     def test_lengths(self):
         for i in range(1, 5):
-            dataset = cmapss.CMAPSSDataModule(fd=i, window_size=30, batch_size=4)
+            dataset = cmapss.CMAPSSDataModule(fd=i, batch_size=4, window_size=30)
             dataset.prepare_data()
             dataset.setup()
             for split in ["dev", "val", "test"]:
@@ -107,13 +109,16 @@ class DummyCMAPSS:
     def __init__(self, length):
         self.window_size = 30
         self.max_rul = 125
-        self.lengths = {"dev": [length]}
         self.data = {
             "dev": (
-                torch.zeros(length, self.window_size, 5),
-                torch.clamp_max(torch.arange(length, 0, step=-1), 125),
+                [torch.zeros(length, self.window_size, 5)],
+                [torch.clamp_max(torch.arange(length, 0, step=-1), 125)],
             ),
         }
+
+    def load_split(self, split):
+        assert split == "dev", "Can only use dev data."
+        return self.data["dev"]
 
 
 class DummyCMAPSSShortRuns:
@@ -122,39 +127,44 @@ class DummyCMAPSSShortRuns:
     def __init__(self):
         self.window_size = 30
         self.max_rul = 125
-        self.lengths = {"dev": [100, 2, 100, 1, 0]}
         self.data = {
             "dev": (
-                torch.cat(
-                    [
-                        torch.ones(100, self.window_size, 5),  # normal run
-                        torch.zeros(2, self.window_size, 5),  # too short run
-                        torch.ones(100, self.window_size, 5),  # normal run
-                        torch.zeros(1, self.window_size, 5),  # empty run
-                    ]
-                ),
-                torch.cat(
-                    [
-                        torch.clamp_max(torch.arange(100, 0, step=-1), 125),
-                        torch.ones(2) * 500,
-                        torch.clamp_max(torch.arange(100, 0, step=-1), 125),
-                        torch.ones(1) * 500,
-                    ]
-                ),
+                [
+                    torch.ones(100, self.window_size, 5)
+                    * torch.arange(1, 101).view(100, 1, 1),  # normal run
+                    torch.zeros(2, self.window_size, 5),  # too short run
+                    torch.ones(100, self.window_size, 5)
+                    * torch.arange(1, 101).view(100, 1, 1),  # normal run
+                    torch.zeros(1, self.window_size, 5),  # empty run
+                ],
+                [
+                    torch.clamp_max(torch.arange(100, 0, step=-1), 125),
+                    torch.ones(2) * 500,
+                    torch.clamp_max(torch.arange(100, 0, step=-1), 125),
+                    torch.ones(1) * 500,
+                ],
             ),
         }
+
+    def load_split(self, split):
+        assert split == "dev", "Can only use dev data."
+        return self.data["dev"]
 
 
 class TestPairedDataset(unittest.TestCase):
     def setUp(self):
-        self.cmapss_normal = DummyCMAPSS(300)
+        self.length = 300
+        self.cmapss_normal = DummyCMAPSS(self.length)
         self.cmapss_short = DummyCMAPSSShortRuns()
+        self.fd1 = loader.CMAPSSLoader(1)
+        self.fd3 = loader.CMAPSSLoader(3)
 
     def test_get_pair_idx(self):
         data = datasets.cmapss.PairedCMAPSS([self.cmapss_normal], "dev", 512, 1, True)
-        middle_idx = self.cmapss_normal.lengths["dev"][0] // 2
+        middle_idx = self.length // 2
         for _ in range(512):
-            anchor_idx, query_idx, _, distance = data._get_pair_idx()
+            run, anchor_idx, query_idx, _, distance = data._get_pair_idx()
+            self.assertEqual(middle_idx, len(run) // 2)
             if anchor_idx < middle_idx:
                 self.assertEqual(0, distance)
             else:
@@ -163,8 +173,9 @@ class TestPairedDataset(unittest.TestCase):
     def test_get_labeled_pair_idx(self):
         data = datasets.cmapss.PairedCMAPSS([self.cmapss_normal], "dev", 512, 1, True)
         for _ in range(512):
-            anchor_idx, query_idx, _, distance = data._get_labeled_pair_idx()
-            expected_distance = data._labels[anchor_idx] - data._labels[query_idx]
+            run, anchor_idx, query_idx, distance, _ = data._get_labeled_pair_idx()
+            self.assertEqual(self.length, len(run))
+            expected_distance = data._labels[0][anchor_idx] - data._labels[0][query_idx]
             self.assertLessEqual(0, distance)
             self.assertEqual(expected_distance, distance)
 
@@ -183,13 +194,92 @@ class TestPairedDataset(unittest.TestCase):
             )
             self.assertEqual(data._get_labeled_pair_idx, data._get_pair_func)
 
+    def test_sampled_data(self):
+        fixed_idx = [0, 60, 80, 1, 55, 99]  # two samples with run, anchor and query idx
+        data = datasets.cmapss.PairedCMAPSS([self.cmapss_short], "dev", 2, 2)
+        data._rng = mock.MagicMock()
+        data._rng.integers = mock.MagicMock(side_effect=fixed_idx)
+        for i, sample in enumerate(data):
+            idx = 3 * i
+            expected_run = data._features[fixed_idx[idx]]
+            expected_anchor = expected_run[fixed_idx[idx + 1]]
+            expected_query = expected_run[fixed_idx[idx + 2]]
+            expected_distance = min(125, fixed_idx[idx + 2] - fixed_idx[idx + 1]) / 125
+            expected_domain_idx = 0
+            self.assertEqual(0, torch.dist(expected_anchor, sample[0]))
+            self.assertEqual(0, torch.dist(expected_query, sample[1]))
+            self.assertAlmostEqual(expected_distance, sample[2].item())
+            self.assertEqual(expected_domain_idx, sample[3].item())
+
     def test_discarding_too_short_runs(self):
         data = datasets.cmapss.PairedCMAPSS([self.cmapss_short], "dev", 512, 2)
-        self.assertTrue((data._features == 1).all())
-        self.assertTrue((data._labels < 500).all())
-        self.assertListEqual([0, 100, 200], data._run_start_idx.tolist())
-        self.assertListEqual([0, 1], data._run_idx.tolist())
-        self.assertListEqual([0, 0], data._run_domain_idx.tolist())
+        for run, labels in zip(data._features, data._labels):
+            self.assertTrue((run >= 1).all())
+            self.assertTrue((labels < 500).all())
+            self.assertLess(2, len(run))
+
+    def test_determinisim(self):
+        with self.subTest("non-deterministic"):
+            data = datasets.cmapss.PairedCMAPSS([self.cmapss_short], "dev", 512, 2)
+            self.assertTrue(self._two_epochs_different(data))
+        with self.subTest("non-deterministic"):
+            data = datasets.cmapss.PairedCMAPSS(
+                [self.cmapss_short], "dev", 512, 2, deterministic=True
+            )
+            self.assertFalse(self._two_epochs_different(data))
+
+    def _two_epochs_different(self, data):
+        first_epoch = [samples for samples in data]
+        second_epoch = [samples for samples in data]
+        different = False
+        for first_samples, second_samples in zip(first_epoch, second_epoch):
+            for first, second in zip(first_samples, second_samples):
+                if torch.dist(first, second) > 0:
+                    different = True
+
+        return different
+
+    def test_min_distance(self):
+        dataset = datasets.cmapss.PairedCMAPSS(
+            [self.cmapss_short], "dev", 512, min_distance=30
+        )
+        pairs = self._get_pairs(dataset)
+        distances = pairs[:, 1] - pairs[:, 0]
+        self.assertTrue(np.all(pairs[:, 0] < pairs[:, 1]))
+        self.assertTrue(np.all(distances >= 30))
+
+    def test_build_pairs(self):
+        for split in ["dev", "val"]:
+            with self.subTest(split=split):
+                paired_dataset = datasets.cmapss.PairedCMAPSS(
+                    [self.fd1, self.fd3], split, 1000, 1
+                )
+                pairs = self._get_pairs(paired_dataset)
+                self.assertTrue(
+                    np.all(pairs[:, 0] < pairs[:, 1])
+                )  # query always after anchor
+                self.assertTrue(np.all(pairs[:, 3] <= 1))  # domain label is either 1
+                self.assertTrue(np.all(pairs[:, 3] >= 0))  # or zero
+
+    def test_domain_labels(self):
+        dataset = datasets.cmapss.PairedCMAPSS(
+            [self.cmapss_normal, self.cmapss_short], "dev", 512, min_distance=30
+        )
+        for _ in range(512):
+            run, _, _, _, domain_idx = dataset._get_pair_idx()
+            if len(run) == self.length:
+                self.assertEqual(0, domain_idx)  # First domain is self.length long
+            else:
+                self.assertEqual(1, domain_idx)  # Second is not
+
+    def _get_pairs(self, paired):
+        pairs = [paired._get_pair_idx() for _ in range(paired.num_samples)]
+        pairs = [
+            (anchor_idx, query_idx, distance, domain_idx)
+            for _, anchor_idx, query_idx, distance, domain_idx in pairs
+        ]
+
+        return np.array(pairs)
 
 
 class TestAdaptionDataset(unittest.TestCase):

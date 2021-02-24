@@ -1,5 +1,4 @@
-import os
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import pytorch_lightning as pl
@@ -12,14 +11,14 @@ from datasets.loader import CMAPSSLoader
 class CMAPSSDataModule(pl.LightningDataModule):
     def __init__(
         self,
-        fd,
-        batch_size,
-        max_rul=125,
-        window_size=None,
-        percent_fail_runs=None,
-        percent_broken=None,
-        feature_select=None,
-        truncate_val=False,
+        fd: int,
+        batch_size: int,
+        window_size: int = None,
+        max_rul: int = 125,
+        percent_fail_runs: int = None,
+        percent_broken: int = None,
+        feature_select: int = None,
+        truncate_val: bool = False,
     ):
         super().__init__()
 
@@ -54,6 +53,19 @@ class CMAPSSDataModule(pl.LightningDataModule):
 
         self.data = {}
         self.lengths = {}
+
+    @classmethod
+    def from_loader(cls, loader: CMAPSSLoader, batch_size: int):
+        return cls(
+            loader.fd,
+            batch_size,
+            loader.window_size,
+            loader.max_rul,
+            loader.percent_fail_runs,
+            loader.percent_broken,
+            loader.feature_select,
+            loader.truncate_val,
+        )
 
     def prepare_data(self, *args, **kwargs):
         self._loader.prepare_data()
@@ -105,35 +117,33 @@ class CMAPSSDataModule(pl.LightningDataModule):
 class PairedCMAPSS(IterableDataset):
     def __init__(
         self,
-        datasets,
-        split,
-        num_samples,
-        min_distance,
-        deterministic=False,
-        labeled=False,
+        loaders: List[CMAPSSLoader],
+        split: str,
+        num_samples: int,
+        min_distance: int,
+        deterministic: bool = False,
+        labeled: bool = False,
     ):
         super().__init__()
 
-        self.datasets = datasets
+        self.loaders = loaders
         self.split = split
         self.min_distance = min_distance
         self.num_samples = num_samples
         self.deterministic = deterministic
 
-        if not all(d.window_size == self.datasets[0].window_size for d in self.datasets):
-            window_sizes = [d.window_size for d in self.datasets]
+        if not all(d.window_size == self.loaders[0].window_size for d in self.loaders):
+            window_sizes = [d.window_size for d in self.loaders]
             raise ValueError(
                 f"Datasets to be paired do not have the same window size, but {window_sizes}"
             )
 
-        self._run_start_idx = None
-        self._run_idx = None
         self._run_domain_idx = None
         self._features = None
         self._labels = None
         self._prepare_datasets()
 
-        self._max_rul = max(dataset.max_rul for dataset in self.datasets)
+        self._max_rul = max(loader.max_rul for loader in self.loaders)
         self._current_iteration = 0
         self._rng = self._reset_rng()
         self._get_pair_func = (
@@ -141,34 +151,25 @@ class PairedCMAPSS(IterableDataset):
         )
 
     def _prepare_datasets(self):
-        run_start_idx = [0]
-        run_idx = []
         run_domain_idx = []
         features = []
         labels = []
-        for domain_idx, dataset in enumerate(self.datasets):
-            run_features, run_labels = dataset.data[self.split]
-            run_lengths = dataset.lengths[self.split]
-            run_features = torch.split(run_features, run_lengths)
-            run_labels = torch.split(run_labels, run_lengths)
-            for i, length in enumerate(run_lengths):
-                if length > self.min_distance:
-                    run_start_idx.append(run_start_idx[-1] + length)
-                    run_idx.append(len(run_idx))
+        for domain_idx, loader in enumerate(self.loaders):
+            run_features, run_labels = loader.load_split(self.split)
+            for feat, lab in zip(run_features, run_labels):
+                if len(feat) > self.min_distance:
                     run_domain_idx.append(domain_idx)
-                    features.append(run_features[i])
-                    labels.append(run_labels[i])
+                    features.append(feat)
+                    labels.append(lab)
 
-        self._run_start_idx = np.array(run_start_idx)
-        self._run_idx = np.array(run_idx)
         self._run_domain_idx = np.array(run_domain_idx)
-        self._features = torch.cat(features)
-        self._labels = torch.cat(labels).numpy()
+        self._features = features
+        self._labels = labels
 
-    def _reset_rng(self):
+    def _reset_rng(self) -> np.random.Generator:
         return np.random.default_rng(seed=42)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.num_samples
 
     def __iter__(self):
@@ -178,28 +179,27 @@ class PairedCMAPSS(IterableDataset):
 
         return self
 
-    def __next__(self):
+    def __next__(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         if self._current_iteration < self.num_samples:
             self._current_iteration += 1
-            pair_idx = self._get_pair_func()
-            return self._build_pair(pair_idx)
+            idx = self._get_pair_func()
+            return self._build_pair(*idx)
         else:
             raise StopIteration
 
-    def _get_pair_idx(self):
-        chosen_run_idx = self._rng.choice(self._run_idx)
+    def _get_pair_idx(self) -> Tuple[torch.Tensor, int, int, int, int]:
+        chosen_run_idx = self._rng.integers(0, len(self._features))
         domain_label = self._run_domain_idx[chosen_run_idx]
-        middle_idx = (
-            self._run_start_idx[chosen_run_idx + 1] + self._run_start_idx[chosen_run_idx]
-        ) // 2
+        chosen_run = self._features[chosen_run_idx]
+
+        run_length = chosen_run.shape[0]
+        middle_idx = run_length // 2
         anchor_idx = self._rng.integers(
-            low=self._run_start_idx[chosen_run_idx],
-            high=self._run_start_idx[chosen_run_idx + 1] - self.min_distance,
+            low=0,
+            high=run_length - self.min_distance,
         )
         end_idx = (
-            middle_idx
-            if anchor_idx < (middle_idx - self.min_distance)
-            else self._run_start_idx[chosen_run_idx + 1]
+            middle_idx if anchor_idx < (middle_idx - self.min_distance) else run_length
         )
         query_idx = self._rng.integers(
             low=anchor_idx + self.min_distance,
@@ -207,29 +207,40 @@ class PairedCMAPSS(IterableDataset):
         )
         distance = query_idx - anchor_idx if anchor_idx > middle_idx else 0
 
-        return anchor_idx, query_idx, domain_label, distance
+        return chosen_run, anchor_idx, query_idx, distance, domain_label
 
-    def _get_labeled_pair_idx(self):
-        chosen_run_idx = self._rng.choice(self._run_idx)
+    def _get_labeled_pair_idx(self) -> Tuple[torch.Tensor, int, int, int, int]:
+        chosen_run_idx = self._rng.integers(0, len(self._features))
         domain_label = self._run_domain_idx[chosen_run_idx]
+        chosen_run = self._features[chosen_run_idx]
+        chosen_labels = self._labels[chosen_run_idx]
+
+        run_length = chosen_run.shape[0]
         anchor_idx = self._rng.integers(
-            low=self._run_start_idx[chosen_run_idx],
-            high=self._run_start_idx[chosen_run_idx + 1] - self.min_distance,
+            low=0,
+            high=run_length - self.min_distance,
         )
         query_idx = self._rng.integers(
             low=anchor_idx + self.min_distance,
-            high=self._run_start_idx[chosen_run_idx + 1],
+            high=run_length,
         )
         # RUL label difference is negative time step difference
-        distance = self._labels[anchor_idx] - self._labels[query_idx]
+        distance = chosen_labels[anchor_idx] - chosen_labels[query_idx]
 
-        return anchor_idx, query_idx, domain_label, distance
+        return chosen_run, anchor_idx, query_idx, distance, domain_label
 
-    def _build_pair(self, pair_idx):
-        anchors = self._features[pair_idx[0]]
-        queries = self._features[pair_idx[1]]
-        domain_label = torch.tensor(pair_idx[2], dtype=torch.float)
-        distances = torch.tensor(pair_idx[3], dtype=torch.float) / self._max_rul
+    def _build_pair(
+        self,
+        run: torch.Tensor,
+        anchor_idx: int,
+        query_idx: int,
+        distance: int,
+        domain_label: int,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        anchors = run[anchor_idx]
+        queries = run[query_idx]
+        domain_label = torch.tensor(domain_label, dtype=torch.float)
+        distances = torch.tensor(distance, dtype=torch.float) / self._max_rul
         distances = torch.clamp_max(distances, max=1)  # max distance is max_rul
 
         return anchors, queries, distances, domain_label

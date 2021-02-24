@@ -112,22 +112,20 @@ class TestPretrainingDataModuleFullData(unittest.TestCase, PretrainingDataModule
         self.dataset.setup()
 
         self.expected_num_val_loaders = 3
-        self.window_size = datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[
-            self.dataset.fd_target
-        ]
+        self.window_size = self.dataset.target_loader.window_size
 
     def test_target_val_truncation(self):
         with self.subTest(truncation=False):
             dataset = datasets.PretrainingAdaptionDataModule(
                 3, 2, num_samples=10000, batch_size=16
             )
-            self.assertFalse(dataset.target.truncate_val)
+            self.assertFalse(dataset.target_loader.truncate_val)
 
         with self.subTest(truncation=True):
             dataset = datasets.PretrainingAdaptionDataModule(
                 3, 2, num_samples=10000, batch_size=16, truncate_target_val=True
             )
-            self.assertTrue(dataset.target.truncate_val)
+            self.assertTrue(dataset.target_loader.truncate_val)
 
     def test_override_window_size(self):
         dataset = datasets.PretrainingAdaptionDataModule(
@@ -145,12 +143,10 @@ class TestPretrainingDataModuleFullData(unittest.TestCase, PretrainingDataModule
 class TestPretrainingDataModuleLowData(unittest.TestCase, PretrainingDataModuleTemplate):
     def setUp(self):
         self.dataset = datasets.PretrainingAdaptionDataModule(
-            1, 3, percent_broken=0.2, num_samples=10000, batch_size=16
+            1, 3, num_samples=10000, batch_size=16, percent_broken=0.2
         )
         self.dataset.prepare_data()
         self.dataset.setup()
 
         self.expected_num_val_loaders = 3
-        self.window_size = datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[
-            self.dataset.fd_target
-        ]
+        self.window_size = self.dataset.target_loader.window_size

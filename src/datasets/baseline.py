@@ -12,10 +12,10 @@ class BaselineDataModule(pl.LightningDataModule):
         self,
         fd_source: int,
         batch_size: int,
-        max_rul: int = 125,
         window_size: int = None,
+        max_rul: int = 125,
         percent_fail_runs: float = None,
-        feature_select: float = None,
+        feature_select: List[int] = None,
     ):
         super().__init__()
 
@@ -39,8 +39,8 @@ class BaselineDataModule(pl.LightningDataModule):
             self.cmapss[fd] = CMAPSSDataModule(
                 fd,
                 self.batch_size,
-                self.max_rul,
                 self.window_size,
+                self.max_rul,
                 self.percent_fail_runs,
                 None,
                 self.feature_select,
@@ -72,29 +72,41 @@ class BaselineDataModule(pl.LightningDataModule):
 class PretrainingBaselineDataModule(pl.LightningDataModule):
     def __init__(
         self,
-        fd_source,
-        num_samples,
-        batch_size,
-        max_rul=125,
-        window_size=None,
-        min_distance=1,
-        percent_fail_runs=None,
-        percent_broken=None,
-        feature_select=None,
-        truncate_val=False,
+        fd_source: int,
+        num_samples: int,
+        batch_size: int,
+        window_size: int = None,
+        max_rul: int = 125,
+        min_distance: int = 1,
+        percent_fail_runs: float = None,
+        percent_broken: float = None,
+        feature_select: List[int] = None,
+        truncate_val: bool = False,
     ):
         super().__init__()
 
         self.fd_source = fd_source
         self.num_samples = num_samples
         self.batch_size = batch_size
-        self.window_size = window_size or CMAPSSDataModule.WINDOW_SIZES[self.fd_source]
         self.min_distance = min_distance
         self.max_rul = max_rul
         self.percent_broken = percent_broken
         self.percent_fail_runs = percent_fail_runs
         self.feature_select = feature_select
         self.truncate_val = truncate_val
+
+        self.source_loader = CMAPSSLoader(
+            self.fd_source,
+            window_size,
+            self.max_rul,
+            None,
+            None,
+            self.feature_select,
+            truncate_val,
+        )
+        self.window_size = self.source_loader.window_size
+
+        self.source = CMAPSSDataModule.from_loader(self.source_loader, self.batch_size)
 
         self.hparams = {
             "fd_source": self.fd_source,
@@ -108,19 +120,8 @@ class PretrainingBaselineDataModule(pl.LightningDataModule):
             "truncate_val": self.truncate_val,
         }
 
-        self.source = CMAPSSDataModule(
-            fd_source,
-            batch_size,
-            max_rul,
-            window_size,
-            percent_fail_runs,
-            percent_broken,
-            feature_select,
-            truncate_val,
-        )
-
     def prepare_data(self, *args, **kwargs):
-        self.source.prepare_data(*args, **kwargs)
+        self.source_loader.prepare_data()
 
     def setup(self, stage: Optional[str] = None):
         self.source.setup(stage)
@@ -130,7 +131,7 @@ class PretrainingBaselineDataModule(pl.LightningDataModule):
             self._get_paired_dataset("dev"), batch_size=self.batch_size, pin_memory=True
         )
 
-    def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
+    def val_dataloader(self, *args, **kwargs) -> List[DataLoader]:
         combined_loader = DataLoader(
             self._get_paired_dataset("val"), batch_size=self.batch_size, pin_memory=True
         )
@@ -138,11 +139,11 @@ class PretrainingBaselineDataModule(pl.LightningDataModule):
 
         return [combined_loader, source_loader]
 
-    def _get_paired_dataset(self, split):
+    def _get_paired_dataset(self, split: str) -> PairedCMAPSS:
         deterministic = split == "val"
         num_samples = 25000 if split == "val" else self.num_samples
         paired = PairedCMAPSS(
-            [self.source], split, num_samples, self.min_distance, deterministic
+            [self.source_loader], split, num_samples, self.min_distance, deterministic
         )
 
         return paired

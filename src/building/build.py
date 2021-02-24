@@ -88,9 +88,7 @@ def build_baseline(source, fails, config, pretrained_encoder_path, gpu, seed, ve
         seed=seed,
     )
     data = datasets.BaselineDataModule(
-        fd_source=source,
-        batch_size=config["batch_size"],
-        percent_fail_runs=fails,
+        fd_source=source, batch_size=config["batch_size"], percent_fail_runs=fails
     )
     model = build_baseline_from_config(config, data.window_size, pretrained_encoder_path)
     add_hparams(model, data, seed)

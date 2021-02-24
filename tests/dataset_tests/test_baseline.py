@@ -6,7 +6,6 @@ from torch.utils.data import TensorDataset, RandomSampler, SequentialSampler
 
 import datasets
 from datasets import cmapss
-from datasets.adaption import _unify_source_and_target_length
 from tests.dataset_tests.templates import PretrainingDataModuleTemplate
 
 
@@ -20,7 +19,7 @@ class TestCMAPSSBaseline(unittest.TestCase):
 
     def test_override_window_size(self):
         dataset = datasets.BaselineDataModule(
-            3, batch_size=16, percent_fail_runs=0.8, window_size=40
+            3, batch_size=16, window_size=40, percent_fail_runs=0.8
         )
         for fd in dataset.cmapss.values():
             self.assertEqual(40, fd.window_size)
@@ -97,21 +96,21 @@ class TestPretrainingBaselineDataModuleFullData(
         self.dataset.setup()
 
         self.expected_num_val_loaders = 2
-        self.window_size = datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[
-            self.dataset.fd_source
-        ]
+        self.window_size = self.dataset.source_loader.window_size
 
     def test_val_truncation(self):
         with self.subTest(truncation=False):
             dataset = datasets.PretrainingBaselineDataModule(
                 3, num_samples=10000, batch_size=16
             )
+            self.assertFalse(dataset.source_loader.truncate_val)
             self.assertFalse(dataset.source.truncate_val)
 
         with self.subTest(truncation=True):
             dataset = datasets.PretrainingBaselineDataModule(
                 3, num_samples=10000, batch_size=16, truncate_val=True
             )
+            self.assertTrue(dataset.source_loader.truncate_val)
             self.assertTrue(dataset.source.truncate_val)
 
     def test_override_window_size(self):
@@ -132,12 +131,10 @@ class TestPretrainingBaselineDataModuleLowData(
 ):
     def setUp(self):
         self.dataset = datasets.PretrainingBaselineDataModule(
-            3, percent_broken=0.2, num_samples=10000, batch_size=16
+            3, num_samples=10000, batch_size=16, percent_broken=0.2
         )
         self.dataset.prepare_data()
         self.dataset.setup()
 
         self.expected_num_val_loaders = 2
-        self.window_size = datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[
-            self.dataset.fd_source
-        ]
+        self.window_size = self.dataset.source_loader.window_size
