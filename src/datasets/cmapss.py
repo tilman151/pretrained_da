@@ -73,7 +73,7 @@ class CMAPSSDataModule(pl.LightningDataModule):
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
         return DataLoader(
-            self._to_dataset(*self.data["dev"]),
+            self.to_dataset("dev"),
             batch_size=self.batch_size,
             shuffle=True,
             pin_memory=True,
@@ -81,7 +81,7 @@ class CMAPSSDataModule(pl.LightningDataModule):
 
     def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
         return DataLoader(
-            self._to_dataset(*self.data["val"]),
+            self.to_dataset("val"),
             batch_size=self.batch_size,
             shuffle=False,
             pin_memory=True,
@@ -89,14 +89,17 @@ class CMAPSSDataModule(pl.LightningDataModule):
 
     def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
         return DataLoader(
-            self._to_dataset(*self.data["test"]),
+            self.to_dataset("test"),
             batch_size=self.batch_size,
             shuffle=False,
             pin_memory=True,
         )
 
-    def _to_dataset(self, features, targets):
-        return TensorDataset(features, targets)
+    def to_dataset(self, split):
+        features, targets = self.data[split]
+        split_dataset = TensorDataset(features, targets)
+
+        return split_dataset
 
 
 class PairedCMAPSS(IterableDataset):
@@ -233,24 +236,32 @@ class PairedCMAPSS(IterableDataset):
 
 
 class AdaptionDataset(Dataset):
-    def __init__(self, source, source_labels, target):
+    def __init__(self, source, target, deterministic=False):
         self.source = source
-        self.source_labels = source_labels
         self.target = target
-        self._target_len = target.shape[0]
+        self.deterministic = deterministic
+        self._target_len = len(target)
 
-        self._rng = self._reset_rng()
+        self._rng = np.random.default_rng(seed=42)
+        if self.deterministic:
+            self._get_target_idx = self._get_deterministic_target_idx
+            self._target_idx = [self._get_random_target_idx(_) for _ in range(len(self))]
+        else:
+            self._get_target_idx = self._get_random_target_idx
+            self._target_idx = None
 
-    def _reset_rng(self):
-        return np.random.default_rng(seed=42)
+    def _get_random_target_idx(self, _):
+        return self._rng.integers(0, self._target_len)
+
+    def _get_deterministic_target_idx(self, idx):
+        return self._target_idx[idx]
 
     def __getitem__(self, idx):
-        target_idx = self._rng.integers(0, self._target_len)
-        source = self.source[idx]
-        source_label = self.source_labels[idx]
-        target = self.target[target_idx]
+        target_idx = self._get_target_idx(idx)
+        source, source_label = self.source[idx]
+        target, _ = self.target[target_idx]
 
         return source, source_label, target
 
     def __len__(self):
-        return self.source.shape[0]
+        return len(self.source)

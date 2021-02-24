@@ -2,6 +2,7 @@ import unittest
 from unittest import mock
 
 import torch
+from torch.utils.data import TensorDataset
 
 import datasets
 from datasets import cmapss
@@ -193,9 +194,15 @@ class TestPairedDataset(unittest.TestCase):
 
 class TestAdaptionDataset(unittest.TestCase):
     def setUp(self):
+        self.source = TensorDataset(torch.arange(100), torch.arange(100))
+        self.target = TensorDataset(torch.arange(150), torch.arange(150))
         self.dataset = datasets.cmapss.AdaptionDataset(
-            torch.arange(100), torch.arange(100), torch.arange(150)
+            self.source,
+            self.target,
         )
+
+    def test_len(self):
+        self.assertEqual(len(self.dataset.source), len(self.dataset))
 
     def test_source_target_shuffeled(self):
         for i in range(len(self.dataset)):
@@ -204,3 +211,20 @@ class TestAdaptionDataset(unittest.TestCase):
             self.assertEqual(source_one, source_another)
             self.assertEqual(label_one, label_another)
             self.assertNotEqual(target_one, target_another)
+
+    def test_source_target_deterministic(self):
+        dataset = datasets.cmapss.AdaptionDataset(
+            self.source, self.target, deterministic=True
+        )
+        for i in range(len(dataset)):
+            source_one, label_one, target_one = dataset[i]
+            source_another, label_another, target_another = dataset[i]
+            self.assertEqual(source_one, source_another)
+            self.assertEqual(label_one, label_another)
+            self.assertEqual(target_one, target_another)
+
+    def test_source_sampled_completely(self):
+        for i in range(len(self.dataset)):
+            source, labels, _ = self.dataset[i]
+            self.assertEqual(i, source.item())
+            self.assertEqual(i, labels.item())

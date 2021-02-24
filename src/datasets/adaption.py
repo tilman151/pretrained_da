@@ -23,21 +23,21 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
         self.fd_source = fd_source
         self.fd_target = fd_target
         self.batch_size = batch_size
-        self.window_size = window_size or CMAPSSDataModule.WINDOW_SIZES[self.fd_target]
         self.max_rul = max_rul
         self.percent_broken = percent_broken
         self.percent_fail_runs = percent_fail_runs
         self.feature_select = feature_select
 
-        self.hparams = {
-            "fd_source": self.fd_source,
-            "fd_target": self.fd_target,
-            "batch_size": self.batch_size,
-            "window_size": self.window_size,
-            "max_rul": self.max_rul,
-            "percent_broken": self.percent_broken,
-            "percent_fail_runs": self.percent_fail_runs,
-        }
+        self.target = CMAPSSDataModule(
+            self.fd_target,
+            self.batch_size,
+            self.max_rul,
+            window_size,
+            self.percent_fail_runs,
+            self.percent_broken,
+            self.feature_select,
+        )
+        self.window_size = self.target.window_size
 
         self.source = CMAPSSDataModule(
             self.fd_source,
@@ -46,15 +46,6 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
             self.window_size,
             None,
             None,
-            self.feature_select,
-        )
-        self.target = CMAPSSDataModule(
-            self.fd_target,
-            self.batch_size,
-            self.max_rul,
-            self.window_size,
-            self.percent_fail_runs,
-            self.percent_broken,
             self.feature_select,
         )
         self.target_truncated = CMAPSSDataModule(
@@ -68,6 +59,16 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
             truncate_val=True,
         )
 
+        self.hparams = {
+            "fd_source": self.fd_source,
+            "fd_target": self.fd_target,
+            "batch_size": self.batch_size,
+            "window_size": self.window_size,
+            "max_rul": self.max_rul,
+            "percent_broken": self.percent_broken,
+            "percent_fail_runs": self.percent_fail_runs,
+        }
+
     def prepare_data(self, *args, **kwargs):
         self.source.prepare_data(*args, **kwargs)
         self.target.prepare_data(*args, **kwargs)
@@ -80,7 +81,7 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
         return DataLoader(
-            self._to_dataset("dev", use_target_labels=False),
+            self._to_dataset("dev"),
             batch_size=self.batch_size,
             shuffle=True,
             pin_memory=True,
@@ -101,10 +102,10 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
             self.target.test_dataloader(*args, **kwargs),
         ]
 
-    def _to_dataset(self, split, use_target_labels):
-        source, source_labels = self.source.data[split]
-        target, target_labels = self.target.data[split]
-        dataset = AdaptionDataset(source, source_labels, target)
+    def _to_dataset(self, split):
+        source = self.source.to_dataset(split)
+        target = self.target.to_dataset(split)
+        dataset = AdaptionDataset(source, target)
 
         return dataset
 
