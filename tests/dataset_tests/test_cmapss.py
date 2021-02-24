@@ -189,3 +189,18 @@ class TestPairedDataset(unittest.TestCase):
         self.assertListEqual([0, 100, 200], data._run_start_idx.tolist())
         self.assertListEqual([0, 1], data._run_idx.tolist())
         self.assertListEqual([0, 0], data._run_domain_idx.tolist())
+
+
+class TestAdaptionDataset(unittest.TestCase):
+    def setUp(self):
+        self.dataset = datasets.cmapss.AdaptionDataset(
+            torch.arange(100), torch.arange(100), torch.arange(150)
+        )
+
+    def test_source_target_shuffeled(self):
+        for i in range(len(self.dataset)):
+            source_one, label_one, target_one = self.dataset[i]
+            source_another, label_another, target_another = self.dataset[i]
+            self.assertEqual(source_one, source_another)
+            self.assertEqual(label_one, label_another)
+            self.assertNotEqual(target_one, target_another)

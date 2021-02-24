@@ -3,7 +3,7 @@ import unittest
 import torch
 
 import datasets
-from datasets.cmapss import PairedCMAPSS
+import datasets.cmapss
 from tests.data.templates import PretrainingDataModuleTemplate
 
 
@@ -107,21 +107,6 @@ class TestCMAPSSAdaption(unittest.TestCase):
         features, labels = batch
         self.assertEqual(torch.Size((16, 14, window_size)), features.shape)
         self.assertEqual(torch.Size((16,)), labels.shape)
-
-
-class TestAdaptionDataset(unittest.TestCase):
-    def setUp(self):
-        self.dataset = datasets.adaption.AdaptionDataset(
-            torch.arange(100), torch.arange(100), torch.arange(150)
-        )
-
-    def test_source_target_shuffeled(self):
-        for i in range(len(self.dataset)):
-            source_one, label_one, target_one = self.dataset[i]
-            source_another, label_another, target_another = self.dataset[i]
-            self.assertEqual(source_one, source_another)
-            self.assertEqual(label_one, label_another)
-            self.assertNotEqual(target_one, target_another)
 
 
 class TestPretrainingDataModuleFullData(unittest.TestCase, PretrainingDataModuleTemplate):

@@ -1,10 +1,9 @@
 from typing import List, Optional, Union
 
 import pytorch_lightning as pl
-import numpy as np
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 
-from datasets.cmapss import CMAPSSDataModule, PairedCMAPSS
+from datasets.cmapss import AdaptionDataset, CMAPSSDataModule, PairedCMAPSS
 
 
 class DomainAdaptionDataModule(pl.LightningDataModule):
@@ -118,30 +117,6 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
         )
 
         return paired
-
-
-class AdaptionDataset(Dataset):
-    def __init__(self, source, source_labels, target):
-        self.source = source
-        self.source_labels = source_labels
-        self.target = target
-        self._target_len = target.shape[0]
-
-        self._rng = self._reset_rng()
-
-    def _reset_rng(self):
-        return np.random.default_rng(seed=42)
-
-    def __getitem__(self, idx):
-        target_idx = self._rng.integers(0, self._target_len)
-        source = self.source[idx]
-        source_label = self.source_labels[idx]
-        target = self.target[target_idx]
-
-        return source, source_label, target
-
-    def __len__(self):
-        return self.source.shape[0]
 
 
 class PretrainingAdaptionDataModule(pl.LightningDataModule):

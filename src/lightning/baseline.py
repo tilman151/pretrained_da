@@ -86,26 +86,17 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        source, source_labels = batch
-        regression_loss, batch_size = self._evaluate(source, source_labels)
+        regression_loss, batch_size = self._evaluate(batch)
 
         return regression_loss, batch_size
 
     def test_step(self, batch, batch_idx, dataloader_idx):
-        source, source_labels, target, target_labels = batch
-        regression_loss, batch_size = self._evaluate(target, target_labels)
-
-        if self.record_embeddings:
-            domain_labels = torch.cat(
-                [torch.zeros_like(source_labels), torch.ones_like(source_labels)]
-            )
-            latent_code = self.encoder(torch.cat([source, target]))
-            ruls = torch.cat([source_labels, target_labels])
-            self.embedding_metric.update(latent_code, domain_labels, ruls)
+        regression_loss, batch_size = self._evaluate(batch)
 
         return regression_loss, batch_size
 
-    def _evaluate(self, features, labels):
+    def _evaluate(self, batch):
+        features, labels = batch
         batch_size = features.shape[0]
         predictions = self(features)
         regression_loss = self.criterion_regression(predictions.squeeze(), labels)

@@ -4,7 +4,7 @@ from typing import List, Optional, Union
 import numpy as np
 import pytorch_lightning as pl
 import torch
-from torch.utils.data import DataLoader, IterableDataset, TensorDataset
+from torch.utils.data import DataLoader, Dataset, IterableDataset, TensorDataset
 
 from datasets.loader import CMAPSSLoader
 
@@ -230,3 +230,27 @@ class PairedCMAPSS(IterableDataset):
         distances = torch.clamp_max(distances, max=1)  # max distance is max_rul
 
         return anchors, queries, distances, domain_label
+
+
+class AdaptionDataset(Dataset):
+    def __init__(self, source, source_labels, target):
+        self.source = source
+        self.source_labels = source_labels
+        self.target = target
+        self._target_len = target.shape[0]
+
+        self._rng = self._reset_rng()
+
+    def _reset_rng(self):
+        return np.random.default_rng(seed=42)
+
+    def __getitem__(self, idx):
+        target_idx = self._rng.integers(0, self._target_len)
+        source = self.source[idx]
+        source_label = self.source_labels[idx]
+        target = self.target[target_idx]
+
+        return source, source_label, target
+
+    def __len__(self):
+        return self.source.shape[0]

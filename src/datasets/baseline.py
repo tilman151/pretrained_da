@@ -1,28 +1,28 @@
 from typing import List, Optional, Union
 
 import pytorch_lightning as pl
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader
 
-from datasets.adaption import _unify_source_and_target_length
 from datasets.cmapss import CMAPSSDataModule, PairedCMAPSS
+from datasets.loader import CMAPSSLoader
 
 
 class BaselineDataModule(pl.LightningDataModule):
     def __init__(
         self,
-        fd_source,
-        batch_size,
-        max_rul=125,
-        window_size=None,
-        percent_fail_runs=None,
-        feature_select=None,
+        fd_source: int,
+        batch_size: int,
+        max_rul: int = 125,
+        window_size: int = None,
+        percent_fail_runs: float = None,
+        feature_select: float = None,
     ):
         super().__init__()
 
         self.fd_source = fd_source
         self.batch_size = batch_size
         self.max_rul = max_rul
-        self.window_size = window_size or CMAPSSDataModule.WINDOW_SIZES[self.fd_source]
+        self.window_size = window_size or CMAPSSLoader.WINDOW_SIZES[self.fd_source]
         self.percent_fail_runs = percent_fail_runs
         self.feature_select = feature_select
 
@@ -55,49 +55,18 @@ class BaselineDataModule(pl.LightningDataModule):
             cmapss_fd.setup(stage)
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
-        return DataLoader(
-            self._to_dataset(self.fd_source, split="dev"),
-            batch_size=self.batch_size,
-            shuffle=True,
-            pin_memory=True,
-        )
+        return self.cmapss[self.fd_source].train_dataloader()
 
-    def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        return DataLoader(
-            self._to_dataset(self.fd_source, split="val"),
-            batch_size=self.batch_size,
-            shuffle=False,
-            pin_memory=True,
-        )
+    def val_dataloader(self, *args, **kwargs) -> DataLoader:
+        return self.cmapss[self.fd_source].val_dataloader()
 
-    def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
+    def test_dataloader(self, *args, **kwargs) -> List[DataLoader]:
         test_dataloaders = []
         for fd_target in range(1, 5):
-            target_dl = DataLoader(
-                self._to_dataset(self.fd_source, fd_target, "test"),
-                batch_size=self.batch_size,
-                shuffle=False,
-                pin_memory=True,
-            )
+            target_dl = self.cmapss[fd_target].test_dataloader()
             test_dataloaders.append(target_dl)
 
         return test_dataloaders
-
-    def _to_dataset(self, fd_source, fd_target=None, split=None):
-        if split == "dev" or split == "val":
-            data = self.cmapss[fd_source].data[split]
-        elif split == "test":
-            source, source_labels = self.cmapss[fd_source].data[split]
-            target, target_labels = self.cmapss[fd_target].data[split]
-            data = _unify_source_and_target_length(
-                source, source_labels, target, target_labels
-            )
-        else:
-            raise ValueError(f"Invalid split {split}")
-
-        dataset = TensorDataset(*data)
-
-        return dataset
 
 
 class PretrainingBaselineDataModule(pl.LightningDataModule):

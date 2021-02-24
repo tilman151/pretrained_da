@@ -22,39 +22,33 @@ class TestCMAPSSBaseline(unittest.TestCase):
         dataset = datasets.BaselineDataModule(
             3, batch_size=16, percent_fail_runs=0.8, window_size=40
         )
-        dataset.prepare_data()
-        dataset.setup()
-        train_loader = dataset.train_dataloader()
+        for fd in dataset.cmapss.values():
+            self.assertEqual(40, fd.window_size)
 
-        batch, _ = next(iter(train_loader))
-        self.assertEqual(40, batch.shape[2])
+    def test_default_window_size(self):
+        window_sizes = [30, 20, 30, 15]
+        for i, win in enumerate(window_sizes, start=1):
+            dataset = datasets.BaselineDataModule(i, batch_size=16, percent_fail_runs=0.8)
+            for fd in dataset.cmapss.values():
+                self.assertEqual(win, fd.window_size)
 
     def test_train_batch_structure(self):
         train_loader = self.dataset.train_dataloader()
         self.assertIsInstance(train_loader.sampler, RandomSampler)
-        self._assert_train_val_batch_structure(train_loader)
+        self._assert_batch_structure(train_loader)
 
     def test_val_batch_structure(self):
         val_loader = self.dataset.val_dataloader()
         self.assertIsInstance(val_loader.sampler, SequentialSampler)
-        self._assert_train_val_batch_structure(val_loader)
+        self._assert_batch_structure(val_loader)
 
     def test_test_batch_structure(self):
-        window_size = datasets.cmapss.CMAPSSDataModule.WINDOW_SIZES[
-            self.dataset.fd_source
-        ]
         test_loaders = self.dataset.test_dataloader()
         for test_loader in test_loaders:
             self.assertIsInstance(test_loader.sampler, SequentialSampler)
-            batch = next(iter(test_loader))
-            self.assertEqual(4, len(batch))
-            source, source_labels, target, target_labels = batch
-            self.assertEqual(torch.Size((16, 14, window_size)), source.shape)
-            self.assertEqual(torch.Size((16, 14, window_size)), target.shape)
-            self.assertEqual(torch.Size((16,)), source_labels.shape)
-            self.assertEqual(torch.Size((16,)), target_labels.shape)
+            self._assert_batch_structure(test_loader)
 
-    def _assert_train_val_batch_structure(self, loader):
+    def _assert_batch_structure(self, loader):
         batch = next(iter(loader))
         self.assertEqual(2, len(batch))
         features, labels = batch
@@ -63,44 +57,22 @@ class TestCMAPSSBaseline(unittest.TestCase):
 
     def test_selected_source_on_train(self):
         fd_source = self.dataset.fd_source
-        baseline_train_dataset = self.dataset._to_dataset(fd_source, split="dev")
-        source_train_dataset = self.dataset.cmapss[fd_source]._to_dataset(
-            *self.dataset.cmapss[fd_source].data["dev"]
-        )
+        baseline_train_dataset = self.dataset.train_dataloader().dataset
+        source_train_dataset = self.dataset.cmapss[fd_source].train_dataloader().dataset
         self._assert_datasets_equal(baseline_train_dataset, source_train_dataset)
 
     def test_selected_source_on_val(self):
         fd_source = self.dataset.fd_source
-        baseline_train_dataset = self.dataset._to_dataset(fd_source, split="val")
-        source_train_dataset = self.dataset.cmapss[fd_source]._to_dataset(
-            *self.dataset.cmapss[fd_source].data["val"]
-        )
-        self._assert_datasets_equal(baseline_train_dataset, source_train_dataset)
+        baseline_val_dataset = self.dataset.val_dataloader().dataset
+        source_val_dataset = self.dataset.cmapss[fd_source].val_dataloader().dataset
+        self._assert_datasets_equal(baseline_val_dataset, source_val_dataset)
 
-    def test_selected_both_on_test(self):
-        fd_source = self.dataset.fd_source
-        fd_target = 1
-        baseline_train_dataset = self.dataset._to_dataset(
-            fd_source, fd_target, split="test"
-        )
-        combined_data = _unify_source_and_target_length(
-            *self.dataset.cmapss[fd_source].data["test"],
-            *self.dataset.cmapss[fd_target].data["test"],
-        )
-        source_train_dataset = TensorDataset(*combined_data)
-        self._assert_datasets_equal(baseline_train_dataset, source_train_dataset)
-
-    def test_received_all_datasets_on_test(self):
-        test_loaders = self.dataset.test_dataloader()
-        fd_source = self.dataset.fd_source
-        for fd_target, test_loader in enumerate(test_loaders, start=1):
-            test_data = test_loader.dataset
-            combined_data = _unify_source_and_target_length(
-                *self.dataset.cmapss[fd_source].data["test"],
-                *self.dataset.cmapss[fd_target].data["test"],
-            )
-            source_train_dataset = TensorDataset(*combined_data)
-            self._assert_datasets_equal(test_data, source_train_dataset)
+    def test_selected_all_on_test(self):
+        baseline_test_loaders = self.dataset.test_dataloader()
+        for fd, baseline_test_loader in enumerate(baseline_test_loaders, start=1):
+            baseline_test_dataset = baseline_test_loader.dataset
+            test_dataset = self.dataset.cmapss[fd].test_dataloader().dataset
+            self._assert_datasets_equal(baseline_test_dataset, test_dataset)
 
     def _assert_datasets_equal(self, baseline_dataset, inner_dataset):
         num_samples = len(baseline_dataset)
