@@ -87,11 +87,11 @@ class TestRegressor(unittest.TestCase, ModelTestsMixin):
     def setUp(self):
         self.net = networks.Regressor(64)
         self.test_inputs = torch.randn(16, 64)
-        self.expected_shape = (16, 1)
+        self.expected_shape = (16,)
 
 
 class TestDiscriminator(unittest.TestCase, ModelTestsMixin):
     def setUp(self):
         self.net = networks.DomainDiscriminator(64, 2, 32)
         self.test_inputs = torch.randn(16, 64)
-        self.expected_shape = (16, 1)
+        self.expected_shape = (16,)

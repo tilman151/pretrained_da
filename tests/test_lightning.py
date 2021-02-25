@@ -34,13 +34,13 @@ class TestDAAN(unittest.TestCase):
     def test_regressor(self):
         inputs = torch.randn(16, 64)
         outputs = self.net.regressor(inputs)
-        self.assertEqual(torch.Size((16, 1)), outputs.shape)
+        self.assertEqual(torch.Size((16,)), outputs.shape)
 
     @torch.no_grad()
     def test_domain_disc(self):
         inputs = torch.randn(16, 64)
         outputs = self.net.domain_disc(inputs)
-        self.assertEqual(torch.Size((16, 1)), outputs.shape)
+        self.assertEqual(torch.Size((16,)), outputs.shape)
 
     def test_batch_independence(self):
         inputs = torch.randn(16, 14, 30)
@@ -51,26 +51,24 @@ class TestDAAN(unittest.TestCase):
         outputs = self.net(inputs)
         self.net.train()
 
-        for n, output in enumerate(outputs):
-            with self.subTest(n_output=n):
-                # Mask loss for certain samples in batch
-                batch_size = output.shape[0]
-                mask_idx = torch.randint(0, batch_size, ())
-                mask = torch.ones_like(output)
-                mask[mask_idx] = 0
-                output = output * mask
+        # Mask loss for certain samples in batch
+        batch_size = outputs.shape[0]
+        mask_idx = torch.randint(0, batch_size, ())
+        mask = torch.ones_like(outputs)
+        mask[mask_idx] = 0
+        output = outputs * mask
 
-                # Compute backward pass
-                loss = output.mean()
-                loss.backward(retain_graph=True)
+        # Compute backward pass
+        loss = output.mean()
+        loss.backward(retain_graph=True)
 
-                # Check if gradient exists and is zero for masked samples
-                for i, grad in enumerate(inputs.grad[:batch_size]):
-                    if i == mask_idx:
-                        self.assertTrue(torch.all(grad == 0).item())
-                    else:
-                        self.assertTrue(not torch.all(grad == 0))
-                inputs.grad = None
+        # Check if gradient exists and is zero for masked samples
+        for i, grad in enumerate(inputs.grad[:batch_size]):
+            if i == mask_idx:
+                self.assertTrue(torch.all(grad == 0).item())
+            else:
+                self.assertTrue(not torch.all(grad == 0))
+        inputs.grad = None
 
     def test_all_parameters_updated(self):
         optim = torch.optim.SGD(self.net.parameters(), lr=0.1)
@@ -285,7 +283,7 @@ class TestBaseline(unittest.TestCase):
     def test_regressor(self):
         inputs = torch.randn(16, 64)
         outputs = self.net.regressor(inputs)
-        self.assertEqual(torch.Size((16, 1)), outputs.shape)
+        self.assertEqual(torch.Size((16,)), outputs.shape)
 
     def test_batch_independence(self):
         inputs = torch.randn(16, 14, 30)
@@ -296,26 +294,24 @@ class TestBaseline(unittest.TestCase):
         outputs = self.net(inputs)
         self.net.train()
 
-        for n, output in enumerate(outputs):
-            with self.subTest(n_output=n):
-                # Mask loss for certain samples in batch
-                batch_size = output.shape[0]
-                mask_idx = torch.randint(0, batch_size, ())
-                mask = torch.ones_like(output)
-                mask[mask_idx] = 0
-                output = output * mask
+        # Mask loss for certain samples in batch
+        batch_size = outputs.shape[0]
+        mask_idx = torch.randint(0, batch_size, ())
+        mask = torch.ones_like(outputs)
+        mask[mask_idx] = 0
+        output = outputs * mask
 
-                # Compute backward pass
-                loss = output.mean()
-                loss.backward(retain_graph=True)
+        # Compute backward pass
+        loss = output.mean()
+        loss.backward(retain_graph=True)
 
-                # Check if gradient exists and is zero for masked samples
-                for i, grad in enumerate(inputs.grad[:batch_size]):
-                    if i == mask_idx:
-                        self.assertTrue(torch.all(grad == 0).item())
-                    else:
-                        self.assertTrue(not torch.all(grad == 0))
-                inputs.grad = None
+        # Check if gradient exists and is zero for masked samples
+        for i, grad in enumerate(inputs.grad[:batch_size]):
+            if i == mask_idx:
+                self.assertTrue(torch.all(grad == 0).item())
+            else:
+                self.assertTrue(not torch.all(grad == 0))
+        inputs.grad = None
 
     def test_all_parameters_updated(self):
         optim = torch.optim.SGD(self.net.parameters(), lr=0.1)

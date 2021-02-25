@@ -124,11 +124,21 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         common = torch.cat([source, target])
         domain_prediction, prediction = self._complete_forward(common)
 
-        regression_loss = self.criterion_regression(prediction.squeeze(), source_labels)
-        domain_loss = self.criterion_domain(domain_prediction.squeeze(), domain_labels)
+        regression_loss = self.criterion_regression(prediction, source_labels)
+        domain_loss = self.criterion_domain(domain_prediction, domain_labels)
         loss = regression_loss + self.domain_trade_off * domain_loss
 
         return loss, regression_loss, domain_loss
+
+    def _complete_forward(self, common):
+        batch_size = common.shape[0] // 2
+
+        latent_code = self.encoder(common)
+        regression_code, _ = torch.split(latent_code, batch_size)
+        prediction = self.regressor(regression_code)
+        domain_prediction = self.domain_disc(latent_code)
+
+        return domain_prediction, prediction
 
     def on_validation_epoch_start(self):
         self._reset_all_metrics()
@@ -179,13 +189,13 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         domain_prediction = self.domain_disc(latent_code)
 
         if target:
-            self.target_regression_metric.update(prediction.squeeze(), labels)
-            rul_score = self.rul_score(prediction.squeeze(), labels)
+            self.target_regression_metric.update(prediction, labels)
+            rul_score = self.rul_score(prediction, labels)
             self.rul_score_metric.update(rul_score, batch_size)
         else:
-            self.source_regression_metric.update(prediction.squeeze(), labels)
+            self.source_regression_metric.update(prediction, labels)
 
-        domain_loss = self.criterion_domain(domain_prediction.squeeze(), domain_labels)
+        domain_loss = self.criterion_domain(domain_prediction, domain_labels)
         self.domain_loss_metric.update(domain_loss, batch_size)
 
         if record_embeddings:
@@ -207,13 +217,3 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         self.log(f"{tag}/regression_loss", self.target_regression_metric.compute())
         self.log(f"{tag}/domain_loss", self.domain_loss_metric.compute())
         self.log(f"{tag}/rul_score", self.rul_score_metric.compute())
-
-    def _complete_forward(self, common):
-        batch_size = common.shape[0] // 2
-
-        latent_code = self.encoder(common)
-        regression_code, _ = torch.split(latent_code, batch_size)
-        prediction = self.regressor(regression_code)
-        domain_prediction = self.domain_disc(latent_code)
-
-        return domain_prediction, prediction

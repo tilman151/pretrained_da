@@ -79,7 +79,7 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
     def training_step(self, batch, batch_idx):
         source, source_labels = batch
         predictions = self(source)
-        loss = self.criterion_regression(predictions.squeeze(), source_labels)
+        loss = self.criterion_regression(predictions, source_labels)
 
         self.log("train/regression_loss", loss)
 
@@ -99,7 +99,7 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         features, labels = batch
         batch_size = features.shape[0]
         predictions = self(features)
-        regression_loss = self.criterion_regression(predictions.squeeze(), labels)
+        regression_loss = self.criterion_regression(predictions, labels)
 
         return regression_loss, batch_size
 

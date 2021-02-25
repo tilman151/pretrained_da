@@ -95,7 +95,7 @@ class Regressor(nn.Module):
         return classifier
 
     def forward(self, inputs):
-        return self.layers(inputs)
+        return self.layers(inputs).squeeze(1)
 
 
 class DomainDiscriminator(nn.Module):
@@ -130,4 +130,4 @@ class DomainDiscriminator(nn.Module):
         return nn.Sequential(*sequence)
 
     def forward(self, inputs):
-        return self.layers(inputs)
+        return self.layers(inputs).squeeze(1)
