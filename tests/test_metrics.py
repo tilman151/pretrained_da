@@ -102,37 +102,50 @@ class TestRMSE(unittest.TestCase):
 
 class TestMeanMetric(unittest.TestCase):
     def setUp(self):
-        self.metric = metrics.MeanMetric()
+        self.mean_metric = metrics.SimpleMetric()
+        self.sum_metric = metrics.SimpleMetric(reduction="sum")
 
     def test_update(self):
         expected_loss, batch_size = self._add_one_batch()
-        self.assertEqual(1, self.metric.sample_counter)
-        self.assertEqual(expected_loss, self.metric.losses[0])
-        self.assertEqual(batch_size, self.metric.sizes[0])
+        self.assertEqual(1, self.mean_metric.sample_counter)
+        self.assertEqual(expected_loss, self.mean_metric.losses[0])
+        self.assertEqual(batch_size, self.mean_metric.sizes[0])
 
     def test_reset(self):
         self._add_one_batch()
-        self.metric.reset()
-        self.assertEqual(0, self.metric.sample_counter)
-        self.assertEqual(0, self.metric.losses.sum())
-        self.assertEqual(0, self.metric.sizes.sum())
+        self.mean_metric.reset()
+        self.assertEqual(0, self.mean_metric.sample_counter)
+        self.assertEqual(0, self.mean_metric.losses.sum())
+        self.assertEqual(0, self.mean_metric.sizes.sum())
 
     def _add_one_batch(self):
         batch_size = 100
         loss = torch.tensor(500)
 
-        self.metric.update(loss, batch_size)
+        self.mean_metric.update(loss, batch_size)
 
         return loss, batch_size
 
-    def test_compute(self):
+    def test_compute_mean(self):
         batch_sizes = [512] * 50 + [100]
         losses = torch.randn(sum(batch_sizes)) + 2
         expected_loss = losses.mean()
 
         batched_inputs = torch.split(losses, batch_sizes)
         for inp, sizes in zip(batched_inputs, batch_sizes):
-            self.metric.update(inp.mean(), sizes)
-        actual_loss = self.metric.compute()
+            self.mean_metric.update(inp.mean(), sizes)
+        actual_loss = self.mean_metric.compute()
 
         self.assertAlmostEqual(expected_loss.item(), actual_loss.item(), places=5)
+
+    def test_compute_sum(self):
+        batch_sizes = [512] * 50 + [100]
+        losses = torch.randn(sum(batch_sizes)) + 2
+        expected_loss = losses.sum()
+
+        batched_inputs = torch.split(losses, batch_sizes)
+        for inp, sizes in zip(batched_inputs, batch_sizes):
+            self.sum_metric.update(inp.sum(), sizes)
+        actual_loss = self.sum_metric.compute()
+
+        self.assertAlmostEqual(expected_loss.item(), actual_loss.item(), delta=0.1)
