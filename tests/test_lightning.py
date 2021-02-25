@@ -132,49 +132,133 @@ class TestDAAN(unittest.TestCase):
         self.assertTrue(self.net.encoder.norm_outputs)
 
     @mock.patch("pytorch_lightning.LightningModule.log")
+    @torch.no_grad()
     def test_metric_reduction(self, mock_log):
-        loss_source = torch.randn(10000) + 5
-        loss_target = torch.randn(10000) + 10
+        source_batches = 600
+        target_batches = 400
+        score_batches = target_batches
+        source_prediction = torch.randn(source_batches, 32) + 30
+        target_prediction = torch.randn(target_batches, 32) + 20
+        score_prediction = torch.randn(2 * score_batches, 32) + 10
+        prediction = torch.cat([source_prediction, target_prediction, score_prediction])
+        domain_pred = torch.rand(source_batches + target_batches, 32)
+        self._mock_predictions(prediction, domain_pred)
 
-        expected_rmse_source = torch.sqrt(loss_source.mean())
-        expected_rmse_target = torch.sqrt(loss_target.mean())
-        expected_domain_loss = torch.cat([loss_source, loss_target]).mean()
-        expected_rul_score = loss_target.sum()
-        expected_score = torch.sqrt(loss_target.mean())
+        self._feed_dummy_source(source_batches)
+        self._feed_dummy_target(target_batches)
+        self._feed_dummy_score(score_batches)
 
-        batch_sizes = [3000, 3000, 3000, 1000]
-        batched_rmse_source = [
-            torch.sqrt(r.mean()) for r in torch.split(loss_source, batch_sizes)
-        ]
-        batched_rmse_target = [
-            torch.sqrt(r.mean()) for r in torch.split(loss_target, batch_sizes)
-        ]
-        batched_loss_source = [r.mean() for r in torch.split(loss_source, batch_sizes)]
-        batched_loss_target = [r.mean() for r in torch.split(loss_target, batch_sizes)]
-        batched_rul_score = [r.sum() for r in torch.split(loss_target, batch_sizes)]
-        batched_source = list(
-            zip(batched_rmse_source, batched_loss_source, batched_rul_score, batch_sizes)
+        domain_labels = torch.cat(
+            [torch.ones_like(source_prediction), torch.zeros_like(target_prediction)]
         )
-        batched_target = list(
-            zip(batched_rmse_target, batched_loss_target, batched_rul_score, batch_sizes)
+        source_regression_loss = torch.sqrt(torch.mean(source_prediction ** 2))
+        target_regression_loss = torch.sqrt(torch.mean(target_prediction ** 2))
+        domain_loss = self.net.criterion_domain(domain_pred, domain_labels)
+        score = torch.sqrt(
+            torch.mean((score_prediction[1::2] - score_prediction[::2]) ** 2)
         )
-        batched_scores = list(zip(batched_loss_target, batch_sizes))
+        rul_score = self.net.rul_score(
+            target_prediction.view(-1), torch.zeros(target_batches * 32)
+        )
 
-        self.net.validation_epoch_end([batched_source, batched_target, batched_scores])
+        self.net.validation_epoch_end([])
         expected_logs = {
-            "val/regression_loss": expected_rmse_target,
-            "val/source_regression_loss": expected_rmse_source,
-            "val/domain_loss": expected_domain_loss,
-            "val/rul_score": expected_rul_score,
-            "val/score": expected_score,
+            "val/regression_loss": (target_regression_loss, 0.001),
+            "val/source_regression_loss": (source_regression_loss, 0.001),
+            "val/domain_loss": (domain_loss, 0.0001),
+            "val/score": (score, 0.001),
+            "val/rul_score": (rul_score, 0.1),
         }
 
         for call in mock_log.mock_calls:
             metric = call[1][0]
-            expected_value = expected_logs[metric].item()
+            expected_value, delta = expected_logs[metric]
+            expected_value = expected_value.item()
             actual_value = call[1][1].item()
             with self.subTest(metric):
-                self.assertAlmostEqual(expected_value, actual_value, places=5)
+                self.assertAlmostEqual(expected_value, actual_value, delta=delta)
+
+    def test_metric_updates(self):
+        source_batches = 600
+        target_batches = 400
+        score_batches = target_batches
+        num_batches = source_batches + target_batches
+        source_prediction = torch.randn(source_batches, 32) + 30
+        target_prediction = torch.randn(target_batches, 32) + 20
+        score_prediction = torch.randn(2 * score_batches, 32) + 10
+        prediction = torch.cat([source_prediction, target_prediction, score_prediction])
+        domain_pred = torch.rand(source_batches + target_batches, 32)
+        self._mock_predictions(prediction, domain_pred)
+
+        with self.subTest("source_data"):
+            self._feed_dummy_source(source_batches)
+            self.assertEqual(
+                source_batches, self.net.source_regression_metric.sample_counter
+            )
+            self.assertEqual(source_batches, self.net.domain_loss_metric.sample_counter)
+            self.assertEqual(0, self.net.target_regression_metric.sample_counter)
+            self.assertEqual(0, self.net.rul_score_metric.sample_counter)
+            self.assertEqual(0, self.net.score_metric.sample_counter)
+
+        with self.subTest("target_data"):
+            self._feed_dummy_target(target_batches)
+            self.assertEqual(
+                source_batches, self.net.source_regression_metric.sample_counter
+            )
+            self.assertEqual(
+                source_batches + target_batches,
+                self.net.domain_loss_metric.sample_counter,
+            )
+            self.assertEqual(
+                target_batches, self.net.target_regression_metric.sample_counter
+            )
+            self.assertEqual(target_batches, self.net.rul_score_metric.sample_counter)
+            self.assertEqual(0, self.net.score_metric.sample_counter)
+
+        with self.subTest("score_data"):
+            self._feed_dummy_score(score_batches)
+            self.assertEqual(
+                source_batches, self.net.source_regression_metric.sample_counter
+            )
+            self.assertEqual(num_batches, self.net.domain_loss_metric.sample_counter)
+            self.assertEqual(
+                target_batches, self.net.target_regression_metric.sample_counter
+            )
+            self.assertEqual(target_batches, self.net.rul_score_metric.sample_counter)
+            self.assertEqual(score_batches, self.net.score_metric.sample_counter)
+
+    def _mock_predictions(self, prediction, domain_pred):
+        self.net.regressor.forward = mock.MagicMock(side_effect=prediction)
+        self.net.domain_disc.forward = mock.MagicMock(side_effect=domain_pred)
+
+    def _feed_dummy_source(self, num_batches):
+        for i in range(num_batches):
+            self.net.validation_step(
+                (torch.zeros(32, 14, 30), torch.zeros(32)),
+                batch_idx=i,
+                dataloader_idx=0,
+            )
+
+    def _feed_dummy_target(self, num_batches):
+        for i in range(num_batches):
+            self.net.validation_step(
+                (torch.zeros(32, 14, 30), torch.zeros(32)),
+                batch_idx=i,
+                dataloader_idx=1,
+            )
+
+    def _feed_dummy_score(self, num_batches):
+        for i in range(num_batches):
+            self.net.validation_step(
+                (
+                    torch.zeros(32, 14, 30),
+                    torch.zeros(32, 14, 30),
+                    torch.zeros(32),
+                    torch.zeros(32),
+                ),
+                batch_idx=i,
+                dataloader_idx=2,
+            )
 
 
 class TestBaseline(unittest.TestCase):
