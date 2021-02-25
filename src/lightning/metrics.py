@@ -109,9 +109,13 @@ class RMSELoss(pl.metrics.Metric):
         return torch.sqrt(self.mse(inputs, targets))
 
 
-class MeanMetric(pl.metrics.Metric):
-    def __init__(self, num_elements: int = 1000):
+class SimpleMetric(pl.metrics.Metric):
+    def __init__(self, num_elements: int = 1000, reduction="mean"):
         super().__init__()
+
+        if reduction not in ["sum", "mean"]:
+            raise ValueError(f"Unsupported reduction {reduction}")
+        self.reduction = reduction
 
         self.add_state("losses", default=torch.zeros(num_elements), dist_reduce_fx=None)
         self.add_state("sizes", default=torch.zeros(num_elements), dist_reduce_fx=None)
@@ -123,10 +127,24 @@ class MeanMetric(pl.metrics.Metric):
         self.sample_counter += 1
 
     def compute(self) -> torch.Tensor:
+        if self.reduction == "mean":
+            loss = self._weighted_mean()
+        else:
+            loss = self._sum()
+
+        return loss
+
+    def _weighted_mean(self):
         weights = self.sizes[: self.sample_counter]
         weights = weights / weights.sum()
         loss = self.losses[: self.sample_counter]
         loss = torch.sum(loss * weights)
+
+        return loss
+
+    def _sum(self):
+        loss = self.losses[: self.sample_counter]
+        loss = torch.sum(loss)
 
         return loss
 
