@@ -99,6 +99,8 @@ class RMSELoss(pl.metrics.Metric):
         self.sample_counter += 1
 
     def compute(self) -> torch.Tensor:
+        if self.sample_counter == 0:
+            raise RuntimeError("RMSE metric was not used. Computation impossible.")
         summed_squares = self.losses[: self.sample_counter]
         batch_sizes = self.sizes[: self.sample_counter]
         rmse = torch.sqrt(summed_squares.sum() / batch_sizes.sum())
@@ -127,6 +129,8 @@ class SimpleMetric(pl.metrics.Metric):
         self.sample_counter += 1
 
     def compute(self) -> torch.Tensor:
+        if self.sample_counter == 0:
+            raise RuntimeError("RMSE metric was not used. Computation impossible.")
         if self.reduction == "mean":
             loss = self._weighted_mean()
         else:

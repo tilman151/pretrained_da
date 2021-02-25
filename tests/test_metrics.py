@@ -97,7 +97,11 @@ class TestRMSE(unittest.TestCase):
             self.metric.update(inp, tgt)
         actual_rmse = self.metric.compute()
 
-        self.assertEqual(expected_rmse, actual_rmse)
+        self.assertAlmostEqual(expected_rmse.item(), actual_rmse.item(), places=5)
+
+    def test_compute_fails_on_empty_metric(self):
+        with self.assertRaises(RuntimeError):
+            self.metric.compute()
 
 
 class TestMeanMetric(unittest.TestCase):
@@ -149,3 +153,9 @@ class TestMeanMetric(unittest.TestCase):
         actual_loss = self.sum_metric.compute()
 
         self.assertAlmostEqual(expected_loss.item(), actual_loss.item(), delta=0.1)
+
+    def test_compute_fails_on_empty_metric(self):
+        with self.assertRaises(RuntimeError):
+            self.mean_metric.compute()
+        with self.assertRaises(RuntimeError):
+            self.sum_metric.compute()
