@@ -131,6 +131,51 @@ class TestDAAN(unittest.TestCase):
         self.net.load_encoder("bogus", load_disc=False)
         self.assertTrue(self.net.encoder.norm_outputs)
 
+    @mock.patch("pytorch_lightning.LightningModule.log")
+    def test_metric_reduction(self, mock_log):
+        loss_source = torch.randn(10000) + 5
+        loss_target = torch.randn(10000) + 10
+
+        expected_rmse_source = torch.sqrt(loss_source.mean())
+        expected_rmse_target = torch.sqrt(loss_target.mean())
+        expected_domain_loss = torch.cat([loss_source, loss_target]).mean()
+        expected_rul_score = loss_target.sum()
+        expected_score = torch.sqrt(loss_target.mean())
+
+        batch_sizes = [3000, 3000, 3000, 1000]
+        batched_rmse_source = [
+            torch.sqrt(r.mean()) for r in torch.split(loss_source, batch_sizes)
+        ]
+        batched_rmse_target = [
+            torch.sqrt(r.mean()) for r in torch.split(loss_target, batch_sizes)
+        ]
+        batched_loss_source = [r.mean() for r in torch.split(loss_source, batch_sizes)]
+        batched_loss_target = [r.mean() for r in torch.split(loss_target, batch_sizes)]
+        batched_rul_score = [r.sum() for r in torch.split(loss_target, batch_sizes)]
+        batched_source = list(
+            zip(batched_rmse_source, batched_loss_source, batched_rul_score, batch_sizes)
+        )
+        batched_target = list(
+            zip(batched_rmse_target, batched_loss_target, batched_rul_score, batch_sizes)
+        )
+        batched_scores = list(zip(batched_loss_target, batch_sizes))
+
+        self.net.validation_epoch_end([batched_source, batched_target, batched_scores])
+        expected_logs = {
+            "val/regression_loss": expected_rmse_target,
+            "val/source_regression_loss": expected_rmse_source,
+            "val/domain_loss": expected_domain_loss,
+            "val/rul_score": expected_rul_score,
+            "val/score": expected_score,
+        }
+
+        for call in mock_log.mock_calls:
+            metric = call[1][0]
+            expected_value = expected_logs[metric].item()
+            actual_value = call[1][1].item()
+            with self.subTest(metric):
+                self.assertAlmostEqual(expected_value, actual_value, places=5)
+
 
 class TestBaseline(unittest.TestCase):
     def setUp(self):
