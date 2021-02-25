@@ -109,6 +109,28 @@ class RMSELoss(pl.metrics.Metric):
         return torch.sqrt(self.mse(inputs, targets))
 
 
+class MeanMetric(pl.metrics.Metric):
+    def __init__(self, num_elements: int = 1000):
+        super().__init__()
+
+        self.add_state("losses", default=torch.zeros(num_elements), dist_reduce_fx=None)
+        self.add_state("sizes", default=torch.zeros(num_elements), dist_reduce_fx=None)
+        self.add_state("sample_counter", default=torch.tensor(0), dist_reduce_fx=None)
+
+    def update(self, loss: torch.Tensor, batch_size: int):
+        self.losses[self.sample_counter] = loss
+        self.sizes[self.sample_counter] = batch_size
+        self.sample_counter += 1
+
+    def compute(self) -> torch.Tensor:
+        weights = self.sizes[: self.sample_counter]
+        weights = weights / weights.sum()
+        loss = self.losses[: self.sample_counter]
+        loss = torch.sum(loss * weights)
+
+        return loss
+
+
 class RULScore:
     def __init__(self, pos_factor=10, neg_factor=-13):
         self.pos_factor = pos_factor
