@@ -159,7 +159,6 @@ class TestDAAN(unittest.TestCase):
             target_prediction.view(-1), torch.zeros(target_batches * 32)
         )
 
-        self.net.validation_epoch_end([])
         expected_logs = {
             "val/regression_loss": (target_regression_loss, 0.001),
             "val/source_regression_loss": (source_regression_loss, 0.001),
@@ -167,7 +166,9 @@ class TestDAAN(unittest.TestCase):
             "val/score": (score, 0.001),
             "val/rul_score": (rul_score, 0.1),
         }
+        self.net.validation_epoch_end([])
 
+        mock_log.assert_called()
         for call in mock_log.mock_calls:
             metric = call[1][0]
             expected_value, delta = expected_logs[metric]
@@ -328,19 +329,92 @@ class TestBaseline(unittest.TestCase):
                     self.assertIsNotNone(param.grad)
                     self.assertNotEqual(0.0, torch.sum(param.grad ** 2))
 
+    @mock.patch("pytorch_lightning.LightningModule.log")
     @torch.no_grad()
-    def test_eval_metrics(self):
-        criterion = torch.nn.MSELoss()
-        target = torch.zeros(16, 14, 30)
-        target_labels = torch.ones(16)
+    def test_metric_val_reduction(self, mock_log):
+        source_batches = 600
+        source_prediction = torch.randn(source_batches, 32) + 30
+        self._mock_predictions(source_prediction)
 
-        expected_prediction = self.net.regressor(self.net.encoder(target))
-        expected_loss = torch.sqrt(
-            criterion(expected_prediction.squeeze(), target_labels)
-        )
-        actual_loss, _ = self.net.validation_step((target, target_labels), 0)
+        self._feed_dummy_val(source_batches)
 
-        self.assertEqual(expected_loss, actual_loss)
+        source_regression_loss = torch.sqrt(torch.mean(source_prediction ** 2))
+        expected_logs = {
+            "val/regression_loss": (source_regression_loss, 0.001),
+        }
+        self.net.validation_epoch_end([])
+
+        self._assert_logs(mock_log, expected_logs)
+
+    def test_metric_val_updates(self):
+        source_batches = 600
+        source_prediction = torch.randn(source_batches, 32) + 30
+        self._mock_predictions(source_prediction)
+
+        self._feed_dummy_val(source_batches)
+        self.assertEqual(source_batches, self.net.regression_metrics[1].sample_counter)
+
+    @mock.patch("pytorch_lightning.LightningModule.log")
+    @torch.no_grad()
+    def test_metric_test_reduction(self, mock_log):
+        source_batches = 600
+        source_prediction = [
+            torch.randn(source_batches, 32) + i * 10 for i in range(1, 5)
+        ]
+        self._mock_predictions(torch.cat(source_prediction))
+
+        self._feed_dummy_test(source_batches)
+
+        expected_logs = {}
+        for i in range(4):
+            source_regression_loss = torch.sqrt(torch.mean(source_prediction[i] ** 2))
+            metric_name = f"test/regression_loss_fd{i+1}"
+            expected_logs[metric_name] = (source_regression_loss, 0.001)
+        self.net.test_epoch_end([])
+
+        self._assert_logs(mock_log, expected_logs)
+
+    def test_metric_test_updates(self):
+        source_batches = 600
+        source_prediction = [
+            torch.randn(source_batches, 32) + i * 10 for i in range(1, 5)
+        ]
+        self._mock_predictions(torch.cat(source_prediction))
+
+        self._feed_dummy_test(source_batches)
+        for fd in range(1, 5):
+            self.assertEqual(
+                source_batches, self.net.regression_metrics[fd].sample_counter
+            )
+
+    def _mock_predictions(self, prediction):
+        self.net.regressor.forward = mock.MagicMock(side_effect=prediction)
+
+    def _feed_dummy_val(self, num_batches):
+        for i in range(num_batches):
+            self.net.validation_step(
+                (torch.zeros(32, 14, 30), torch.zeros(32)),
+                batch_idx=i,
+            )
+
+    def _feed_dummy_test(self, num_batches):
+        for fd in range(4):
+            for i in range(num_batches):
+                self.net.test_step(
+                    (torch.zeros(32, 14, 30), torch.zeros(32)),
+                    batch_idx=i,
+                    dataloader_idx=fd,
+                )
+
+    def _assert_logs(self, mock_log, expected_logs):
+        mock_log.assert_called()
+        for call in mock_log.mock_calls:
+            metric = call[1][0]
+            expected_value, delta = expected_logs[metric]
+            expected_value = expected_value.item()
+            actual_value = call[1][1].item()
+            with self.subTest(metric):
+                self.assertAlmostEqual(expected_value, actual_value, delta=delta)
 
 
 class TestUnsupervisedPretraining(unittest.TestCase):
