@@ -97,7 +97,7 @@ class TestRMSE(unittest.TestCase):
             self.metric.update(inp, tgt)
         actual_rmse = self.metric.compute()
 
-        self.assertAlmostEqual(expected_rmse.item(), actual_rmse.item(), places=5)
+        self.assertAlmostEqual(expected_rmse.item(), actual_rmse.item(), delta=0.001)
 
     def test_compute_fails_on_empty_metric(self):
         with self.assertRaises(RuntimeError):
