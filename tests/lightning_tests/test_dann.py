@@ -73,7 +73,7 @@ class TestDAAN(unittest.TestCase):
     def test_all_parameters_updated(self):
         optim = torch.optim.SGD(self.net.parameters(), lr=0.1)
 
-        loss, *_ = self.net._train(
+        loss, *_ = self.net._get_losses(
             torch.randn(16, 14, 30),
             torch.ones(16),
             torch.randn(16, 14, 30),
@@ -88,23 +88,40 @@ class TestDAAN(unittest.TestCase):
                     self.assertIsNotNone(param.grad)
                     self.assertNotEqual(0.0, torch.sum(param.grad ** 2))
 
+    @mock.patch("pytorch_lightning.LightningModule.log")
     @torch.no_grad()
-    def test_train_metrics(self):
+    def test_train_metrics(self, mock_log):
         criterion = torch.nn.MSELoss()
-        target = torch.zeros(16, 14, 30)
         source = torch.zeros(16, 14, 30)
-        target_labels = torch.ones(16)
-        domain_labels = torch.cat(
-            [torch.zeros_like(target_labels), torch.ones_like(target_labels)]
+        target = torch.zeros(16, 14, 30)
+        source_labels = torch.ones(16)
+
+        source_embeddings = self.net.encoder(source)
+        target_embeddings = self.net.encoder(target)
+        source_prediction = self.net.regressor(source_embeddings)
+        regression_loss = torch.sqrt(criterion(source_prediction, source_labels))
+        source_domain_pred = self.net.domain_disc(source_embeddings)
+        target_domain_pred = self.net.domain_disc(target_embeddings)
+        source_domain_loss = self.net.criterion_domain(
+            source_domain_pred, torch.ones_like(source_domain_pred)
+        )
+        target_domain_loss = self.net.criterion_domain(
+            target_domain_pred, torch.zeros_like(target_domain_pred)
+        )
+        domain_loss = (source_domain_loss + target_domain_loss) / 2
+        expected_overall_loss = regression_loss + self.net.domain_trade_off * domain_loss
+
+        actual_overall_loss = self.net.training_step((source, source_labels, target), 0)
+        self.assertAlmostEqual(
+            expected_overall_loss.item(), actual_overall_loss.item(), delta=0.001
         )
 
-        expected_prediction = self.net.regressor(self.net.encoder(target))
-        expected_loss = torch.sqrt(
-            criterion(expected_prediction.squeeze(), target_labels)
-        )
-        _, actual_loss, _ = self.net._train(target, target_labels, source, domain_labels)
-
-        self.assertEqual(expected_loss, actual_loss)
+        expected_logs = {
+            "train/regression_loss": (regression_loss, 0.001),
+            "train/loss": (expected_overall_loss, 0.001),
+            "train/domain_loss": (domain_loss, 0.0001),
+        }
+        self._assert_logs(mock_log, expected_logs)
 
     def test_norm_output(self):
         with self.subTest(norm=False):
@@ -167,10 +184,13 @@ class TestDAAN(unittest.TestCase):
             "val/rul_score": (rul_score, 0.1),
         }
         self.net.validation_epoch_end([])
+        self._assert_logs(mock_log, expected_logs)
 
+    def _assert_logs(self, mock_log, expected_logs):
         mock_log.assert_called()
         for call in mock_log.mock_calls:
             metric = call[1][0]
+            self.assertIn(metric, expected_logs, "Unexpected logged metric found.")
             expected_value, delta = expected_logs[metric]
             expected_value = expected_value.item()
             actual_value = call[1][1].item()

@@ -110,7 +110,7 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
             [torch.ones_like(source_labels), torch.zeros_like(source_labels)]
         )
         # Predict on source and reconstruct/domain classify both
-        loss, regression_loss, domain_loss = self._train(
+        loss, regression_loss, domain_loss = self._get_losses(
             source, source_labels, target, domain_labels
         )
 
@@ -120,7 +120,7 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
 
         return loss
 
-    def _train(self, source, source_labels, target, domain_labels):
+    def _get_losses(self, source, source_labels, target, domain_labels):
         domain_prediction, prediction = self._train_forward(source, target)
         regression_loss = self.criterion_regression(prediction, source_labels)
         domain_loss = self.criterion_domain(domain_prediction, domain_labels)
@@ -209,17 +209,17 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
             latent_code = self.encoder(target)
             self.embedding_metric.update(latent_code, domain_labels, labels)
 
-    def _evaluate_pairs(self, anchors, queries, true_distances):
-        anchor_rul = self.forward(anchors)
-        query_rul = self.forward(queries)
-        distances = query_rul - anchor_rul
-        self.target_checkpoint_score_metric.update(distances, true_distances * 125)
-
     def _eval_forward(self, features):
         latent_code = self.encoder(features)
         prediction = self.regressor(latent_code)
         domain_prediction = self.domain_disc(latent_code)
         return domain_prediction, prediction
+
+    def _evaluate_pairs(self, anchors, queries, true_distances):
+        anchor_rul = self.forward(anchors)
+        query_rul = self.forward(queries)
+        distances = query_rul - anchor_rul
+        self.target_checkpoint_score_metric.update(distances, true_distances * 125)
 
     def validation_epoch_end(self, outputs):
         if self.record_embeddings:

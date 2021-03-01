@@ -156,6 +156,7 @@ class TestBaseline(unittest.TestCase):
         mock_log.assert_called()
         for call in mock_log.mock_calls:
             metric = call[1][0]
+            self.assertIn(metric, expected_logs, "Unexpected logged metric found.")
             expected_value, delta = expected_logs[metric]
             expected_value = expected_value.item()
             actual_value = call[1][1].item()
