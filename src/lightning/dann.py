@@ -63,11 +63,11 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         self.rul_score = metrics.RULScore()
 
         self.embedding_metric = metrics.EmbeddingViz(40000, self.latent_dim)
-        self.target_regression_metric = metrics.RMSELoss()
         self.source_regression_metric = metrics.RMSELoss()
-        self.score_metric = metrics.RMSELoss()
+        self.target_regression_metric = metrics.RMSELoss()
+        self.target_rul_score_metric = metrics.SimpleMetric(reduction="sum")
+        self.target_checkpoint_score_metric = metrics.RMSELoss()
         self.domain_loss_metric = metrics.SimpleMetric()
-        self.rul_score_metric = metrics.SimpleMetric(reduction="sum")
 
         self.save_hyperparameters()
 
@@ -121,17 +121,16 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         return loss
 
     def _train(self, source, source_labels, target, domain_labels):
-        common = torch.cat([source, target])
-        domain_prediction, prediction = self._complete_forward(common)
-
+        domain_prediction, prediction = self._train_forward(source, target)
         regression_loss = self.criterion_regression(prediction, source_labels)
         domain_loss = self.criterion_domain(domain_prediction, domain_labels)
         loss = regression_loss + self.domain_trade_off * domain_loss
 
         return loss, regression_loss, domain_loss
 
-    def _complete_forward(self, common):
-        batch_size = common.shape[0] // 2
+    def _train_forward(self, source, target):
+        batch_size = source.shape[0]
+        common = torch.cat([source, target])
 
         latent_code = self.encoder(common)
         regression_code, _ = torch.split(latent_code, batch_size)
@@ -150,57 +149,77 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         self.embedding_metric.reset()
         self.source_regression_metric.reset()
         self.target_regression_metric.reset()
-        self.score_metric.reset()
-        self.rul_score_metric.reset()
+        self.target_checkpoint_score_metric.reset()
+        self.target_rul_score_metric.reset()
 
     def validation_step(self, batch, batch_idx, dataloader_idx):
-        return self._choose_step_by_dataloader(batch, dataloader_idx)
+        return self._choose_step_by_dataloader(
+            batch, dataloader_idx, self.record_embeddings
+        )
 
     def test_step(self, batch, batch_idx, dataloader_idx):
-        return self._choose_step_by_dataloader(batch, dataloader_idx)
+        return self._choose_step_by_dataloader(
+            batch, dataloader_idx, record_embeddings=False
+        )
 
-    def _choose_step_by_dataloader(self, batch, dataloader_idx):
-        if dataloader_idx < 2:
+    def _choose_step_by_dataloader(self, batch, dataloader_idx, record_embeddings):
+        if dataloader_idx == 0:
             features, labels = batch
-            domain_labels = (
-                torch.ones_like(labels)
-                if dataloader_idx == 0
-                else torch.zeros_like(labels)
-            )
-            target = dataloader_idx == 1
-            self._evaluate(
+            self._evaluate_source(
                 features,
                 labels,
-                domain_labels,
-                target,
-                record_embeddings=self.record_embeddings,
+                record_embeddings,
+            )
+        elif dataloader_idx == 1:
+            features, labels = batch
+            self._evaluate_target(
+                features,
+                labels,
+                record_embeddings,
             )
         else:
             anchors, queries, true_distances, _ = batch
-            anchor_rul = self.forward(anchors)
-            query_rul = self.forward(queries)
-            distances = query_rul - anchor_rul
-            self.score_metric.update(distances.squeeze(), true_distances * 125)
+            self._evaluate_pairs(anchors, queries, true_distances)
 
-    def _evaluate(self, features, labels, domain_labels, target, record_embeddings=False):
-        batch_size = features.shape[0]
-        latent_code = self.encoder(features)
-        prediction = self.regressor(latent_code)
-        domain_prediction = self.domain_disc(latent_code)
+    def _evaluate_source(self, source, labels, record_embeddings=False):
+        batch_size = source.shape[0]
+        domain_labels = torch.ones_like(labels)
+        domain_prediction, prediction = self._eval_forward(source)
 
-        if target:
-            self.target_regression_metric.update(prediction, labels)
-            rul_score = self.rul_score(prediction, labels)
-            self.rul_score_metric.update(rul_score, batch_size)
-        else:
-            self.source_regression_metric.update(prediction, labels)
-
+        self.source_regression_metric.update(prediction, labels)
         domain_loss = self.criterion_domain(domain_prediction, domain_labels)
         self.domain_loss_metric.update(domain_loss, batch_size)
 
         if record_embeddings:
-            latent_code = self.encoder(features)
+            latent_code = self.encoder(source)
             self.embedding_metric.update(latent_code, domain_labels, labels)
+
+    def _evaluate_target(self, target, labels, record_embeddings=False):
+        batch_size = target.shape[0]
+        domain_labels = torch.zeros_like(labels)
+        domain_prediction, prediction = self._eval_forward(target)
+
+        self.target_regression_metric.update(prediction, labels)
+        rul_score = self.rul_score(prediction, labels)
+        self.target_rul_score_metric.update(rul_score, batch_size)
+        domain_loss = self.criterion_domain(domain_prediction, domain_labels)
+        self.domain_loss_metric.update(domain_loss, batch_size)
+
+        if record_embeddings:
+            latent_code = self.encoder(target)
+            self.embedding_metric.update(latent_code, domain_labels, labels)
+
+    def _evaluate_pairs(self, anchors, queries, true_distances):
+        anchor_rul = self.forward(anchors)
+        query_rul = self.forward(queries)
+        distances = query_rul - anchor_rul
+        self.target_checkpoint_score_metric.update(distances, true_distances * 125)
+
+    def _eval_forward(self, features):
+        latent_code = self.encoder(features)
+        prediction = self.regressor(latent_code)
+        domain_prediction = self.domain_disc(latent_code)
+        return domain_prediction, prediction
 
     def validation_epoch_end(self, outputs):
         if self.record_embeddings:
@@ -209,11 +228,11 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         self.log("val/regression_loss", self.target_regression_metric.compute())
         self.log("val/source_regression_loss", self.source_regression_metric.compute())
         self.log("val/domain_loss", self.domain_loss_metric.compute())
-        self.log("val/rul_score", self.rul_score_metric.compute())
-        self.log("val/score", self.score_metric.compute())
+        self.log("val/rul_score", self.target_rul_score_metric.compute())
+        self.log("val/score", self.target_checkpoint_score_metric.compute())
 
     def test_epoch_end(self, outputs):
         tag = f"test/{self.test_tag}" if self.test_tag else "test"
         self.log(f"{tag}/regression_loss", self.target_regression_metric.compute())
         self.log(f"{tag}/domain_loss", self.domain_loss_metric.compute())
-        self.log(f"{tag}/rul_score", self.rul_score_metric.compute())
+        self.log(f"{tag}/rul_score", self.target_rul_score_metric.compute())
