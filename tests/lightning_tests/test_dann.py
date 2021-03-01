@@ -196,8 +196,8 @@ class TestDAAN(unittest.TestCase):
             )
             self.assertEqual(source_batches, self.net.domain_loss_metric.sample_counter)
             self.assertEqual(0, self.net.target_regression_metric.sample_counter)
-            self.assertEqual(0, self.net.rul_score_metric.sample_counter)
-            self.assertEqual(0, self.net.score_metric.sample_counter)
+            self.assertEqual(0, self.net.target_rul_score_metric.sample_counter)
+            self.assertEqual(0, self.net.target_checkpoint_score_metric.sample_counter)
 
         with self.subTest("target_data"):
             self._feed_dummy_target(target_batches)
@@ -211,8 +211,10 @@ class TestDAAN(unittest.TestCase):
             self.assertEqual(
                 target_batches, self.net.target_regression_metric.sample_counter
             )
-            self.assertEqual(target_batches, self.net.rul_score_metric.sample_counter)
-            self.assertEqual(0, self.net.score_metric.sample_counter)
+            self.assertEqual(
+                target_batches, self.net.target_rul_score_metric.sample_counter
+            )
+            self.assertEqual(0, self.net.target_checkpoint_score_metric.sample_counter)
 
         with self.subTest("score_data"):
             self._feed_dummy_score(score_batches)
@@ -223,8 +225,12 @@ class TestDAAN(unittest.TestCase):
             self.assertEqual(
                 target_batches, self.net.target_regression_metric.sample_counter
             )
-            self.assertEqual(target_batches, self.net.rul_score_metric.sample_counter)
-            self.assertEqual(score_batches, self.net.score_metric.sample_counter)
+            self.assertEqual(
+                target_batches, self.net.target_rul_score_metric.sample_counter
+            )
+            self.assertEqual(
+                score_batches, self.net.target_checkpoint_score_metric.sample_counter
+            )
 
     def _mock_predictions(self, prediction, domain_pred):
         self.net.regressor.forward = mock.MagicMock(side_effect=prediction)
