@@ -520,3 +520,70 @@ class TestUnsupervisedPretraining(unittest.TestCase):
                 with self.subTest(name=param_name):
                     self.assertIsNotNone(param.grad)
                     self.assertNotEqual(0.0, torch.sum(param.grad ** 2))
+
+    @mock.patch("pytorch_lightning.LightningModule.log")
+    @torch.no_grad()
+    def test_metric_val_reduction(self, mock_log):
+        paired_batches = 600
+        anchor_embeddings = torch.randn(paired_batches, 32, 64)
+        query_embeddings = torch.randn(paired_batches, 32, 64)
+        domain_predictions = torch.randn(paired_batches, 32)
+        self._mock_predictions(anchor_embeddings, query_embeddings, domain_predictions)
+
+        self._feed_dummy_val(paired_batches)
+
+        regression_loss = torch.pairwise_distance(
+            anchor_embeddings.view(-1, 64), query_embeddings.view(-1, 64), eps=1e-8
+        )
+        regression_loss = torch.mean(regression_loss ** 2)
+        domain_labels = torch.zeros_like(domain_predictions)
+        domain_loss = self.net.criterion_domain(domain_predictions, domain_labels)
+        checkpoint_score = regression_loss - 0.1 * domain_loss
+        expected_logs = {
+            "val/regression_loss": (regression_loss, 0.0001),
+            "val/domain_loss": (domain_loss, 0.0001),
+            "val/checkpoint_score": (checkpoint_score, 0.0001),
+        }
+        self.net.validation_epoch_end([])
+
+        self._assert_logs(mock_log, expected_logs)
+
+    def test_metric_val_updates(self):
+        paired_batches = 600
+        anchor_embeddings = torch.randn(paired_batches, 32, 64)
+        query_embeddings = torch.randn(paired_batches, 32, 64)
+        domain_predictions = torch.randn(paired_batches, 32)
+        self._mock_predictions(anchor_embeddings, query_embeddings, domain_predictions)
+
+        self._feed_dummy_val(paired_batches)
+        self.assertEqual(paired_batches, self.net.regression_metric.sample_counter)
+        self.assertEqual(paired_batches, self.net.domain_metric.sample_counter)
+
+    def _mock_predictions(self, anchor_embeddings, query_embeddings, domain_predictions):
+        embeddings = torch.cat([anchor_embeddings, query_embeddings], dim=1)
+        self.net.encoder.forward = mock.MagicMock(side_effect=embeddings)
+        self.net.domain_disc.forward = mock.MagicMock(side_effect=domain_predictions)
+
+    def _feed_dummy_val(self, num_batches):
+        for i in range(num_batches):
+            self.net.validation_step(
+                (
+                    torch.zeros(32, 14, 30),
+                    torch.zeros(32, 14, 30),
+                    torch.zeros(32),
+                    torch.zeros(32),
+                ),
+                batch_idx=i,
+                dataloader_idx=0,
+            )
+
+    def _assert_logs(self, mock_log, expected_logs):
+        mock_log.assert_called()
+        for call in mock_log.mock_calls:
+            metric = call[1][0]
+            self.assertIn(metric, expected_logs, "Unexpected logged metric found.")
+            expected_value, delta = expected_logs[metric]
+            expected_value = expected_value.item()
+            actual_value = call[1][1].item()
+            with self.subTest(metric):
+                self.assertAlmostEqual(expected_value, actual_value, delta=delta)

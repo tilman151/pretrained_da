@@ -58,9 +58,13 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
             )
         else:
             self.domain_disc = None
+
         self.criterion_regression = nn.MSELoss()
         self.criterion_domain = nn.BCEWithLogitsLoss()
+
         self.embedding_metric = metrics.EmbeddingViz(40000, self.latent_dim)
+        self.regression_metric = metrics.SimpleMetric(40000)
+        self.domain_metric = metrics.SimpleMetric(40000)
 
         self.save_hyperparameters()
 
@@ -77,22 +81,6 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
 
         return pred_distances
 
-    def _pairwise_distance(self, anchor_embeddings, query_embeddings):
-        return torch.pairwise_distance(anchor_embeddings, query_embeddings, eps=1e-8)
-
-    def _get_anchor_query_embeddings(self, anchors, queries):
-        batch_size = anchors.shape[0]
-        combined = torch.cat([anchors, queries])
-        embeddings = self._get_embeddings(combined)
-        anchor_embeddings, query_embeddings = torch.split(embeddings, batch_size)
-
-        return anchor_embeddings, query_embeddings
-
-    def _get_embeddings(self, inputs):
-        embeddings = self.encoder(inputs)
-
-        return embeddings
-
     def training_step(self, batch, batch_idx):
         regression_loss, domain_loss = self._get_losses(batch)
         loss = regression_loss + self.domain_tradeoff * domain_loss
@@ -102,10 +90,20 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
 
         return loss
 
+    def on_validation_epoch_start(self):
+        self._reset_all_metrics()
+
+    def _reset_all_metrics(self):
+        self.embedding_metric.reset()
+        self.regression_metric.reset()
+        self.domain_metric.reset()
+
     def validation_step(self, batch, batch_idx, dataloader_idx):
         if dataloader_idx == 0:
             regression_loss, domain_loss = self._get_losses(batch)
-            return regression_loss, domain_loss, batch[0].shape[0]
+            batch_size = batch[0].shape[0]
+            self.regression_metric.update(regression_loss, batch_size)
+            self.domain_metric.update(domain_loss, batch_size)
         elif self.record_embeddings:
             self._record_embeddings(batch, dataloader_idx)
 
@@ -121,16 +119,9 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         if self.record_embeddings:
             embedding_fig = self.embedding_metric.compute()
             self.logger.log_figure("val/embeddings", embedding_fig, self.global_step)
-            self.embedding_metric.reset()
 
-        val_loss = validation_step_outputs[0]
-        _, _, batch_sizes = zip(*val_loss)
-        regression_loss = sum(
-            loss * batch_size for loss, _, batch_size in val_loss
-        ) / sum(batch_sizes)
-        domain_loss = sum(loss * batch_size for _, loss, batch_size in val_loss) / sum(
-            batch_sizes
-        )
+        regression_loss = self.regression_metric.compute()
+        domain_loss = self.domain_metric.compute()
 
         self.log("val/regression_loss", regression_loss)
         self.log("val/domain_loss", domain_loss)
@@ -151,3 +142,14 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
             domain_loss = 0
 
         return regression_loss, domain_loss
+
+    def _pairwise_distance(self, anchor_embeddings, query_embeddings):
+        return torch.pairwise_distance(anchor_embeddings, query_embeddings, eps=1e-8)
+
+    def _get_anchor_query_embeddings(self, anchors, queries):
+        batch_size = anchors.shape[0]
+        combined = torch.cat([anchors, queries])
+        embeddings = self.encoder(combined)
+        anchor_embeddings, query_embeddings = torch.split(embeddings, batch_size)
+
+        return anchor_embeddings, query_embeddings
