@@ -83,6 +83,13 @@ class TestEncoder(unittest.TestCase, ModelTestsMixin):
         self.expected_shape = (16, 64)
 
 
+class TestDecoder(unittest.TestCase, ModelTestsMixin):
+    def setUp(self):
+        self.net = networks.Decoder(14, 16, 3, 6, 64, 30, 0.1)
+        self.test_inputs = torch.randn(16, 64)
+        self.expected_shape = (16, 14, 30)
+
+
 class TestRegressor(unittest.TestCase, ModelTestsMixin):
     def setUp(self):
         self.net = networks.Regressor(64)
