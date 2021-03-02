@@ -125,7 +125,6 @@ def build_pretraining(
     seed,
     version,
 ):
-    pl.trainer.seed_everything(seed)
     logger = loggers.MLTBLogger(
         get_logdir(),
         loggers.pretraining_experiment_name(source, target),
