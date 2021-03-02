@@ -76,6 +76,7 @@ class AutoencoderPretraining(pl.LightningModule, DataHparamsMixin):
         self.domain_metric = metrics.SimpleMetric(40000)
 
         self.save_hyperparameters()
+        self.hparams["mode"] = "autoencoder"
 
     def configure_optimizers(self):
         return torch.optim.Adam(

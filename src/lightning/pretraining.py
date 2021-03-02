@@ -67,6 +67,7 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         self.domain_metric = metrics.SimpleMetric(40000)
 
         self.save_hyperparameters()
+        self.hparams["mode"] = "metric"
 
     def configure_optimizers(self):
         return torch.optim.Adam(

@@ -23,6 +23,11 @@ class TestUnsupervisedPretraining(unittest.TestCase):
             lr=0.01,
         )
 
+    def test_mode_hparam(self):
+        self.assertLess(1, len(self.net.hparams))
+        self.assertIn("mode", self.net.hparams)
+        self.assertEqual("metric", self.net.hparams["mode"])
+
     @torch.no_grad()
     def test_encoder(self):
         inputs = torch.randn(16, 14, 30)
