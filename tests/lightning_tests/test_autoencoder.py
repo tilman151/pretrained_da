@@ -101,8 +101,8 @@ class TestUnsupervisedPretraining(unittest.TestCase):
     @torch.no_grad()
     def test_metric_val_reduction(self, mock_log):
         num_batches = 600
-        embeddings = torch.randn(num_batches, 32, 64)
-        reconstructions = torch.randn(num_batches, 32, 14, 30)
+        embeddings = torch.randn(num_batches, 64, 64)
+        reconstructions = torch.randn(num_batches, 64, 14, 30)
         domain_predictions = torch.randn(num_batches, 32)
         self._mock_predictions(embeddings, reconstructions, domain_predictions)
 
@@ -123,8 +123,8 @@ class TestUnsupervisedPretraining(unittest.TestCase):
 
     def test_metric_val_updates(self):
         num_batches = 600
-        embeddings = torch.randn(num_batches, 32, 64)
-        reconstructions = torch.randn(num_batches, 32, 14, 30)
+        embeddings = torch.randn(num_batches, 64, 64)
+        reconstructions = torch.randn(num_batches, 64, 14, 30)
         domain_predictions = torch.randn(num_batches, 32)
         self._mock_predictions(embeddings, reconstructions, domain_predictions)
 

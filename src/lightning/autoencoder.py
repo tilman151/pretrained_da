@@ -137,12 +137,14 @@ class AutoencoderPretraining(pl.LightningModule, DataHparamsMixin):
 
     def _get_losses(self, batch):
         anchors, queries, true_distances, domain_labels = batch
-        anchor_embeddings = self.encoder(anchors)
-        outputs = self.decoder(anchor_embeddings)
-        regression_loss = self.criterion_regression(outputs, anchors)
+        combined = torch.cat([anchors, queries])
+        embeddings = self.encoder(combined)
+        outputs = self.decoder(embeddings)
+        regression_loss = self.criterion_regression(outputs, combined)
 
         if self.domain_tradeoff > 0:
-            domain_pred = self.domain_disc(anchor_embeddings)
+            batch_size = anchors.shape[0]
+            domain_pred = self.domain_disc(embeddings[:batch_size])
             domain_loss = self.criterion_domain(domain_pred, domain_labels)
         else:
             domain_loss = 0
