@@ -135,7 +135,7 @@ class TestBuildingFunctions(unittest.TestCase):
     @mock.patch("building.build.build_pretraining_from_config")
     @mock.patch("building.build._build_datamodule")
     @mock.patch("building.build.build_trainer")
-    def test_build_pretraining(
+    def test_build_pretraining_metric(
         self,
         mock_build_trainer,
         mock_datamodule,
@@ -143,10 +143,59 @@ class TestBuildingFunctions(unittest.TestCase):
         mock_logger,
         mock_checkpoint,
     ):
+        self._check_build_pretraining(
+            mock_build_trainer,
+            mock_checkpoint,
+            mock_datamodule,
+            mock_logger,
+            mock_pretraining_from_config,
+            "metric",
+        )
+
+    @mock.patch("lightning.loggers.MinEpochModelCheckpoint")
+    @mock.patch("lightning.loggers.MLTBLogger")
+    @mock.patch("building.build.build_autoencoder_from_config")
+    @mock.patch("building.build._build_datamodule")
+    @mock.patch("building.build.build_trainer")
+    def test_build_pretraining_autoencoder(
+        self,
+        mock_build_trainer,
+        mock_datamodule,
+        mock_pretraining_from_config,
+        mock_logger,
+        mock_checkpoint,
+    ):
+        self._check_build_pretraining(
+            mock_build_trainer,
+            mock_checkpoint,
+            mock_datamodule,
+            mock_logger,
+            mock_pretraining_from_config,
+            "autoencoder",
+        )
+
+    def _check_build_pretraining(
+        self,
+        mock_build_trainer,
+        mock_checkpoint,
+        mock_datamodule,
+        mock_logger,
+        mock_pretraining_from_config,
+        mode,
+    ):
         mock_logger.return_value = "mock_logger"
         mock_checkpoint.return_value = "mock_checkpoint"
         build.build_pretraining(
-            2, 1, 0.8, self.config, self.pretraining_config, False, 1, 42, "version"
+            2,
+            1,
+            0.8,
+            self.config,
+            self.pretraining_config,
+            mode,
+            False,
+            1,
+            42,
+            "version",
         )
         mock_logger.assert_called_with(
             get_logdir(),
@@ -178,9 +227,18 @@ class TestBuildingFunctions(unittest.TestCase):
 
     @mock.patch("lightning.pretraining.UnsupervisedPretraining")
     def test_build_pretraining_from_config(self, mock_pretraining):
-        build.build_pretraining_from_config(
-            self.config, self.pretraining_config, 30, False, use_adaption=True
+        self._check_pretraining_from_config(
+            build.build_pretraining_from_config, mock_pretraining
         )
+
+    @mock.patch("lightning.autoencoder.AutoencoderPretraining")
+    def test_build_autoencoder_from_config(self, mock_autoencoder):
+        self._check_pretraining_from_config(
+            build.build_autoencoder_from_config, mock_autoencoder
+        )
+
+    def _check_pretraining_from_config(self, building_func, mock_pretraining):
+        building_func(self.config, self.pretraining_config, 30, False, use_adaption=True)
         mock_pretraining.assert_called_with(
             in_channels=14,
             seq_len=30,
@@ -196,10 +254,7 @@ class TestBuildingFunctions(unittest.TestCase):
             weight_decay=0.0,
             record_embeddings=False,
         )
-
-        build.build_pretraining_from_config(
-            self.config, self.pretraining_config, 30, False, use_adaption=False
-        )
+        building_func(self.config, self.pretraining_config, 30, False, use_adaption=False)
         mock_pretraining.assert_called_with(
             in_channels=14,
             seq_len=30,

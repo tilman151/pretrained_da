@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 
 import datasets
 from building.build_common import get_logdir, add_hparams, build_trainer
-from lightning import baseline, dann, loggers, pretraining
+from lightning import autoencoder, baseline, dann, loggers, pretraining
 
 
 def build_transfer(
@@ -120,6 +120,7 @@ def build_pretraining(
     percent_broken,
     arch_config,
     config,
+    mode,
     record_embeddings,
     gpu,
     seed,
@@ -147,9 +148,17 @@ def build_pretraining(
         source, target, percent_broken, config["batch_size"], truncate_val
     )
     use_adaption = target is not None
-    model = build_pretraining_from_config(
-        arch_config, config, data.window_size, record_embeddings, use_adaption
-    )
+    if mode == "metric":
+        model = build_pretraining_from_config(
+            arch_config, config, data.window_size, record_embeddings, use_adaption
+        )
+    elif mode == "autoencoder":
+        model = build_autoencoder_from_config(
+            arch_config, config, data.window_size, record_embeddings, use_adaption
+        )
+    else:
+        raise ValueError(f"Unrecognized pre-training mode {mode}.")
+
     add_hparams(model, data, seed)
 
     return trainer, data, model
@@ -181,6 +190,28 @@ def build_pretraining_from_config(
     arch_config, config, seq_len, record_embeddings, use_adaption
 ):
     model = pretraining.UnsupervisedPretraining(
+        in_channels=14,
+        seq_len=seq_len,
+        num_layers=arch_config["num_layers"],
+        kernel_size=3,
+        base_filters=arch_config["base_filters"],
+        latent_dim=arch_config["latent_dim"],
+        dropout=config["dropout"],
+        domain_tradeoff=config["domain_tradeoff"] if use_adaption else 0.0,
+        domain_disc_dim=arch_config["latent_dim"],
+        num_disc_layers=arch_config["num_disc_layers"],
+        lr=config["lr"],
+        weight_decay=0.0,
+        record_embeddings=record_embeddings,
+    )
+
+    return model
+
+
+def build_autoencoder_from_config(
+    arch_config, config, seq_len, record_embeddings, use_adaption
+):
+    model = autoencoder.AutoencoderPretraining(
         in_channels=14,
         seq_len=seq_len,
         num_layers=arch_config["num_layers"],

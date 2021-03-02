@@ -11,6 +11,7 @@ def run(
     percent_broken,
     arch_config,
     config,
+    mode,
     record_embeddings,
     seed,
     gpu,
@@ -22,6 +23,7 @@ def run(
         percent_broken,
         arch_config,
         config,
+        mode,
         record_embeddings,
         gpu,
         seed,
@@ -52,6 +54,7 @@ def run_multiple(
     broken,
     arch_config,
     config,
+    mode,
     record_embeddings,
     replications,
     gpu,
@@ -67,7 +70,16 @@ def run_multiple(
     for b in broken:
         for s in seeds:
             checkpoint_path = run(
-                source, target, b, arch_config, config, record_embeddings, s, gpu, version
+                source,
+                target,
+                b,
+                arch_config,
+                config,
+                mode,
+                record_embeddings,
+                s,
+                gpu,
+                version,
             )
             checkpoints[b].append(checkpoint_path)
 
@@ -92,6 +104,12 @@ if __name__ == "__main__":
     )
     parser.add_argument("--config", required=True, help="path to config file")
     parser.add_argument(
+        "--mode",
+        default="metric",
+        choices=["metric", "autoencoder"],
+        help="metric or autoencoder pre-training mode",
+    )
+    parser.add_argument(
         "--record_embeddings",
         action="store_true",
         help="whether to record embeddings of val data",
@@ -110,6 +128,7 @@ if __name__ == "__main__":
         opt.broken,
         _arch_config,
         _config,
+        opt.mode,
         opt.record_embeddings,
         opt.replications,
         opt.gpu,

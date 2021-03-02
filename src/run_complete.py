@@ -12,6 +12,7 @@ def run(
     percent_broken,
     arch_config,
     pre_config,
+    mode,
     record_embeddings,
     pretraining_reps,
     best_only,
@@ -25,6 +26,7 @@ def run(
         percent_broken,
         arch_config,
         pre_config,
+        mode,
         record_embeddings,
         pretraining_reps,
         gpu,
@@ -146,6 +148,12 @@ if __name__ == "__main__":
         "--best_only", action="store_true", help="adapt only on best pretraining run"
     )
     parser.add_argument(
+        "--mode",
+        default="metric",
+        choices=["metric", "autoencoder"],
+        help="metric or autoencoder pre-training mode",
+    )
+    parser.add_argument(
         "--record_embeddings",
         action="store_true",
         help="whether to record embeddings of val data",
@@ -161,6 +169,7 @@ if __name__ == "__main__":
         opt.broken,
         _arch_config,
         _pre_config,
+        opt.mode,
         opt.record_embeddings,
         opt.pretraining_reps,
         opt.best_only,
