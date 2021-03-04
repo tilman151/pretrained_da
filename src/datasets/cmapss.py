@@ -52,7 +52,6 @@ class CMAPSSDataModule(pl.LightningDataModule):
         }
 
         self.data = {}
-        self.lengths = {}
 
     @classmethod
     def from_loader(cls, loader: CMAPSSLoader, batch_size: int):
@@ -71,17 +70,16 @@ class CMAPSSDataModule(pl.LightningDataModule):
         self._loader.prepare_data()
 
     def setup(self, stage: Optional[str] = None):
-        *self.data["dev"], self.lengths["dev"] = self._setup_split("dev")
-        *self.data["val"], self.lengths["val"] = self._setup_split("val")
-        *self.data["test"], self.lengths["test"] = self._setup_split("test")
+        self.data["dev"] = self._setup_split("dev")
+        self.data["val"] = self._setup_split("val")
+        self.data["test"] = self._setup_split("test")
 
     def _setup_split(self, split):
         features, targets = self._loader.load_split(split)
-        lengths = [len(f) for f in features]
         features = torch.cat(features)
         targets = torch.cat(targets)
 
-        return features, targets, lengths
+        return features, targets
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
         return DataLoader(

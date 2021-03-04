@@ -90,20 +90,6 @@ class TestCMAPSS(unittest.TestCase):
             full_dataset.data["dev"][1][0], dataset.data["dev"][1][0]
         )  # First target has to be equal
 
-    def test_lengths(self):
-        for i in range(1, 5):
-            dataset = cmapss.CMAPSSDataModule(fd=i, batch_size=4, window_size=30)
-            dataset.prepare_data()
-            dataset.setup()
-            for split in ["dev", "val", "test"]:
-                with self.subTest(fd=i, split=split):
-                    raw_data, _ = dataset._loader.load_split(split)
-                    expected_lenghts = [len(f) for f in raw_data]
-                    self.assertListEqual(expected_lenghts, dataset.lengths[split])
-                    self.assertEqual(
-                        len(dataset.data[split][0]), sum(dataset.lengths[split])
-                    )
-
 
 class DummyCMAPSS:
     def __init__(self, length):
