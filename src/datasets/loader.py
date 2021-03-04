@@ -95,17 +95,17 @@ class CMAPSSLoader(AbstractLoader):
         if split == "dev" or split == "val":
             # Build targets from time steps on training
             targets = self._generate_targets(time_steps)
-            if split == "dev" or self.truncate_val:
-                features, targets = self._truncate_runs(features, targets)
             # Window data to get uniform sequence lengths
             features, targets = self._window_data(features, targets)
+            if split == "dev" or self.truncate_val:
+                features, targets = self._truncate_runs(features, targets)
         else:
             # Load targets from file on test
             targets = self._load_targets()
             # Crop data to get uniform sequence lengths
             features = self._crop_data(features)
 
-        features = self._make_channel_first(features)
+        features, targets = self._to_tensor(features, targets)
 
         return features, targets
 
@@ -172,49 +172,54 @@ class CMAPSSLoader(AbstractLoader):
         """Generate RUL targets from time steps."""
         return [np.minimum(self.max_rul, steps)[::-1].copy() for steps in time_steps]
 
-    def _load_targets(self) -> List[torch.Tensor]:
+    def _load_targets(self) -> List[np.ndarray]:
         """Load target file."""
         file_name = f"RUL_FD{self.fd:03d}.txt"
         file_path = os.path.join(self.DATA_ROOT, file_name)
         targets = np.loadtxt(file_path)
 
         targets = np.minimum(self.max_rul, targets)
-        targets = torch.tensor(targets, dtype=torch.float32)
-        targets = torch.split(targets, 1)
+        targets = np.split(targets, len(targets))
 
         return targets
 
     def _window_data(
         self, features: List[np.ndarray], targets: List[np.ndarray]
-    ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
+    ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         """Window features with specified window size."""
         new_features = []
         new_targets = []
         for seq, target in zip(features, targets):
-            num_frames = seq.shape[0]
-            seq = np.concatenate([np.zeros((self.window_size - 1, seq.shape[1])), seq])
+            num_frames = seq.shape[0] - self.window_size + 1
             feature_windows = [
                 seq[i : (i + self.window_size)] for i in range(0, num_frames)
             ]
+            target = target[-num_frames:]
             feature_windows = np.stack(feature_windows)
-            new_features.append(torch.tensor(feature_windows, dtype=torch.float32))
-            new_targets.append(torch.tensor(target, dtype=torch.float32))
+            new_features.append(feature_windows)
+            new_targets.append(target)
 
         return new_features, new_targets
 
-    def _crop_data(self, features: List[np.ndarray]) -> List[torch.Tensor]:
+    def _crop_data(self, features: List[np.ndarray]) -> List[np.ndarray]:
         """Crop length of features to specified window size."""
         cropped_features = []
         for seq in features:
-            seq = torch.tensor(seq, dtype=torch.float32)
             if seq.shape[0] < self.window_size:
                 pad = (self.window_size - seq.shape[0], seq.shape[1])
-                seq = torch.cat([torch.zeros(*pad), seq])
+                seq = np.concatenate([np.zeros(pad), seq])
             else:
                 seq = seq[-self.window_size :]
-            cropped_features.append(seq.unsqueeze(0))
+            cropped_features.append(np.expand_dims(seq, axis=0))
 
         return cropped_features
 
-    def _make_channel_first(self, features):
-        return [f.permute(0, 2, 1) for f in features]
+    def _to_tensor(
+        self, features: List[np.ndarray], targets: List[np.ndarray]
+    ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
+        features = [
+            torch.tensor(f, dtype=torch.float32).permute(0, 2, 1) for f in features
+        ]
+        targets = [torch.tensor(t, dtype=torch.float32) for t in targets]
+
+        return features, targets
