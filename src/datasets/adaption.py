@@ -133,6 +133,7 @@ class PretrainingAdaptionDataModule(pl.LightningDataModule):
         percent_broken: float = None,
         feature_select: List[int] = None,
         truncate_target_val: bool = False,
+        distance_mode: str = "linear",
     ):
         super().__init__()
 
@@ -146,6 +147,7 @@ class PretrainingAdaptionDataModule(pl.LightningDataModule):
         self.percent_fail_runs = percent_fail_runs
         self.feature_select = feature_select
         self.truncate_target_val = truncate_target_val
+        self.distance_mode = distance_mode
 
         self.target_loader = CMAPSSLoader(
             self.fd_target,
@@ -181,6 +183,7 @@ class PretrainingAdaptionDataModule(pl.LightningDataModule):
             "percent_broken": self.percent_broken,
             "percent_fail_runs": self.percent_fail_runs,
             "truncate_target_val": self.truncate_target_val,
+            "distance_mode": self.distance_mode,
         }
 
     def prepare_data(self, *args, **kwargs):
@@ -214,6 +217,7 @@ class PretrainingAdaptionDataModule(pl.LightningDataModule):
             num_samples,
             self.min_distance,
             deterministic,
+            mode=self.distance_mode,
         )
 
         return paired

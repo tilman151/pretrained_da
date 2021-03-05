@@ -129,6 +129,7 @@ class PairedCMAPSS(IterableDataset):
         self.min_distance = min_distance
         self.num_samples = num_samples
         self.deterministic = deterministic
+        self.mode = mode
 
         if not all(d.window_size == self.loaders[0].window_size for d in self.loaders):
             window_sizes = [d.window_size for d in self.loaders]

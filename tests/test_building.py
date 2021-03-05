@@ -23,6 +23,7 @@ class TestBuildingFunctions(unittest.TestCase):
             "dropout": 0.3,
             "lr": 0.02,
             "batch_size": 256,
+            "distance_mode": "piecewise",
         }
 
     @mock.patch("lightning.loggers.MinEpochModelCheckpoint")
@@ -215,7 +216,12 @@ class TestBuildingFunctions(unittest.TestCase):
             seed=42,
         )
         mock_datamodule.assert_called_with(
-            2, 1, 0.8, self.pretraining_config["batch_size"], True
+            2,
+            1,
+            0.8,
+            self.pretraining_config["batch_size"],
+            True,
+            "piecewise",
         )
         mock_pretraining_from_config.assert_called_with(
             self.config,

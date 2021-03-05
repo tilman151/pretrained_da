@@ -132,6 +132,13 @@ class TestPretrainingBaselineDataModuleFullData(
         self.assertEqual(0.2, dataset.source_loader.percent_broken)
         self.assertEqual(0.5, dataset.source_loader.percent_fail_runs)
 
+    def test_distance_mode_passed_correctly(self):
+        dataset = datasets.PretrainingBaselineDataModule(
+            3, 1000, 16, distance_mode="labeled"
+        )
+        data_loader = dataset.train_dataloader()
+        self.assertEqual(dataset.distance_mode, data_loader.dataset.mode)
+
 
 class TestPretrainingBaselineDataModuleLowData(
     unittest.TestCase, PretrainingDataModuleTemplate

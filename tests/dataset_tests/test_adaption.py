@@ -113,6 +113,13 @@ class TestCMAPSSAdaption(unittest.TestCase):
         self.assertEqual(0.2, dataset.target_truncated.percent_broken)
         self.assertEqual(0.5, dataset.target_truncated.percent_fail_runs)
 
+    def test_distance_mode_passed_correctly(self):
+        dataset = datasets.PretrainingAdaptionDataModule(
+            3, 2, 1000, 16, distance_mode="labeled"
+        )
+        data_loader = dataset.train_dataloader()
+        self.assertEqual(dataset.distance_mode, data_loader.dataset.mode)
+
 
 class TestPretrainingDataModuleFullData(unittest.TestCase, PretrainingDataModuleTemplate):
     def setUp(self):
