@@ -15,8 +15,8 @@ class CMAPSSDataModule(pl.LightningDataModule):
         batch_size: int,
         window_size: int = None,
         max_rul: int = 125,
-        percent_fail_runs: int = None,
-        percent_broken: int = None,
+        percent_broken: float = None,
+        percent_fail_runs: Union[float, List[int]] = None,
         feature_select: int = None,
         truncate_val: bool = False,
     ):
@@ -60,8 +60,8 @@ class CMAPSSDataModule(pl.LightningDataModule):
             batch_size,
             loader.window_size,
             loader.max_rul,
-            loader.percent_fail_runs,
             loader.percent_broken,
+            loader.percent_fail_runs,
             loader.feature_select,
             loader.truncate_val,
         )

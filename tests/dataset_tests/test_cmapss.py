@@ -90,6 +90,25 @@ class TestCMAPSS(unittest.TestCase):
             full_dataset.data["dev"][1][0], dataset.data["dev"][1][0]
         )  # First target has to be equal
 
+    def test_truncation_passed_correctly(self):
+        dataset = cmapss.CMAPSSDataModule(1, 4, percent_broken=0.2, percent_fail_runs=0.5)
+        self.assertEqual(dataset.percent_broken, dataset._loader.percent_broken)
+        self.assertEqual(dataset.percent_fail_runs, dataset._loader.percent_fail_runs)
+
+    def test_from_loader(self):
+        cmapss_loader = loader.CMAPSSLoader(3, 40, 130, 0.2, 0.5, truncate_val=True)
+        cmapss_dataset = cmapss.CMAPSSDataModule.from_loader(cmapss_loader, 128)
+        self.assertEqual(cmapss_loader.fd, cmapss_dataset.fd)
+        self.assertEqual(cmapss_loader.window_size, cmapss_dataset.window_size)
+        self.assertEqual(cmapss_loader.max_rul, cmapss_dataset.max_rul)
+        self.assertEqual(cmapss_loader.percent_broken, cmapss_dataset.percent_broken)
+        self.assertEqual(
+            cmapss_loader.percent_fail_runs, cmapss_dataset.percent_fail_runs
+        )
+        self.assertEqual(cmapss_loader.feature_select, cmapss_dataset.feature_select)
+        self.assertEqual(cmapss_loader.truncate_val, cmapss_dataset.truncate_val)
+        self.assertEqual(128, cmapss_dataset.batch_size)
+
 
 class DummyCMAPSS:
     def __init__(self, length):

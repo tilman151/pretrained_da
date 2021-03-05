@@ -41,8 +41,8 @@ class BaselineDataModule(pl.LightningDataModule):
                 self.batch_size,
                 self.window_size,
                 self.max_rul,
-                self.percent_fail_runs,
                 None,
+                self.percent_fail_runs,
                 self.feature_select,
             )
 
@@ -99,8 +99,8 @@ class PretrainingBaselineDataModule(pl.LightningDataModule):
             self.fd_source,
             window_size,
             self.max_rul,
-            None,
-            None,
+            self.percent_broken,
+            self.percent_fail_runs,
             self.feature_select,
             truncate_val,
         )

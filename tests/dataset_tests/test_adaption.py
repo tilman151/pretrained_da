@@ -102,6 +102,17 @@ class TestCMAPSSAdaption(unittest.TestCase):
         self.assertEqual(torch.Size((16, 14, window_size)), features.shape)
         self.assertEqual(torch.Size((16,)), labels.shape)
 
+    def test_truncation_passed_correctly(self):
+        dataset = datasets.DomainAdaptionDataModule(
+            3, 2, 16, percent_broken=0.2, percent_fail_runs=0.5
+        )
+        self.assertIsNone(dataset.source.percent_broken)
+        self.assertIsNone(dataset.source.percent_fail_runs)
+        self.assertEqual(0.2, dataset.target.percent_broken)
+        self.assertEqual(0.5, dataset.target.percent_fail_runs)
+        self.assertEqual(0.2, dataset.target_truncated.percent_broken)
+        self.assertEqual(0.5, dataset.target_truncated.percent_fail_runs)
+
 
 class TestPretrainingDataModuleFullData(unittest.TestCase, PretrainingDataModuleTemplate):
     def setUp(self):
@@ -138,6 +149,15 @@ class TestPretrainingDataModuleFullData(unittest.TestCase, PretrainingDataModule
         anchors, queries, _, _ = next(iter(train_loader))
         self.assertEqual(40, anchors.shape[2])
         self.assertEqual(40, queries.shape[2])
+
+    def test_truncation_passed_correctly(self):
+        dataset = datasets.PretrainingAdaptionDataModule(
+            3, 2, 10000, 16, percent_broken=0.2, percent_fail_runs=0.5
+        )
+        self.assertIsNone(dataset.source.percent_broken)
+        self.assertIsNone(dataset.source.percent_fail_runs)
+        self.assertEqual(0.2, dataset.target.percent_broken)
+        self.assertEqual(0.5, dataset.target.percent_fail_runs)
 
 
 class TestPretrainingDataModuleLowData(unittest.TestCase, PretrainingDataModuleTemplate):

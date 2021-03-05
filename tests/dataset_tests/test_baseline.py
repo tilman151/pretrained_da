@@ -125,6 +125,13 @@ class TestPretrainingBaselineDataModuleFullData(
         self.assertEqual(40, anchors.shape[2])
         self.assertEqual(40, queries.shape[2])
 
+    def test_truncation_passed_correctly(self):
+        dataset = datasets.PretrainingBaselineDataModule(
+            3, 1000, 16, percent_broken=0.2, percent_fail_runs=0.5
+        )
+        self.assertEqual(0.2, dataset.source_loader.percent_broken)
+        self.assertEqual(0.5, dataset.source_loader.percent_fail_runs)
+
 
 class TestPretrainingBaselineDataModuleLowData(
     unittest.TestCase, PretrainingDataModuleTemplate

@@ -34,8 +34,8 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
             self.batch_size,
             window_size,
             self.max_rul,
-            self.percent_fail_runs,
             self.percent_broken,
+            self.percent_fail_runs,
             self.feature_select,
         )
         self.window_size = self.target.window_size
@@ -53,8 +53,8 @@ class DomainAdaptionDataModule(pl.LightningDataModule):
             self.fd_target,
             self.window_size,
             self.max_rul,
-            self.percent_fail_runs,
             self.percent_broken,
+            self.percent_fail_runs,
             self.feature_select,
             truncate_val=True,
         )
@@ -151,8 +151,8 @@ class PretrainingAdaptionDataModule(pl.LightningDataModule):
             self.fd_target,
             window_size,
             self.max_rul,
-            self.percent_fail_runs,
             self.percent_broken,
+            self.percent_fail_runs,
             self.feature_select,
             self.truncate_target_val,
         )
