@@ -120,7 +120,7 @@ class PairedCMAPSS(IterableDataset):
         num_samples: int,
         min_distance: int,
         deterministic: bool = False,
-        labeled: bool = False,
+        mode: str = "linear",
     ):
         super().__init__()
 
@@ -144,9 +144,12 @@ class PairedCMAPSS(IterableDataset):
         self._max_rul = max(loader.max_rul for loader in self.loaders)
         self._current_iteration = 0
         self._rng = self._reset_rng()
-        self._get_pair_func = (
-            self._get_labeled_pair_idx if labeled else self._get_pair_idx
-        )
+        if mode == "linear":
+            self._get_pair_func = self._get_pair_idx
+        elif mode == "piecewise":
+            self._get_pair_func = self._get_pair_idx_piecewise
+        elif mode == "labeled":
+            self._get_pair_func = self._get_labeled_pair_idx
 
     def _prepare_datasets(self):
         run_domain_idx = []
@@ -186,6 +189,24 @@ class PairedCMAPSS(IterableDataset):
             raise StopIteration
 
     def _get_pair_idx(self) -> Tuple[torch.Tensor, int, int, int, int]:
+        chosen_run_idx = self._rng.integers(0, len(self._features))
+        domain_label = self._run_domain_idx[chosen_run_idx]
+        chosen_run = self._features[chosen_run_idx]
+
+        run_length = chosen_run.shape[0]
+        anchor_idx = self._rng.integers(
+            low=0,
+            high=run_length - self.min_distance,
+        )
+        query_idx = self._rng.integers(
+            low=anchor_idx + self.min_distance,
+            high=run_length,
+        )
+        distance = query_idx - anchor_idx
+
+        return chosen_run, anchor_idx, query_idx, distance, domain_label
+
+    def _get_pair_idx_piecewise(self) -> Tuple[torch.Tensor, int, int, int, int]:
         chosen_run_idx = self._rng.integers(0, len(self._features))
         domain_label = self._run_domain_idx[chosen_run_idx]
         chosen_run = self._features[chosen_run_idx]
