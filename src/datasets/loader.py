@@ -1,7 +1,7 @@
 import os
 import pickle
 import warnings
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import numpy as np
 import re
@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 
 class AbstractLoader:
-    def __init__(self, percent_fail_runs, percent_broken):
+    def __init__(self, percent_fail_runs: Union[float, List[int]], percent_broken: float):
         self.percent_fail_runs = percent_fail_runs
         self.percent_broken = percent_broken
 
@@ -25,17 +25,42 @@ class AbstractLoader:
         self, features: List[np.ndarray], targets: List[np.ndarray]
     ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         # Truncate the number of runs to failure
-        if self.percent_fail_runs is not None and self.percent_fail_runs < 1:
-            num_runs = int(self.percent_fail_runs * len(features))
-            features = features[:num_runs]
-            targets = targets[:num_runs]
+        if self.percent_fail_runs is not None:
+            if isinstance(self.percent_fail_runs, float):
+                features, targets = self._trunc_fail_runs_by_percentage(features, targets)
+            elif isinstance(self.percent_fail_runs, list):
+                features, targets = self._trunc_fail_runs_by_index(features, targets)
 
         # Truncate the number of samples per run, starting at failure
         if self.percent_broken is not None and self.percent_broken < 1:
-            for i, run in enumerate(features):
-                num_cycles = int(self.percent_broken * len(run))
-                features[i] = run[:num_cycles]
-                targets[i] = targets[i][:num_cycles]
+            features, targets = self._trunc_broken_by_percentage(features, targets)
+
+        return features, targets
+
+    def _trunc_fail_runs_by_percentage(
+        self, features: List[np.ndarray], targets: List[np.ndarray]
+    ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        num_runs = int(self.percent_fail_runs * len(features))
+        features = features[:num_runs]
+        targets = targets[:num_runs]
+
+        return features, targets
+
+    def _trunc_fail_runs_by_index(
+        self, features: List[np.ndarray], targets: List[np.ndarray]
+    ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        features = [features[i] for i in self.percent_fail_runs]
+        targets = [targets[i] for i in self.percent_fail_runs]
+
+        return features, targets
+
+    def _trunc_broken_by_percentage(
+        self, features: List[np.ndarray], targets: List[np.ndarray]
+    ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        for i, run in enumerate(features):
+            num_cycles = int(self.percent_broken * len(run))
+            features[i] = run[:num_cycles]
+            targets[i] = targets[i][:num_cycles]
 
         return features, targets
 
@@ -65,7 +90,7 @@ class CMAPSSLoader(AbstractLoader):
         window_size: int = None,
         max_rul: int = 125,
         percent_broken: float = None,
-        percent_fail_runs: float = None,
+        percent_fail_runs: Union[float, List[int]] = None,
         feature_select: List[int] = None,
         truncate_val: bool = False,
     ):
@@ -134,11 +159,13 @@ class CMAPSSLoader(AbstractLoader):
             features, targets = self._window_data(features, targets)
             if split == "dev" or self.truncate_val:
                 features, targets = self._truncate_runs(features, targets)
-        else:
+        elif split == "test":
             # Load targets from file on test
             targets = self._load_targets()
             # Crop data to get uniform sequence lengths
             features = self._crop_data(features)
+        else:
+            raise ValueError(f"Unknown split {split}.")
 
         features, targets = self._to_tensor(features, targets)
 
@@ -243,7 +270,7 @@ class FEMTOLoader(AbstractLoader):
         window_size: int = None,
         max_rul: int = 125,
         percent_broken: float = None,
-        percent_fail_runs: float = None,
+        percent_fail_runs: Union[float, List[int]] = None,
         feature_select: List[int] = None,
         truncate_val: bool = False,
     ):

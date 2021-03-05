@@ -140,6 +140,22 @@ class TestCMAPSSLoader(unittest.TestCase):
                 self.assertLessEqual(max(torch.max(r).item() for r in trunc_dev), 1.0)
                 self.assertGreaterEqual(min(torch.min(r).item() for r in trunc_dev), -1.0)
 
+    def test_truncation_by_index(self):
+        full_dataset = loader.CMAPSSLoader(1)
+        full_train, full_train_targets = full_dataset.load_split("dev")
+        indices = [50, 60, 70]
+        truncated_dataset = loader.CMAPSSLoader(1, percent_fail_runs=indices)
+        trunc_train, trunc_train_targets = truncated_dataset.load_split("dev")
+
+        self.assertEqual(len(indices), len(trunc_train))
+        self.assertEqual(len(indices), len(trunc_train_targets))
+        for trunc_idx, full_idx in enumerate(indices):
+            self.assertEqual(0, torch.dist(full_train[full_idx], trunc_train[trunc_idx]))
+            self.assertEqual(
+                0,
+                torch.dist(full_train_targets[full_idx], trunc_train_targets[trunc_idx]),
+            )
+
 
 class TestFEMTOLoader(unittest.TestCase):
     NUM_CHANNELS = 2
@@ -256,6 +272,17 @@ class TestFEMTOLoader(unittest.TestCase):
                 self.assertAlmostEqual(
                     0.0, torch.mean(torch.cat(trunc_train)).item(), delta=0.1
                 )
+
+    def test_truncation_by_index(self):
+        full_dataset = loader.FEMTOLoader(1)
+        full_train, full_train_targets = full_dataset.load_split("train")
+        truncated_dataset = loader.FEMTOLoader(1, percent_fail_runs=[1])
+        trunc_train, trunc_train_targets = truncated_dataset.load_split("train")
+
+        self.assertEqual(1, len(trunc_train))
+        self.assertEqual(1, len(trunc_train_targets))
+        self.assertEqual(0, torch.dist(full_train[1], trunc_train[0]))
+        self.assertEqual(0, torch.dist(full_train_targets[1], trunc_train_targets[0]))
 
 
 class TestFEMTOPreperator(unittest.TestCase):
