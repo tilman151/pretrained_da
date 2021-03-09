@@ -9,6 +9,7 @@ def run(
     source,
     target,
     percent_broken,
+    percent_fail_runs,
     arch_config,
     config,
     mode,
@@ -21,6 +22,7 @@ def run(
         source,
         target,
         percent_broken,
+        percent_fail_runs,
         arch_config,
         config,
         mode,
@@ -52,6 +54,7 @@ def run_multiple(
     source,
     target,
     broken,
+    fails,
     arch_config,
     config,
     mode,
@@ -68,20 +71,22 @@ def run_multiple(
 
     checkpoints = {b: [] for b in broken}
     for b in broken:
-        for s in seeds:
-            checkpoint_path = run(
-                source,
-                target,
-                b,
-                arch_config,
-                config,
-                mode,
-                record_embeddings,
-                s,
-                gpu,
-                version,
-            )
-            checkpoints[b].append(checkpoint_path)
+        for f in fails:
+            for s in seeds:
+                checkpoint_path = run(
+                    source,
+                    target,
+                    b,
+                    f,
+                    arch_config,
+                    config,
+                    mode,
+                    record_embeddings,
+                    s,
+                    gpu,
+                    version,
+                )
+                checkpoints[b].append(checkpoint_path)
 
     return checkpoints
 
@@ -96,6 +101,9 @@ if __name__ == "__main__":
     parser.add_argument("--target", type=int, help="FD number of the target data")
     parser.add_argument(
         "-b", "--broken", nargs="+", type=float, help="percent broken to use"
+    )
+    parser.add_argument(
+        "-f", "--fails", nargs="+", type=float, help="percent fail runs to use"
     )
     parser.add_argument(
         "--arch_config",
@@ -126,6 +134,7 @@ if __name__ == "__main__":
         opt.source,
         opt.target,
         opt.broken,
+        opt.fails,
         _arch_config,
         _config,
         opt.mode,

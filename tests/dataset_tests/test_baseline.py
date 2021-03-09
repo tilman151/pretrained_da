@@ -96,21 +96,21 @@ class TestPretrainingBaselineDataModuleFullData(
         self.dataset.setup()
 
         self.expected_num_val_loaders = 2
-        self.window_size = self.dataset.source_loader.window_size
+        self.window_size = self.dataset.broken_source_loader.window_size
 
     def test_val_truncation(self):
         with self.subTest(truncation=False):
             dataset = datasets.PretrainingBaselineDataModule(
                 3, num_samples=10000, batch_size=16
             )
-            self.assertFalse(dataset.source_loader.truncate_val)
+            self.assertFalse(dataset.broken_source_loader.truncate_val)
             self.assertFalse(dataset.source.truncate_val)
 
         with self.subTest(truncation=True):
             dataset = datasets.PretrainingBaselineDataModule(
                 3, num_samples=10000, batch_size=16, truncate_val=True
             )
-            self.assertTrue(dataset.source_loader.truncate_val)
+            self.assertTrue(dataset.broken_source_loader.truncate_val)
             self.assertTrue(dataset.source.truncate_val)
 
     def test_override_window_size(self):
@@ -129,8 +129,10 @@ class TestPretrainingBaselineDataModuleFullData(
         dataset = datasets.PretrainingBaselineDataModule(
             3, 1000, 16, percent_broken=0.2, percent_fail_runs=0.5
         )
-        self.assertEqual(0.2, dataset.source_loader.percent_broken)
-        self.assertEqual(0.5, dataset.source_loader.percent_fail_runs)
+        self.assertEqual(0.2, dataset.broken_source_loader.percent_broken)
+        self.assertIsNone(dataset.broken_source_loader.percent_fail_runs)
+        self.assertEqual(0.5, dataset.fails_source_loader.percent_fail_runs)
+        self.assertIsNone(dataset.fails_source_loader.percent_broken)
 
     def test_distance_mode_passed_correctly(self):
         dataset = datasets.PretrainingBaselineDataModule(
@@ -138,6 +140,19 @@ class TestPretrainingBaselineDataModuleFullData(
         )
         data_loader = dataset.train_dataloader()
         self.assertEqual(dataset.distance_mode, data_loader.dataset.mode)
+
+    def test_both_source_datasets_used(self):
+        dataset = datasets.PretrainingBaselineDataModule(
+            3, 1000, 16, percent_broken=0.2, percent_fail_runs=0.5
+        )
+        for split in ["dev", "val"]:
+            with self.subTest(split):
+                num_broken_runs = len(dataset.broken_source_loader.load_split(split)[0])
+                num_fail_runs = len(dataset.fails_source_loader.load_split(split)[0])
+                paired_dataset = dataset._get_paired_dataset(split)
+                self.assertEqual(
+                    num_broken_runs + num_fail_runs, len(paired_dataset._features)
+                )
 
 
 class TestPretrainingBaselineDataModuleLowData(
@@ -151,4 +166,4 @@ class TestPretrainingBaselineDataModuleLowData(
         self.dataset.setup()
 
         self.expected_num_val_loaders = 2
-        self.window_size = self.dataset.source_loader.window_size
+        self.window_size = self.dataset.broken_source_loader.window_size

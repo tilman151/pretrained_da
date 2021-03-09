@@ -97,18 +97,30 @@ class PretrainingBaselineDataModule(pl.LightningDataModule):
         self.truncate_val = truncate_val
         self.distance_mode = distance_mode
 
-        self.source_loader = CMAPSSLoader(
+        self.broken_source_loader = CMAPSSLoader(
             self.fd_source,
             window_size,
             self.max_rul,
             self.percent_broken,
+            None,
+            self.feature_select,
+            self.truncate_val,
+        )
+        self.fails_source_loader = CMAPSSLoader(
+            self.fd_source,
+            window_size,
+            self.max_rul,
+            None,
             self.percent_fail_runs,
             self.feature_select,
-            truncate_val,
+            self.truncate_val,
         )
-        self.window_size = self.source_loader.window_size
 
-        self.source = CMAPSSDataModule.from_loader(self.source_loader, self.batch_size)
+        self.window_size = self.broken_source_loader.window_size
+
+        self.source = CMAPSSDataModule.from_loader(
+            self.broken_source_loader, self.batch_size
+        )
 
         self.hparams = {
             "fd_source": self.fd_source,
@@ -124,7 +136,7 @@ class PretrainingBaselineDataModule(pl.LightningDataModule):
         }
 
     def prepare_data(self, *args, **kwargs):
-        self.source_loader.prepare_data()
+        self.broken_source_loader.prepare_data()
 
     def setup(self, stage: Optional[str] = None):
         self.source.setup(stage)
@@ -146,7 +158,7 @@ class PretrainingBaselineDataModule(pl.LightningDataModule):
         deterministic = split == "val"
         num_samples = 25000 if split == "val" else self.num_samples
         paired = PairedCMAPSS(
-            [self.source_loader],
+            [self.broken_source_loader, self.fails_source_loader],
             split,
             num_samples,
             self.min_distance,
