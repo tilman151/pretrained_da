@@ -180,6 +180,7 @@ class TestPairedDataset(unittest.TestCase):
         for _ in range(512):
             run, anchor_idx, query_idx, distance, _ = data._get_pair_idx()
             self.assertLess(0, distance)
+            self.assertGreaterEqual(125, distance)
 
     def test_get_labeled_pair_idx(self):
         data = datasets.cmapss.PairedCMAPSS([self.cmapss_normal], "dev", 512, 1, True)

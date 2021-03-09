@@ -199,9 +199,10 @@ class PairedCMAPSS(IterableDataset):
             low=0,
             high=run_length - self.min_distance,
         )
+        end_idx = min(run_length, anchor_idx + self._max_rul)
         query_idx = self._rng.integers(
             low=anchor_idx + self.min_distance,
-            high=run_length,
+            high=end_idx,
         )
         distance = query_idx - anchor_idx
 
