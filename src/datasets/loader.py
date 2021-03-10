@@ -11,10 +11,6 @@ from tqdm import tqdm
 
 
 class AbstractLoader:
-    def __init__(self, percent_fail_runs: Union[float, List[int]], percent_broken: float):
-        self.percent_fail_runs = percent_fail_runs
-        self.percent_broken = percent_broken
-
     def prepare_data(self):
         raise NotImplementedError
 
@@ -22,43 +18,59 @@ class AbstractLoader:
         raise NotImplementedError
 
     def _truncate_runs(
-        self, features: List[np.ndarray], targets: List[np.ndarray]
+        self,
+        features: List[np.ndarray],
+        targets: List[np.ndarray],
+        percent_broken: float,
+        percent_fail_runs: Union[float, List[int]],
     ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         # Truncate the number of runs to failure
-        if self.percent_fail_runs is not None:
-            if isinstance(self.percent_fail_runs, float):
-                features, targets = self._trunc_fail_runs_by_percentage(features, targets)
-            elif isinstance(self.percent_fail_runs, list):
-                features, targets = self._trunc_fail_runs_by_index(features, targets)
+        if percent_fail_runs is not None:
+            if isinstance(percent_fail_runs, float):
+                features, targets = self._trunc_fail_runs_by_percentage(
+                    features, targets, percent_fail_runs
+                )
+            elif isinstance(percent_fail_runs, list):
+                features, targets = self._trunc_fail_runs_by_index(
+                    features, targets, percent_fail_runs
+                )
 
         # Truncate the number of samples per run, starting at failure
-        if self.percent_broken is not None and self.percent_broken < 1:
-            features, targets = self._trunc_broken_by_percentage(features, targets)
+        if percent_broken is not None and percent_broken < 1:
+            features, targets = self._trunc_broken_by_percentage(
+                features, targets, percent_broken
+            )
 
         return features, targets
 
     def _trunc_fail_runs_by_percentage(
-        self, features: List[np.ndarray], targets: List[np.ndarray]
+        self,
+        features: List[np.ndarray],
+        targets: List[np.ndarray],
+        percent_fail_runs: Union[float, List[int]],
     ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
-        num_runs = int(self.percent_fail_runs * len(features))
+        num_runs = int(percent_fail_runs * len(features))
         features = features[:num_runs]
         targets = targets[:num_runs]
 
         return features, targets
 
     def _trunc_fail_runs_by_index(
-        self, features: List[np.ndarray], targets: List[np.ndarray]
+        self,
+        features: List[np.ndarray],
+        targets: List[np.ndarray],
+        percent_fail_runs: Union[float, List[int]],
     ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
-        features = [features[i] for i in self.percent_fail_runs]
-        targets = [targets[i] for i in self.percent_fail_runs]
+        features = [features[i] for i in percent_fail_runs]
+        targets = [targets[i] for i in percent_fail_runs]
 
         return features, targets
 
     def _trunc_broken_by_percentage(
-        self, features: List[np.ndarray], targets: List[np.ndarray]
+        self, features: List[np.ndarray], targets: List[np.ndarray], percent_broken: float
     ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         for i, run in enumerate(features):
-            num_cycles = int(self.percent_broken * len(run))
+            num_cycles = int(percent_broken * len(run))
             features[i] = run[:num_cycles]
             targets[i] = targets[i][:num_cycles]
 
@@ -94,7 +106,7 @@ class CMAPSSLoader(AbstractLoader):
         feature_select: List[int] = None,
         truncate_val: bool = False,
     ):
-        super().__init__(percent_fail_runs, percent_broken)
+        super().__init__()
 
         # Select features according to https://doi.org/10.1016/j.ress.2017.11.021
         if feature_select is None:
@@ -105,6 +117,8 @@ class CMAPSSLoader(AbstractLoader):
         self.max_rul = max_rul
         self.feature_select = feature_select
         self.truncate_val = truncate_val
+        self.percent_broken = percent_broken
+        self.percent_fail_runs = percent_fail_runs
 
         self.DATA_ROOT = os.path.join(
             os.path.dirname(__file__), "../..", "data", "CMAPSS"
@@ -158,7 +172,9 @@ class CMAPSSLoader(AbstractLoader):
             # Window data to get uniform sequence lengths
             features, targets = self._window_data(features, targets)
             if split == "dev" or self.truncate_val:
-                features, targets = self._truncate_runs(features, targets)
+                features, targets = self._truncate_runs(
+                    features, targets, self.percent_broken, self.percent_fail_runs
+                )
         elif split == "test":
             # Load targets from file on test
             targets = self._load_targets()
@@ -274,13 +290,15 @@ class FEMTOLoader(AbstractLoader):
         feature_select: List[int] = None,
         truncate_val: bool = False,
     ):
-        super().__init__(percent_fail_runs, percent_broken)
+        super().__init__()
 
         self.fd = fd
         self.window_size = window_size or FEMTOPreparator.DEFAULT_WINDOW_SIZE
         self.max_rul = max_rul
         self.feature_select = feature_select
         self.truncate_val = truncate_val
+        self.percent_broken = percent_broken
+        self.percent_fail_runs = percent_fail_runs
 
         self._preparator = FEMTOPreparator(self.fd, self.DATA_ROOT)
 
@@ -291,7 +309,9 @@ class FEMTOLoader(AbstractLoader):
     def load_split(self, split: str) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
         features, targets = self._load_runs(split)
         if split == "train":
-            features, targets = self._truncate_runs(features, targets)
+            features, targets = self._truncate_runs(
+                features, targets, self.percent_broken, self.percent_fail_runs
+            )
         features = self._scale_features(features)
         features, targets = self._to_tensor(features, targets)
 
