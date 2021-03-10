@@ -83,6 +83,13 @@ class TestEncoder(unittest.TestCase, ModelTestsMixin):
         self.expected_shape = (16, 64)
 
 
+class TestEncoderEllefsenEtAl(unittest.TestCase, ModelTestsMixin):
+    def setUp(self):
+        self.net = networks.EncoderEllefsenEtAl(14, 16, 3, 6, 64, 15, 0.1, True)
+        self.test_inputs = torch.randn(16, 14, 15)
+        self.expected_shape = (16, 8)
+
+
 class TestDecoder(unittest.TestCase, ModelTestsMixin):
     def setUp(self):
         self.net = networks.Decoder(14, 16, 3, 6, 64, 30, 0.1)

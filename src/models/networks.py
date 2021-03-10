@@ -77,6 +77,78 @@ class Encoder(nn.Module):
         return outputs
 
 
+class EncoderEllefsenEtAl(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        base_filters,
+        kernel_size,
+        num_layers,
+        latent_dim,
+        seq_len,
+        dropout,
+        norm_outputs,
+    ):
+        super().__init__()
+
+        self.in_channels = in_channels
+        self.base_filters = base_filters
+        self.kernel_size = kernel_size
+        self.num_layers = num_layers
+        self.latent_dim = latent_dim
+        self.seq_len = seq_len
+        self.dropout = dropout
+        self.norm_outputs = norm_outputs
+
+        self.rbm = None
+        self.lstm1 = None
+        self.lstm2 = None
+        self.dense = None
+        self._build_encoder()
+
+    def _build_encoder(self):
+        self.rbm = nn.Sequential(
+            nn.Conv1d(self.in_channels, out_channels=64, kernel_size=1),
+            nn.ReLU(True),
+        )
+
+        self.lstm1 = nn.Sequential(
+            nn.Dropout(0.2),
+            nn.LSTM(
+                input_size=64,
+                hidden_size=128,
+                batch_first=True,
+            ),
+        )
+        self.lstm2 = nn.Sequential(
+            nn.Dropout(0.3),
+            nn.LSTM(
+                input_size=128,
+                hidden_size=32,
+                batch_first=True,
+            ),
+        )
+
+        self.dense = nn.Sequential(
+            nn.Dropout(0.4),
+            nn.Linear(in_features=32, out_features=8),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, inputs):
+        inputs = self.rbm(inputs)  # Emulate RBM layer
+        inputs = inputs.permute(0, 2, 1)  # Convert to [batch, time, channels]
+        inputs, _ = self.lstm1(inputs)
+        _, (inputs, _) = self.lstm2(inputs)  # Get last hidden state
+        inputs = inputs.squeeze(0)  # Convert to [batch, channels]
+        outputs = self.dense(inputs)
+
+        if self.norm_outputs:
+            outputs = outputs / torch.norm(outputs, dim=1, keepdim=True)
+
+        return outputs
+
+
 class Decoder(nn.Module):
     def __init__(
         self,
