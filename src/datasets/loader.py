@@ -21,8 +21,8 @@ class AbstractLoader:
         self,
         features: List[np.ndarray],
         targets: List[np.ndarray],
-        percent_broken: float,
-        percent_fail_runs: Union[float, List[int]],
+        percent_broken: float = None,
+        percent_fail_runs: Union[float, List[int]] = None,
     ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         # Truncate the number of runs to failure
         if percent_fail_runs is not None:
@@ -171,9 +171,13 @@ class CMAPSSLoader(AbstractLoader):
             targets = self._generate_targets(time_steps)
             # Window data to get uniform sequence lengths
             features, targets = self._window_data(features, targets)
-            if split == "dev" or self.truncate_val:
+            if split == "dev":
                 features, targets = self._truncate_runs(
                     features, targets, self.percent_broken, self.percent_fail_runs
+                )
+            elif split == "val" and self.truncate_val:
+                features, targets = self._truncate_runs(
+                    features, targets, self.percent_broken
                 )
         elif split == "test":
             # Load targets from file on test
