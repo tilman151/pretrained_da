@@ -167,27 +167,39 @@ class CMAPSSLoader(AbstractLoader):
         features, time_steps = self._remove_time_steps_from_features(features)
 
         if split == "dev" or split == "val":
-            # Build targets from time steps on training
-            targets = self._generate_targets(time_steps)
-            # Window data to get uniform sequence lengths
-            features, targets = self._window_data(features, targets)
-            if split == "dev":
-                features, targets = self._truncate_runs(
-                    features, targets, self.percent_broken, self.percent_fail_runs
-                )
-            elif split == "val" and self.truncate_val:
-                features, targets = self._truncate_runs(
-                    features, targets, self.percent_broken
-                )
+            features, targets = self._process_dev_or_val_split(
+                split, features, time_steps
+            )
         elif split == "test":
-            # Load targets from file on test
-            targets = self._load_targets()
-            # Crop data to get uniform sequence lengths
-            features = self._crop_data(features)
+            features, targets = self._process_test_split(features)
         else:
             raise ValueError(f"Unknown split {split}.")
 
         features, targets = self._to_tensor(features, targets)
+
+        return features, targets
+
+    def _process_dev_or_val_split(self, split, features, time_steps):
+        # Build targets from time steps on training
+        targets = self._generate_targets(time_steps)
+        # Window data to get uniform sequence lengths
+        features, targets = self._window_data(features, targets)
+        if split == "dev":
+            features, targets = self._truncate_runs(
+                features, targets, self.percent_broken, self.percent_fail_runs
+            )
+        elif split == "val" and self.truncate_val:
+            features, targets = self._truncate_runs(
+                features, targets, self.percent_broken
+            )
+
+        return features, targets
+
+    def _process_test_split(self, features):
+        # Load targets from file on test
+        targets = self._load_targets()
+        # Crop data to get uniform sequence lengths
+        features = self._crop_data(features)
 
         return features, targets
 
