@@ -2,10 +2,10 @@ import unittest
 
 import torch
 import torch.utils.data
-from torch.utils.data import TensorDataset, RandomSampler, SequentialSampler
+from torch.utils.data import RandomSampler, SequentialSampler
 
 import datasets
-from datasets import cmapss
+
 from tests.dataset_tests.templates import PretrainingDataModuleTemplate
 
 
@@ -153,6 +153,15 @@ class TestPretrainingBaselineDataModuleFullData(
                 self.assertEqual(
                     num_broken_runs + num_fail_runs, len(paired_dataset._features)
                 )
+
+    def test_get_unfailed_runs(self):
+        fail_runs = [1, 5, 40, 79]
+        dataset = datasets.PretrainingBaselineDataModule(
+            3, 1000, 16, percent_broken=0.2, percent_fail_runs=fail_runs
+        )
+        self.assertListEqual(fail_runs, dataset.fails_source_loader.percent_fail_runs)
+        for r in fail_runs:
+            self.assertNotIn(r, dataset.broken_source_loader.percent_fail_runs)
 
 
 class TestPretrainingBaselineDataModuleLowData(

@@ -95,6 +95,7 @@ class CMAPSSLoader(AbstractLoader):
     _TRAIN_PERCENTAGE = 0.8
     WINDOW_SIZES = {1: 30, 2: 20, 3: 30, 4: 15}
     DEFAULT_CHANNELS = [4, 5, 6, 9, 10, 11, 13, 14, 15, 16, 17, 19, 22, 23]
+    NUM_TRAIN_RUNS = {1: 80, 2: 208, 3: 80, 4: 199}
 
     def __init__(
         self,

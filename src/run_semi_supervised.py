@@ -1,9 +1,12 @@
 import random
 from datetime import datetime
 
+from sklearn.model_selection import ShuffleSplit
+
 import building
+from datasets.loader import CMAPSSLoader
 from run_baseline import run as run_baseline
-from run_pretraining import run_multiple as run_pretraining
+from run_pretraining import run as run_pretraining
 
 
 def run(
@@ -15,98 +18,39 @@ def run(
     mode,
     record_embeddings,
     pretraining_reps,
-    best_only,
     gpu,
 ):
     version = datetime.now().timestamp()
-
-    pretrained_checkpoints = run_pretraining(
-        source,
-        None,
-        [percent_broken],
-        [percent_fails],
-        arch_config,
-        pre_config,
-        mode,
-        record_embeddings,
-        pretraining_reps,
-        gpu,
-        version,
-    )
     random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(pretraining_reps)]
-    if best_only:
-        _train_with_best_pretrained(
+
+    splitter = ShuffleSplit(
+        n_splits=pretraining_reps, train_size=percent_fails, random_state=42
+    )
+    run_idx = range(CMAPSSLoader.NUM_TRAIN_RUNS[source])
+    for (failed_idx, _), s in zip(splitter.split(run_idx), seeds):
+        checkpoint, score = run_pretraining(
             source,
-            percent_fails,
+            None,
+            percent_broken,
+            failed_idx,
             arch_config,
-            pretrained_checkpoints,
-            seeds,
+            pre_config,
+            mode,
+            record_embeddings,
+            s,
             gpu,
             version,
         )
-    else:
-        _train_with_all_pretrained(
+        run_baseline(
             source,
-            percent_fails,
+            failed_idx,
             arch_config,
-            pretrained_checkpoints,
-            seeds,
+            s,
             gpu,
+            checkpoint,
             version,
         )
-
-
-def _train_with_all_pretrained(
-    source,
-    fails,
-    arch_config,
-    pretrained_checkpoints,
-    seeds,
-    gpu,
-    version,
-):
-    for _, checkpoints in pretrained_checkpoints.items():
-        for (pretrained_checkpoint, best_val_score), s in zip(checkpoints, seeds):
-            run_baseline(
-                source,
-                fails,
-                arch_config,
-                s,
-                gpu,
-                pretrained_checkpoint,
-                version,
-            )
-
-
-def _train_with_best_pretrained(
-    source,
-    fails,
-    arch_config,
-    pretrained_checkpoints,
-    seeds,
-    gpu,
-    version,
-):
-    for broken, checkpoints in pretrained_checkpoints.items():
-        best_pretrained_path = _get_best_pretrained_checkpoint(checkpoints)
-        for s in seeds:
-            run_baseline(
-                source,
-                fails,
-                arch_config,
-                s,
-                gpu,
-                best_pretrained_path,
-                version,
-            )
-
-
-def _get_best_pretrained_checkpoint(checkpoints):
-    sorted_checkpoints = sorted(checkpoints, key=lambda x: x[1])  # sort by val loss
-    best_pretrained_path = sorted_checkpoints[0][0]
-
-    return best_pretrained_path
 
 
 if __name__ == "__main__":
@@ -136,9 +80,6 @@ if __name__ == "__main__":
         help="replications for each pretraining run",
     )
     parser.add_argument(
-        "--best_only", action="store_true", help="adapt only on best pretraining run"
-    )
-    parser.add_argument(
         "--mode",
         default="metric",
         choices=["metric", "autoencoder"],
@@ -163,6 +104,5 @@ if __name__ == "__main__":
         opt.mode,
         opt.record_embeddings,
         opt.pretraining_reps,
-        opt.best_only,
         opt.gpu,
     )

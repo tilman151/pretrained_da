@@ -78,8 +78,8 @@ class PretrainingBaselineDataModule(pl.LightningDataModule):
         window_size: int = None,
         max_rul: int = 125,
         min_distance: int = 1,
-        percent_fail_runs: float = None,
         percent_broken: float = None,
+        percent_fail_runs: Union[float, List[int]] = None,
         feature_select: List[int] = None,
         truncate_val: bool = False,
         distance_mode: str = "linear",
@@ -97,21 +97,22 @@ class PretrainingBaselineDataModule(pl.LightningDataModule):
         self.truncate_val = truncate_val
         self.distance_mode = distance_mode
 
-        self.broken_source_loader = CMAPSSLoader(
-            self.fd_source,
-            window_size,
-            self.max_rul,
-            self.percent_broken,
-            None,
-            self.feature_select,
-            self.truncate_val,
-        )
         self.fails_source_loader = CMAPSSLoader(
             self.fd_source,
             window_size,
             self.max_rul,
             None,
             self.percent_fail_runs,
+            self.feature_select,
+            self.truncate_val,
+        )
+        unfailed_runs = self._get_unbroken_runs(self.percent_fail_runs)
+        self.broken_source_loader = CMAPSSLoader(
+            self.fd_source,
+            window_size,
+            self.max_rul,
+            self.percent_broken,
+            unfailed_runs,
             self.feature_select,
             self.truncate_val,
         )
@@ -134,6 +135,15 @@ class PretrainingBaselineDataModule(pl.LightningDataModule):
             "truncate_val": self.truncate_val,
             "distance_mode": self.distance_mode,
         }
+
+    def _get_unbroken_runs(self, fail_runs):
+        if fail_runs is None or isinstance(fail_runs, float):
+            unfailed_runs = None
+        else:
+            run_idx = range(CMAPSSLoader.NUM_TRAIN_RUNS[self.fd_source])
+            unfailed_runs = list(set(run_idx).difference(fail_runs))
+
+        return unfailed_runs
 
     def prepare_data(self, *args, **kwargs):
         self.broken_source_loader.prepare_data()
