@@ -1,7 +1,7 @@
 import os
 import pickle
 import warnings
-from typing import List, Tuple, Union
+from typing import Iterable, List, Tuple, Union
 
 import numpy as np
 import re
@@ -30,7 +30,7 @@ class AbstractLoader:
                 features, targets = self._trunc_fail_runs_by_percentage(
                     features, targets, percent_fail_runs
                 )
-            elif isinstance(percent_fail_runs, list):
+            elif isinstance(percent_fail_runs, Iterable):
                 features, targets = self._trunc_fail_runs_by_index(
                     features, targets, percent_fail_runs
                 )
@@ -47,7 +47,7 @@ class AbstractLoader:
         self,
         features: List[np.ndarray],
         targets: List[np.ndarray],
-        percent_fail_runs: Union[float, List[int]],
+        percent_fail_runs: float,
     ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         num_runs = int(percent_fail_runs * len(features))
         features = features[:num_runs]
@@ -59,7 +59,7 @@ class AbstractLoader:
         self,
         features: List[np.ndarray],
         targets: List[np.ndarray],
-        percent_fail_runs: Union[float, List[int]],
+        percent_fail_runs: Iterable[int],
     ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         features = [features[i] for i in percent_fail_runs]
         targets = [targets[i] for i in percent_fail_runs]
