@@ -90,7 +90,7 @@ class TestPretrainingBaselineDataModuleFullData(
 ):
     def setUp(self):
         self.dataset = datasets.PretrainingBaselineDataModule(
-            3, num_samples=10000, batch_size=16
+            3, num_samples=10000, batch_size=16, min_distance=2
         )
         self.dataset.prepare_data()
         self.dataset.setup()

@@ -124,7 +124,7 @@ class TestCMAPSSAdaption(unittest.TestCase):
 class TestPretrainingDataModuleFullData(unittest.TestCase, PretrainingDataModuleTemplate):
     def setUp(self):
         self.dataset = datasets.PretrainingAdaptionDataModule(
-            3, 2, num_samples=10000, batch_size=16
+            3, 2, num_samples=10000, batch_size=16, min_distance=2
         )
         self.dataset.prepare_data()
         self.dataset.setup()

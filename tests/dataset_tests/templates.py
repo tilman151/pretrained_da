@@ -1,8 +1,6 @@
-import numpy as np
 import torch
 from torch.utils.data import TensorDataset
 
-import datasets
 from datasets.cmapss import PairedCMAPSS
 
 
@@ -84,3 +82,9 @@ class PretrainingDataModuleTemplate:
             end += anchor.shape[0]
 
         return anchors, queries, distances, domain_labels
+
+    def test_min_distance(self):
+        train_loader = self.dataset.train_dataloader()
+        self.assertEqual(self.dataset.min_distance, train_loader.dataset.min_distance)
+        val_loader = self.dataset.val_dataloader()[0]
+        self.assertEqual(1, val_loader.dataset.min_distance)
