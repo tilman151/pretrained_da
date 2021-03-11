@@ -109,6 +109,12 @@ class TestCMAPSS(unittest.TestCase):
         self.assertEqual(cmapss_loader.truncate_val, cmapss_dataset.truncate_val)
         self.assertEqual(128, cmapss_dataset.batch_size)
 
+    def test_empty_dataset(self):
+        dataset = cmapss.CMAPSSDataModule(1, 4, percent_broken=0.2, percent_fail_runs=0.0)
+        dataset.setup()
+        dataset = cmapss.CMAPSSDataModule(1, 4, percent_broken=0.0, percent_fail_runs=0.5)
+        dataset.setup()
+
 
 class DummyCMAPSS:
     def __init__(self, length):

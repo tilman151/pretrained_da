@@ -163,6 +163,15 @@ class TestPretrainingBaselineDataModuleFullData(
         for r in fail_runs:
             self.assertNotIn(r, dataset.broken_source_loader.percent_fail_runs)
 
+    def test_percent_fails_zero(self):
+        dataset = datasets.PretrainingBaselineDataModule(
+            3, 1000, 16, percent_broken=0.2, percent_fail_runs=0.0
+        )
+        num_broken_runs = len(dataset.broken_source_loader.load_split("dev")[0])
+        num_fail_runs = len(dataset.fails_source_loader.load_split("dev")[0])
+        self.assertEqual(0, num_fail_runs)
+        self.assertNotEqual(0, num_broken_runs)
+
 
 class TestPretrainingBaselineDataModuleLowData(
     unittest.TestCase, PretrainingDataModuleTemplate

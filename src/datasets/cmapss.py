@@ -76,8 +76,12 @@ class CMAPSSDataModule(pl.LightningDataModule):
 
     def _setup_split(self, split):
         features, targets = self._loader.load_split(split)
-        features = torch.cat(features)
-        targets = torch.cat(targets)
+        if features:
+            features = torch.cat(features)
+            targets = torch.cat(targets)
+        else:
+            features = torch.empty(0, len(self._loader.feature_select), self.window_size)
+            targets = torch.empty(0)
 
         return features, targets
 
