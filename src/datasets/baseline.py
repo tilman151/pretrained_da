@@ -36,15 +36,21 @@ class BaselineDataModule(pl.LightningDataModule):
 
         self.cmapss = {}
         for fd in range(1, 5):
-            self.cmapss[fd] = CMAPSSDataModule(
-                fd,
-                self.batch_size,
-                self.window_size,
-                self.max_rul,
-                None,
-                self.percent_fail_runs,
-                self.feature_select,
-            )
+            self.cmapss[fd] = self._get_cmapss(fd)
+
+    def _get_cmapss(self, fd):
+        fail_runs = self.percent_fail_runs if fd == self.fd_source else None
+        cmapss = CMAPSSDataModule(
+            fd,
+            self.batch_size,
+            self.window_size,
+            self.max_rul,
+            None,
+            fail_runs,
+            self.feature_select,
+        )
+
+        return cmapss
 
     def prepare_data(self, *args, **kwargs):
         for cmapss_fd in self.cmapss.values():
