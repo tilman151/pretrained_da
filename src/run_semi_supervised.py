@@ -15,33 +15,37 @@ def run(
     percent_fails,
     arch_config,
     pre_config,
+    pretrain,
     mode,
     record_embeddings,
-    pretraining_reps,
+    replications,
     gpu,
 ):
     version = datetime.now().timestamp()
     random.seed(999)
-    seeds = [random.randint(0, 9999999) for _ in range(pretraining_reps)]
+    seeds = [random.randint(0, 9999999) for _ in range(replications)]
 
     splitter = ShuffleSplit(
-        n_splits=pretraining_reps, train_size=percent_fails, random_state=42
+        n_splits=replications, train_size=percent_fails, random_state=42
     )
     run_idx = range(CMAPSSLoader.NUM_TRAIN_RUNS[source])
     for (failed_idx, _), s in zip(splitter.split(run_idx), seeds):
-        checkpoint, score = run_pretraining(
-            source,
-            None,
-            percent_broken,
-            failed_idx,
-            arch_config,
-            pre_config,
-            mode,
-            record_embeddings,
-            s,
-            gpu,
-            version,
-        )
+        if pretrain:
+            checkpoint, _ = run_pretraining(
+                source,
+                None,
+                percent_broken,
+                failed_idx,
+                arch_config,
+                pre_config,
+                mode,
+                record_embeddings,
+                s,
+                gpu,
+                version,
+            )
+        else:
+            checkpoint = None
         run_baseline(
             source,
             failed_idx,
@@ -72,12 +76,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pre_config", required=True, help="path to pretraining config file"
     )
+    parser.add_argument("--pretrain", action="store_true", help="use pre-training")
     parser.add_argument(
-        "-p",
-        "--pretraining_reps",
+        "-r",
+        "--replications",
         type=int,
         default=1,
-        help="replications for each pretraining run",
+        help="runs of the cross-validation",
     )
     parser.add_argument(
         "--mode",
@@ -101,8 +106,9 @@ if __name__ == "__main__":
         opt.fails,
         _arch_config,
         _pre_config,
+        opt.pretrain,
         opt.mode,
         opt.record_embeddings,
-        opt.pretraining_reps,
+        opt.replications,
         opt.gpu,
     )
