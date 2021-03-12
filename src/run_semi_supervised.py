@@ -20,9 +20,11 @@ def run(
     record_embeddings,
     replications,
     gpu,
+    seeded,
 ):
     version = datetime.now().timestamp()
-    random.seed(999)
+    if seeded:
+        random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
 
     splitter = ShuffleSplit(
@@ -96,6 +98,9 @@ if __name__ == "__main__":
         help="whether to record embeddings of val data",
     )
     parser.add_argument("--gpu", type=int, default=0, help="id of GPU to use")
+    parser.add_argument(
+        "--seeded", action="store_true", help="apply a default root seed of 999"
+    )
     opt = parser.parse_args()
 
     _arch_config = building.load_config(opt.arch_config)
@@ -111,4 +116,5 @@ if __name__ == "__main__":
         opt.record_embeddings,
         opt.replications,
         opt.gpu,
+        opt.seeded,
     )
