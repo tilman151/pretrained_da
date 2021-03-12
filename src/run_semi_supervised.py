@@ -1,6 +1,7 @@
 import random
 from datetime import datetime
 
+import ray
 from sklearn.model_selection import ShuffleSplit
 
 import building
@@ -22,6 +23,8 @@ def run(
     gpu,
     seeded,
 ):
+    ray.init()
+
     version = datetime.now().timestamp()
     if seeded:
         random.seed(999)
@@ -31,11 +34,11 @@ def run(
         n_splits=replications, train_size=percent_fails, random_state=42
     )
     run_idx = range(CMAPSSLoader.NUM_TRAIN_RUNS[source])
+    process_ids = []
     for (failed_idx, _), s in zip(splitter.split(run_idx), seeds):
-        if pretrain:
-            checkpoint, _ = run_pretraining(
+        process_ids.append(
+            ray_train.remote(
                 source,
-                None,
                 percent_broken,
                 failed_idx,
                 arch_config,
@@ -45,18 +48,52 @@ def run(
                 s,
                 gpu,
                 version,
+                pretrain,
             )
-        else:
-            checkpoint = None
-        run_baseline(
+        )
+
+    ray.get(process_ids)
+
+
+@ray.remote(num_cpus=3, num_gpus=0.5)
+def ray_train(
+    source,
+    percent_broken,
+    failed_idx,
+    arch_config,
+    pre_config,
+    mode,
+    record_embeddings,
+    s,
+    gpu,
+    version,
+    pretrain,
+):
+    if pretrain:
+        checkpoint, _ = run_pretraining(
             source,
+            None,
+            percent_broken,
             failed_idx,
             arch_config,
+            pre_config,
+            mode,
+            record_embeddings,
             s,
             gpu,
-            checkpoint,
             version,
         )
+    else:
+        checkpoint = None
+    run_baseline(
+        source,
+        failed_idx,
+        arch_config,
+        s,
+        gpu,
+        checkpoint,
+        version,
+    )
 
 
 if __name__ == "__main__":
