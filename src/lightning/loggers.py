@@ -55,6 +55,13 @@ def pretraining_hyperopt_name(source, target, percent_broken):
     return f"pre_hyperopt_{ExperimentNaming[source]}&{ExperimentNaming[target]}@{percent_broken:.2f}"
 
 
+def semi_supervised_hyperopt_name(source, percent_broken):
+    assert source in ExperimentNaming, f"Unknown source FD number {source}."
+    assert 0 <= percent_broken <= 1, f"Invalid percent broken {percent_broken}."
+
+    return f"pre_hyperopt_{ExperimentNaming[source]}@{percent_broken:.2f}"
+
+
 class MLTBLogger(loggers.LoggerCollection):
     """Combined MlFlow and Tensorboard logger that saves models as MlFlow artifacts."""
 
