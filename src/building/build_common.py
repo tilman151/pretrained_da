@@ -10,11 +10,12 @@ def build_trainer(
     max_epochs,
     val_interval,
     gpu,
-    seed,
+    seed=None,
     callbacks=None,
     check_sanity=True,
 ):
-    pl.trainer.seed_everything(seed)
+    if seed is not None:
+        pl.trainer.seed_everything(seed)
     trainer = pl.Trainer(
         num_sanity_val_steps=2 if check_sanity else 0,
         gpus=[gpu],
