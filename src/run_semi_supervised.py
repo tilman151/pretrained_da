@@ -22,10 +22,12 @@ def run(
     replications,
     gpu,
     seeded,
+    version=None,
 ):
     ray.init()
 
-    version = datetime.now().timestamp()
+    if version is None:
+        version = datetime.now().timestamp()
     if seeded:
         random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
@@ -138,6 +140,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--seeded", action="store_true", help="apply a default root seed of 999"
     )
+    parser.add_argument("--version", help="version tag to group runs together")
     opt = parser.parse_args()
 
     _arch_config = building.load_config(opt.arch_config)
@@ -154,4 +157,5 @@ if __name__ == "__main__":
         opt.replications,
         opt.gpu,
         opt.seeded,
+        opt.version,
     )
