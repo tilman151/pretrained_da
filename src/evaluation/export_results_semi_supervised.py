@@ -9,6 +9,9 @@ import numpy as np
 import pandas as pd
 
 
+LIST_PATTERN = re.compile(r".?\d{1,3}")
+
+
 def export_all(mlflow_uri):
     """Export all transfer and baseline experiments to CSV."""
     client = mlflow.tracking.MlflowClient(mlflow_uri)
@@ -42,15 +45,12 @@ def _runs_of_semi_supervised(client, e):
     replications = _get_replications(client, e)
     replications = _filter_newest_complete(replications)
     df = pd.DataFrame(
-        np.zeros((len(replications), 8)),
+        np.zeros((len(replications), 5)),
         columns=[
             "source",
             "num_labeled",
             "pretrained",
-            "rmse_1",
-            "rmse_2",
-            "rmse_3",
-            "rmse_4",
+            "test",
             "val",
         ],
         index=[e.name] * len(replications),
@@ -58,12 +58,12 @@ def _runs_of_semi_supervised(client, e):
     for i, run in enumerate(replications):
         statics = [
             run.data.params["fd_source"],
-            3,
+            _get_num_labeled(run.data.params["percent_fail_runs"]),
             "pretrained_checkpoint" in run.data.params,
         ]
-        test_rmse = [_get_test_value(f"regression_loss_fd{i}", run) for i in range(1, 5)]
+        test_rmse = _get_test_value(f"regression_loss_fd{statics[0]}", run)
         val_rmse = _get_val_value(client, "regression_loss", "regression_loss", run)
-        df.iloc[i] = statics + test_rmse + [val_rmse]
+        df.iloc[i] = statics + [test_rmse, val_rmse]
     print("Return %d runs..." % len(df))
 
     return df
@@ -84,6 +84,10 @@ def _filter_newest_complete(replications):
     replications = [r for r in replications if r.data.tags["version"] in versions]
 
     return replications
+
+
+def _get_num_labeled(percent_labeled):
+    return len(LIST_PATTERN.findall(percent_labeled))
 
 
 def _get_test_value(metric, run):
