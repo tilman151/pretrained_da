@@ -224,6 +224,7 @@ class TestBuildingFunctions(unittest.TestCase):
             self.pretraining_config["batch_size"],
             True,
             "piecewise",
+            1,
         )
         mock_pretraining_from_config.assert_called_with(
             self.config,

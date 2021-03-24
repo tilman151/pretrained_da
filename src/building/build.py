@@ -146,6 +146,7 @@ def build_pretraining(
     )
     truncate_val = not record_embeddings
     distance_mode = config["distance_mode"]
+    min_distance = config["min_distance"] if "min_distance" in config else 1
     data = _build_datamodule(
         source,
         target,
@@ -154,6 +155,7 @@ def build_pretraining(
         config["batch_size"],
         truncate_val,
         distance_mode,
+        min_distance,
     )
     use_adaption = target is not None
     if mode == "metric":
@@ -180,13 +182,14 @@ def _build_datamodule(
     batch_size,
     truncate_val,
     distance_mode,
+    min_distance,
 ):
     if target is None:
         return datasets.PretrainingBaselineDataModule(
             fd_source=source,
             num_samples=25000,
             batch_size=batch_size,
-            min_distance=1,
+            min_distance=min_distance,
             percent_broken=percent_broken,
             percent_fail_runs=percent_fail_runs,
             truncate_val=truncate_val,
@@ -198,7 +201,7 @@ def _build_datamodule(
             fd_target=target,
             num_samples=50000,
             batch_size=batch_size,
-            min_distance=1,
+            min_distance=min_distance,
             percent_broken=percent_broken,
             percent_fail_runs=percent_fail_runs,
             truncate_target_val=truncate_val,
