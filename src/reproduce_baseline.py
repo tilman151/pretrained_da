@@ -23,7 +23,7 @@ def reproduce(base_version, master_seed):
 
     for num_fd, fd in enumerate(fds):
         for num_fails, fails in enumerate(percent_fails):
-            master_seed = seeds[num_fd][num_fails]
+            seed = seeds[num_fd][num_fails]
             arch_config_path = os.path.join(config_root, f"baseline_fd{fd}.json")
             pre_config_path = os.path.join(config_root, f"baseline_pre_fd{fd}.json")
             try:
@@ -38,7 +38,7 @@ def reproduce(base_version, master_seed):
                     record_embeddings=False,
                     replications=10,
                     gpu=[0],
-                    master_seed=master_seed,
+                    master_seed=seed,
                     version=f"{base_version}_baseline@{fails:.2f}",
                 )
             except Exception as e:
