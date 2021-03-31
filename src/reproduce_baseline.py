@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+import random
 
 from run_semi_supervised import run
 
@@ -8,15 +9,21 @@ script_path = os.path.dirname(__file__)
 config_root = os.path.join(script_path, "..", "configs")
 
 
-def reproduce(base_version):
+def reproduce(base_version, master_seed):
     if base_version is None:
         base_version = datetime.now().timestamp()
     error_log = []
     fds = [1, 2, 3, 4]
     percent_fails = [1.0, 0.4, 0.2, 0.1, 0.02]
+    random.seed(master_seed)
+    seeds = [
+        [random.randint(0, 99999999) for _ in range(len(percent_fails))]
+        for _ in range(len(fds))
+    ]
 
-    for fd in fds:
-        for fails in percent_fails:
+    for num_fd, fd in enumerate(fds):
+        for num_fails, fails in enumerate(percent_fails):
+            master_seed = seeds[num_fd][num_fails]
             arch_config_path = os.path.join(config_root, f"baseline_fd{fd}.json")
             pre_config_path = os.path.join(config_root, f"baseline_pre_fd{fd}.json")
             try:
@@ -31,7 +38,7 @@ def reproduce(base_version):
                     record_embeddings=False,
                     replications=10,
                     gpu=[0],
-                    seeded=False,
+                    master_seed=master_seed,
                     version=f"{base_version}_baseline@{fails:.2f}",
                 )
             except Exception as e:
@@ -53,6 +60,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "base_version", default=None, help="common prefix for the version tag"
     )
+    parser.add_argument(
+        "--seed", default=42, help="master seed used to produce all other seeds"
+    )
     opt = parser.parse_args()
 
-    reproduce(opt.base_version)
+    reproduce(opt.base_version, opt.seed)

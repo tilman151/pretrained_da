@@ -21,15 +21,15 @@ def run(
     record_embeddings,
     replications,
     gpu,
-    seeded,
+    master_seed,
     version=None,
 ):
     ray.init()
 
     if version is None:
         version = datetime.now().timestamp()
-    if seeded:
-        random.seed(999)
+    if master_seed:
+        random.seed(master_seed)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
 
     if percent_fails < 1:
@@ -152,7 +152,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--gpu", type=int, default=0, help="id of GPU to use")
     parser.add_argument(
-        "--seeded", action="store_true", help="apply a default root seed of 999"
+        "--seed", default=999, help="master seed used to produce all seeds"
     )
     parser.add_argument("--version", help="version tag to group runs together")
     opt = parser.parse_args()
@@ -170,6 +170,6 @@ if __name__ == "__main__":
         opt.record_embeddings,
         opt.replications,
         opt.gpu,
-        opt.seeded,
+        opt.seed,
         opt.version,
     )
