@@ -5,4 +5,5 @@ from .build import (
     build_baseline,
     build_dann_from_config,
     build_pretraining_from_config,
+    build_baseline_from_config
 )
