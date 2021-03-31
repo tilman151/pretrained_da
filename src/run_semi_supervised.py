@@ -32,9 +32,12 @@ def run(
         random.seed(999)
     seeds = [random.randint(0, 9999999) for _ in range(replications)]
 
-    splitter = ShuffleSplit(
-        n_splits=replications, train_size=percent_fails, random_state=42
-    )
+    if percent_fails < 1:
+        splitter = ShuffleSplit(
+            n_splits=replications, train_size=percent_fails, random_state=42
+        )
+    else:
+        splitter = AllDataSplitter(replications)
     run_idx = range(CMAPSSLoader.NUM_TRAIN_RUNS[source])
     process_ids = []
     for (failed_idx, _), s in zip(splitter.split(run_idx), seeds):
@@ -55,6 +58,17 @@ def run(
         )
 
     ray.get(process_ids)
+
+
+class AllDataSplitter:
+    """Splitter that returns the whole dataset as training and nothing as test split."""
+
+    def __init__(self, n_splits):
+        self.n_splits = n_splits
+
+    def split(self, x):
+        for _ in range(self.n_splits):
+            yield list(x), []
 
 
 @ray.remote(num_cpus=3, num_gpus=0.5)
