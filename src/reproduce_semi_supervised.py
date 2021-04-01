@@ -2,6 +2,9 @@ import os
 from datetime import datetime
 import random
 
+import ray
+
+import building
 from run_semi_supervised import run
 
 
@@ -10,6 +13,8 @@ config_root = os.path.join(script_path, "..", "configs")
 
 
 def reproduce(base_version, master_seed):
+    ray.init()
+
     if base_version is None:
         base_version = datetime.now().timestamp()
     error_log = []
@@ -26,18 +31,20 @@ def reproduce(base_version, master_seed):
     ]
 
     for num_fd, fd in enumerate(fds):
+        arch_config_path = os.path.join(config_root, f"baseline_fd{fd}.json")
+        arch_config = building.load_config(arch_config_path)
+        pre_config_path = os.path.join(config_root, f"baseline_pre_fd{fd}.json")
+        pre_config = building.load_config(pre_config_path)
         for num_broken, broken in enumerate(percent_broken):
             for num_fails, fails in enumerate(percent_fails):
                 seed = seeds[num_fd][num_broken][num_fails]
-                arch_config_path = os.path.join(config_root, f"baseline_fd{fd}.json")
-                pre_config_path = os.path.join(config_root, f"baseline_pre_fd{fd}.json")
                 try:
                     run(
                         fd,
                         broken,
                         fails,
-                        arch_config_path,
-                        pre_config_path,
+                        arch_config,
+                        pre_config,
                         pretrain=True,
                         mode="linear",
                         record_embeddings=False,
@@ -48,6 +55,8 @@ def reproduce(base_version, master_seed):
                     )
                 except Exception as e:
                     error_log.append(e)
+
+    ray.shutdown()
 
     if error_log:
         for e in error_log:
