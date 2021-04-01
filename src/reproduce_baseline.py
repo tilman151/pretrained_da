@@ -2,6 +2,9 @@ import os
 from datetime import datetime
 import random
 
+import ray
+
+import building
 from run_semi_supervised import run
 
 
@@ -10,6 +13,8 @@ config_root = os.path.join(script_path, "..", "configs")
 
 
 def reproduce(base_version, master_seed):
+    ray.init()
+
     if base_version is None:
         base_version = datetime.now().timestamp()
     error_log = []
@@ -43,6 +48,8 @@ def reproduce(base_version, master_seed):
                 )
             except Exception as e:
                 error_log.append(e)
+
+    ray.shutdown()
 
     if error_log:
         for e in error_log:
