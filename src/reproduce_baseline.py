@@ -27,17 +27,19 @@ def reproduce(base_version, master_seed):
     ]
 
     for num_fd, fd in enumerate(fds):
+        arch_config_path = os.path.join(config_root, f"baseline_fd{fd}.json")
+        arch_config = building.load_config(arch_config_path)
+        pre_config_path = os.path.join(config_root, f"baseline_pre_fd{fd}.json")
+        pre_config = building.load_config(pre_config_path)
         for num_fails, fails in enumerate(percent_fails):
             seed = seeds[num_fd][num_fails]
-            arch_config_path = os.path.join(config_root, f"baseline_fd{fd}.json")
-            pre_config_path = os.path.join(config_root, f"baseline_pre_fd{fd}.json")
             try:
                 run(
                     fd,
                     None,
                     fails,
-                    arch_config_path,
-                    pre_config_path,
+                    arch_config,
+                    pre_config,
                     pretrain=False,
                     mode="linear",
                     record_embeddings=False,
