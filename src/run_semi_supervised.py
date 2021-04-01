@@ -24,8 +24,6 @@ def run(
     master_seed,
     version=None,
 ):
-    ray.init()
-
     if version is None:
         version = datetime.now().timestamp()
     if master_seed:
@@ -159,6 +157,7 @@ if __name__ == "__main__":
 
     _arch_config = building.load_config(opt.arch_config)
     _pre_config = building.load_config(opt.pre_config)
+    ray.init()
     run(
         opt.source,
         opt.broken,
@@ -173,3 +172,4 @@ if __name__ == "__main__":
         opt.seed,
         opt.version,
     )
+    ray.shutdown()
