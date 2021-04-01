@@ -86,12 +86,17 @@ class CMAPSSDataModule(pl.LightningDataModule):
         return features, targets
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
-        return DataLoader(
-            self.to_dataset("dev"),
+        dataset = self.to_dataset("dev")
+        drop_last = len(dataset) % self.batch_size == 1
+        loader = DataLoader(
+            dataset,
             batch_size=self.batch_size,
             shuffle=True,
+            drop_last=drop_last,
             pin_memory=True,
         )
+
+        return loader
 
     def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
         return DataLoader(
