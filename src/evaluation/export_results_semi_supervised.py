@@ -12,19 +12,19 @@ import pandas as pd
 LIST_PATTERN = re.compile(r".?\d{1,3}")
 
 
-def export_all(mlflow_uri):
+def export_all(mlflow_uri, tag):
     """Export all transfer and baseline experiments to CSV."""
     client = mlflow.tracking.MlflowClient(mlflow_uri)
 
     print("Export baseline experiments...")
     df = export_matching_experiments(
-        client, "cmapss_.{3,5}_baseline$", _runs_of_semi_supervised
+        client, "cmapss_.{3,5}_baseline$", tag, _runs_of_semi_supervised
     )
     if df is not None:
         df.to_csv("semi_supervised.csv")
 
 
-def export_matching_experiments(client, exp_name_regex, func):
+def export_matching_experiments(client, exp_name_regex, tag, func):
     regex = re.compile(exp_name_regex)
     experiments = client.list_experiments()
     filtered_experiments = [e for e in experiments if regex.match(e.name) is not None]
@@ -32,7 +32,7 @@ def export_matching_experiments(client, exp_name_regex, func):
     df = []
     for e in filtered_experiments:
         print('Evaluate experiment "%s" with id %s' % (e.name, e.experiment_id))
-        df.append(func(client, e))
+        df.append(func(client, e, tag))
     if df:
         df = pd.concat(df)
     else:
@@ -41,9 +41,9 @@ def export_matching_experiments(client, exp_name_regex, func):
     return df
 
 
-def _runs_of_semi_supervised(client, e):
+def _runs_of_semi_supervised(client, e, tag):
     replications = _get_replications(client, e)
-    replications = _filter_newest_complete(replications)
+    replications = _filter_complete_with_tag(replications, tag)
     df = pd.DataFrame(
         np.zeros((len(replications), 5)),
         columns=[
@@ -76,11 +76,14 @@ def _get_replications(client, experiment):
     return runs
 
 
-def _filter_newest_complete(replications):
-    versions = [r.data.tags["version"] for r in replications]
+def _filter_complete_with_tag(replications, tag):
+    versions = [
+        r.data.tags["version"]
+        for r in replications
+        if r.data.tags["version"].startswith(tag)
+    ]
     versions, version_counts = np.unique(versions, return_counts=True)
     versions = versions[version_counts == 10]
-    versions = versions[-2:]
     replications = [r for r in replications if r.data.tags["version"] in versions]
 
     return replications
@@ -121,6 +124,7 @@ if __name__ == "__main__":
         description="Exports semi_supervised experiments to CSV"
     )
     parser.add_argument("mlflow_uri", help="URI for MLFlow Server.")
+    parser.add_argument("--tag", "-t", help="MLFlow tag prefix of runs to export")
     opt = parser.parse_args()
 
-    export_all(opt.mlflow_uri)
+    export_all(opt.mlflow_uri, opt.tag)
