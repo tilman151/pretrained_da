@@ -41,7 +41,7 @@ def reproduce(base_version, master_seed):
                     arch_config,
                     pre_config,
                     pretrain=False,
-                    mode="linear",
+                    mode="metric",
                     record_embeddings=False,
                     replications=10,
                     gpu=[0],
