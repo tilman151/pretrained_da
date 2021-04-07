@@ -5,13 +5,15 @@ from plotnine import ggplot, aes
 
 def plot(file_path):
     df = pd.read_csv(file_path, index_col=0)
+    percent_broken = [0.6, 0.8]
 
     plotnine.options.figure_size = (15, 8)
-    gg = _box_plot(df, "val")
-    gg.save(file_path.replace(".csv", "_val.pdf"))
-
-    gg = _box_plot(df, "test")
-    gg.save(file_path.replace(".csv", "_test.pdf"))
+    for broken in percent_broken:
+        plot_df = df[(df["percent_broken"] == broken) | (df["percent_broken"] == 0.0)]
+        gg = _box_plot(plot_df, "val")
+        gg.save(file_path.replace(".csv", f"_val@{broken:.2f}.pdf"))
+        gg = _box_plot(plot_df, "test")
+        gg.save(file_path.replace(".csv", f"_test@{broken:.2f}.pdf"))
 
 
 def _box_plot(df, column):

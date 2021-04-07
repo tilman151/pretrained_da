@@ -1,7 +1,6 @@
 """Exports all RUL experiments to a data frame."""
 
 import argparse
-import json
 import re
 
 import mlflow
@@ -10,6 +9,7 @@ import pandas as pd
 
 
 LIST_PATTERN = re.compile(r".?\d{1,3}")
+VERSION_PATTERN = re.compile(r".*?(@(?P<percent_broken>.*))?@(?P<percent_fail_runs>.*)")
 
 
 def export_all(mlflow_uri, tag):
@@ -45,10 +45,11 @@ def _runs_of_semi_supervised(client, e, tag):
     replications = _get_replications(client, e)
     replications = _filter_complete_with_tag(replications, tag)
     df = pd.DataFrame(
-        np.zeros((len(replications), 5)),
+        np.zeros((len(replications), 6)),
         columns=[
             "source",
             "num_labeled",
+            "percent_broken",
             "pretrained",
             "test",
             "val",
@@ -59,6 +60,7 @@ def _runs_of_semi_supervised(client, e, tag):
         statics = [
             run.data.params["fd_source"],
             _get_num_labeled(run.data.params["percent_fail_runs"]),
+            _get_percent_broken(run.data.tags["version"]),
             "pretrained_checkpoint" in run.data.params,
         ]
         test_rmse = _get_test_value(f"regression_loss_fd{statics[0]}", run)
@@ -91,6 +93,17 @@ def _filter_complete_with_tag(replications, tag):
 
 def _get_num_labeled(percent_labeled):
     return len(LIST_PATTERN.findall(percent_labeled))
+
+
+def _get_percent_broken(version):
+    match = VERSION_PATTERN.match(version)
+    if match is not None:
+        percent_broken = match.group("percent_broken") or "0.0"
+        percent_broken = float(percent_broken)
+    else:
+        raise ValueError(f"Could not parse version tag '{version}'")
+
+    return percent_broken
 
 
 def _get_test_value(metric, run):
