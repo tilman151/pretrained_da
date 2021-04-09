@@ -6,29 +6,16 @@ import torch
 from lightning import baseline
 
 
-class TestBaseline(unittest.TestCase):
-    def setUp(self):
-        self.trade_off = 0.5
-        self.net = baseline.Baseline(
-            in_channels=14,
-            seq_len=30,
-            num_layers=4,
-            kernel_size=3,
-            base_filters=16,
-            latent_dim=64,
-            optim_type="adam",
-            lr=0.01,
-        )
-
+class TestBaselineTemplate:
     @torch.no_grad()
     def test_encoder(self):
         inputs = torch.randn(16, 14, 30)
         outputs = self.net.encoder(inputs)
-        self.assertEqual(torch.Size((16, 64)), outputs.shape)
+        self.assertEqual(self.encoder_shape, outputs.shape)
 
     @torch.no_grad()
     def test_regressor(self):
-        inputs = torch.randn(16, 64)
+        inputs = torch.randn(*self.encoder_shape)
         outputs = self.net.regressor(inputs)
         self.assertEqual(torch.Size((16,)), outputs.shape)
 
@@ -162,3 +149,36 @@ class TestBaseline(unittest.TestCase):
             actual_value = call[1][1].item()
             with self.subTest(metric):
                 self.assertAlmostEqual(expected_value, actual_value, delta=delta)
+
+
+class TestCnnBaseline(unittest.TestCase, TestBaselineTemplate):
+    def setUp(self):
+        self.encoder_shape = torch.Size((16, 64))
+        self.trade_off = 0.5
+        self.net = baseline.Baseline(
+            in_channels=14,
+            seq_len=30,
+            num_layers=4,
+            kernel_size=3,
+            base_filters=16,
+            latent_dim=64,
+            optim_type="adam",
+            lr=0.01,
+        )
+
+
+class TestLstmBaseline(unittest.TestCase, TestBaselineTemplate):
+    def setUp(self):
+        self.encoder_shape = torch.Size((16, 8))
+        self.trade_off = 0.5
+        self.net = baseline.Baseline(
+            in_channels=14,
+            seq_len=30,
+            num_layers=4,
+            kernel_size=3,
+            base_filters=16,
+            latent_dim=8,
+            optim_type="adam",
+            lr=0.01,
+            encoder="lstm",
+        )
