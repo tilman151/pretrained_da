@@ -23,6 +23,7 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         lr,
         weight_decay,
         record_embeddings=False,
+        encoder="cnn",
     ):
         super().__init__()
 
@@ -39,17 +40,9 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         self.lr = lr
         self.weight_decay = weight_decay
         self.record_embeddings = record_embeddings
+        self.encoder_type = encoder
 
-        self.encoder = networks.Encoder(
-            self.in_channels,
-            self.base_filters,
-            self.kernel_size,
-            self.num_layers,
-            self.latent_dim,
-            self.seq_len,
-            self.dropout,
-            norm_outputs=True,
-        )
+        self.encoder = self._get_encoder()
         if self.domain_tradeoff > 0:
             self.domain_disc = networks.DomainDiscriminator(
                 self.latent_dim,
@@ -68,6 +61,35 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
 
         self.save_hyperparameters()
         self.hparams["mode"] = "metric"
+
+    def _get_encoder(self):
+        if self.encoder_type == "cnn":
+            encoder = networks.Encoder(
+                self.in_channels,
+                self.base_filters,
+                self.kernel_size,
+                self.num_layers,
+                self.latent_dim,
+                self.seq_len,
+                self.dropout,
+                norm_outputs=True,
+            )
+        elif self.encoder_type == "lstm":
+            encoder = networks.EncoderEllefsenEtAl(
+                self.in_channels,
+                self.base_filters,
+                self.kernel_size,
+                self.num_layers,
+                self.latent_dim,
+                self.seq_len,
+                self.dropout,
+                norm_outputs=True,
+            )
+        else:
+            raise ValueError(
+                f"Unknown encoder type {self.encoder}. Use either 'cnn' or 'lstm'."
+            )
+        return encoder
 
     def configure_optimizers(self):
         return torch.optim.Adam(

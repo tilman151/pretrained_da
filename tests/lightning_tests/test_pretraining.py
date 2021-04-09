@@ -6,23 +6,7 @@ import torch
 from lightning import pretraining
 
 
-class TestUnsupervisedPretraining(unittest.TestCase):
-    def setUp(self):
-        self.net = pretraining.UnsupervisedPretraining(
-            in_channels=14,
-            seq_len=30,
-            num_layers=4,
-            kernel_size=3,
-            base_filters=16,
-            latent_dim=64,
-            dropout=0.1,
-            domain_tradeoff=0.001,
-            domain_disc_dim=32,
-            num_disc_layers=2,
-            weight_decay=0,
-            lr=0.01,
-        )
-
+class TestUnsupervisedPretraining:
     def test_mode_hparam(self):
         self.assertLess(1, len(self.net.hparams))
         self.assertIn("mode", self.net.hparams)
@@ -32,7 +16,7 @@ class TestUnsupervisedPretraining(unittest.TestCase):
     def test_encoder(self):
         inputs = torch.randn(16, 14, 30)
         outputs = self.net.encoder(inputs)
-        self.assertEqual(torch.Size((16, 64)), outputs.shape)
+        self.assertEqual(self.encoder_shape, outputs.shape)
 
     @torch.no_grad()
     def test_get_anchor_query_embeddings(self):
@@ -42,8 +26,8 @@ class TestUnsupervisedPretraining(unittest.TestCase):
             anchors, queries
         )
 
-        self.assertEqual(torch.Size((16, 64)), anchor_embeddings.shape)
-        self.assertEqual(torch.Size((16, 64)), query_embeddings.shape)
+        self.assertEqual(self.encoder_shape, anchor_embeddings.shape)
+        self.assertEqual(self.encoder_shape, query_embeddings.shape)
 
         for norm in torch.norm(anchor_embeddings, dim=1).tolist():
             self.assertAlmostEqual(1.0, norm, places=6)
@@ -119,15 +103,18 @@ class TestUnsupervisedPretraining(unittest.TestCase):
     @torch.no_grad()
     def test_metric_val_reduction(self, mock_log):
         paired_batches = 600
-        anchor_embeddings = torch.randn(paired_batches, 32, 64)
-        query_embeddings = torch.randn(paired_batches, 32, 64)
+        embedding_dim = self.encoder_shape[-1]
+        anchor_embeddings = torch.randn(paired_batches, 32, embedding_dim)
+        query_embeddings = torch.randn(paired_batches, 32, embedding_dim)
         domain_predictions = torch.randn(paired_batches, 32)
         self._mock_predictions(anchor_embeddings, query_embeddings, domain_predictions)
 
         self._feed_dummy_val(paired_batches)
 
         regression_loss = torch.pairwise_distance(
-            anchor_embeddings.view(-1, 64), query_embeddings.view(-1, 64), eps=1e-8
+            anchor_embeddings.view(-1, embedding_dim),
+            query_embeddings.view(-1, embedding_dim),
+            eps=1e-8,
         )
         regression_loss = torch.mean(regression_loss ** 2)
         domain_labels = torch.zeros_like(domain_predictions)
@@ -144,8 +131,9 @@ class TestUnsupervisedPretraining(unittest.TestCase):
 
     def test_metric_val_updates(self):
         paired_batches = 600
-        anchor_embeddings = torch.randn(paired_batches, 32, 64)
-        query_embeddings = torch.randn(paired_batches, 32, 64)
+        embedding_dim = self.encoder_shape[-1]
+        anchor_embeddings = torch.randn(paired_batches, 32, embedding_dim)
+        query_embeddings = torch.randn(paired_batches, 32, embedding_dim)
         domain_predictions = torch.randn(paired_batches, 32)
         self._mock_predictions(anchor_embeddings, query_embeddings, domain_predictions)
 
@@ -181,3 +169,42 @@ class TestUnsupervisedPretraining(unittest.TestCase):
             actual_value = call[1][1].item()
             with self.subTest(metric):
                 self.assertAlmostEqual(expected_value, actual_value, delta=delta)
+
+
+class TestCnnUnsupervisedPretraining(unittest.TestCase, TestUnsupervisedPretraining):
+    def setUp(self):
+        self.encoder_shape = torch.Size((16, 64))
+        self.net = pretraining.UnsupervisedPretraining(
+            in_channels=14,
+            seq_len=30,
+            num_layers=4,
+            kernel_size=3,
+            base_filters=16,
+            latent_dim=64,
+            dropout=0.1,
+            domain_tradeoff=0.001,
+            domain_disc_dim=32,
+            num_disc_layers=2,
+            weight_decay=0,
+            lr=0.01,
+        )
+
+
+class TestLstmUnsupervisedPretraining(unittest.TestCase, TestUnsupervisedPretraining):
+    def setUp(self):
+        self.encoder_shape = torch.Size((16, 8))
+        self.net = pretraining.UnsupervisedPretraining(
+            in_channels=14,
+            seq_len=30,
+            num_layers=4,
+            kernel_size=3,
+            base_filters=16,
+            latent_dim=8,
+            dropout=0.1,
+            domain_tradeoff=0.001,
+            domain_disc_dim=32,
+            num_disc_layers=2,
+            weight_decay=0,
+            lr=0.01,
+            encoder="lstm",
+        )
