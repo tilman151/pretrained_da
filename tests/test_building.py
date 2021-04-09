@@ -356,6 +356,7 @@ class TestBuildingFunctions(unittest.TestCase):
             kernel_size=3,
             base_filters=self.config["base_filters"],
             latent_dim=self.config["latent_dim"],
+            dropout=self.config["dropout"],
             optim_type="adam",
             lr=self.config["lr"],
             record_embeddings=False,

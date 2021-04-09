@@ -104,6 +104,7 @@ def build_baseline_from_config(config, seq_len, pretrained_encoder_path):
         kernel_size=3,
         base_filters=config["base_filters"],
         latent_dim=config["latent_dim"],
+        dropout=config["dropout"],
         optim_type="adam",
         lr=config["lr"],
         record_embeddings=False,

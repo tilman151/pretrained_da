@@ -162,6 +162,7 @@ class TestCnnBaseline(unittest.TestCase, TestBaselineTemplate):
             kernel_size=3,
             base_filters=16,
             latent_dim=64,
+            dropout=0.1,
             optim_type="adam",
             lr=0.01,
         )
@@ -178,6 +179,7 @@ class TestLstmBaseline(unittest.TestCase, TestBaselineTemplate):
             kernel_size=3,
             base_filters=16,
             latent_dim=8,
+            dropout=0.0,
             optim_type="adam",
             lr=0.01,
             encoder="lstm",

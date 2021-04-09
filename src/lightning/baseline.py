@@ -15,6 +15,7 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         kernel_size,
         base_filters,
         latent_dim,
+        dropout,
         optim_type,
         lr,
         record_embeddings=False,
@@ -28,6 +29,7 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         self.kernel_size = kernel_size
         self.base_filters = base_filters
         self.latent_dim = latent_dim
+        self.dropout = dropout
         self.optim_type = optim_type
         self.lr = lr
         self.record_embeddings = record_embeddings
@@ -52,7 +54,7 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
                 self.num_layers,
                 self.latent_dim,
                 self.seq_len,
-                dropout=0,
+                dropout=self.dropout,
                 norm_outputs=False,
             )
         elif self.encoder_type == "lstm":
@@ -63,7 +65,7 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
                 self.num_layers,
                 self.latent_dim,
                 self.seq_len,
-                dropout=0,
+                dropout=self.dropout,
                 norm_outputs=False,
             )
         else:
