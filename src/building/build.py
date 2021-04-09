@@ -74,7 +74,9 @@ def build_dann_from_config(config, seq_len, pretrained_encoder_path, record_embe
     return model
 
 
-def build_baseline(source, fails, config, pretrained_encoder_path, gpu, seed, version):
+def build_baseline(
+    source, fails, config, encoder, pretrained_encoder_path, gpu, seed, version
+):
     logger = loggers.MLTBLogger(
         get_logdir(), loggers.baseline_experiment_name(source), tag=version
     )
@@ -90,13 +92,15 @@ def build_baseline(source, fails, config, pretrained_encoder_path, gpu, seed, ve
     data = datasets.BaselineDataModule(
         fd_source=source, batch_size=config["batch_size"], percent_fail_runs=fails
     )
-    model = build_baseline_from_config(config, data.window_size, pretrained_encoder_path)
+    model = build_baseline_from_config(
+        config, data.window_size, encoder, pretrained_encoder_path
+    )
     add_hparams(model, data, seed)
 
     return trainer, data, model
 
 
-def build_baseline_from_config(config, seq_len, pretrained_encoder_path):
+def build_baseline_from_config(config, seq_len, encoder, pretrained_encoder_path):
     model = baseline.Baseline(
         in_channels=14,
         seq_len=seq_len,
@@ -108,6 +112,7 @@ def build_baseline_from_config(config, seq_len, pretrained_encoder_path):
         optim_type="adam",
         lr=config["lr"],
         record_embeddings=False,
+        encoder=encoder,
     )
     if pretrained_encoder_path is not None:
         model.load_encoder(pretrained_encoder_path)
@@ -122,6 +127,7 @@ def build_pretraining(
     percent_fail_runs,
     arch_config,
     config,
+    encoder,
     mode,
     record_embeddings,
     gpu,
@@ -161,11 +167,21 @@ def build_pretraining(
     use_adaption = target is not None
     if mode == "metric":
         model = build_pretraining_from_config(
-            arch_config, config, data.window_size, record_embeddings, use_adaption
+            arch_config,
+            config,
+            data.window_size,
+            encoder,
+            record_embeddings,
+            use_adaption,
         )
     elif mode == "autoencoder":
         model = build_autoencoder_from_config(
-            arch_config, config, data.window_size, record_embeddings, use_adaption
+            arch_config,
+            config,
+            data.window_size,
+            encoder,
+            record_embeddings,
+            use_adaption,
         )
     else:
         raise ValueError(f"Unrecognized pre-training mode {mode}.")
@@ -211,7 +227,7 @@ def _build_datamodule(
 
 
 def build_pretraining_from_config(
-    arch_config, config, seq_len, record_embeddings, use_adaption
+    arch_config, config, seq_len, encoder, record_embeddings, use_adaption
 ):
     model = pretraining.UnsupervisedPretraining(
         in_channels=14,
@@ -227,13 +243,14 @@ def build_pretraining_from_config(
         lr=config["lr"],
         weight_decay=0.0,
         record_embeddings=record_embeddings,
+        encoder=encoder,
     )
 
     return model
 
 
 def build_autoencoder_from_config(
-    arch_config, config, seq_len, record_embeddings, use_adaption
+    arch_config, config, seq_len, encoder, record_embeddings, use_adaption
 ):
     model = autoencoder.AutoencoderPretraining(
         in_channels=14,
@@ -249,6 +266,7 @@ def build_autoencoder_from_config(
         lr=config["lr"],
         weight_decay=0.0,
         record_embeddings=record_embeddings,
+        encoder=encoder,
     )
 
     return model

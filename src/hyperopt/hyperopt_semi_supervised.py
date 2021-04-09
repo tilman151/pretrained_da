@@ -42,6 +42,7 @@ def tune_pretraining(config, arch_config, source, percent_broken):
             arch_config,
             config,
             data.window_size,
+            encoder="cnn",
             record_embeddings=False,
             use_adaption=False,
         )

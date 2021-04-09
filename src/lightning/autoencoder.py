@@ -23,6 +23,7 @@ class AutoencoderPretraining(pl.LightningModule, DataHparamsMixin):
         lr,
         weight_decay,
         record_embeddings=False,
+        encoder="cnn",
     ):
         super().__init__()
 

@@ -12,7 +12,7 @@ script_path = os.path.dirname(__file__)
 config_root = os.path.join(script_path, "..", "configs")
 
 
-def reproduce(base_version, percent_fails, master_seed):
+def reproduce(base_version, percent_fails, encoder, master_seed):
     ray.init()
 
     if base_version is None:
@@ -40,6 +40,7 @@ def reproduce(base_version, percent_fails, master_seed):
                     arch_config,
                     pre_config,
                     pretrain=False,
+                    encoder=encoder,
                     mode="metric",
                     record_embeddings=False,
                     replications=10,
@@ -75,8 +76,14 @@ if __name__ == "__main__":
         help="percentage of failed runs",
     )
     parser.add_argument(
+        "--encoder",
+        default="cnn",
+        choices=["cnn", "lstm"],
+        help="encoder type",
+    )
+    parser.add_argument(
         "--seed", default=42, help="master seed used to produce all other seeds"
     )
     opt = parser.parse_args()
 
-    reproduce(opt.base_version, opt.percent_fails, opt.seed)
+    reproduce(opt.base_version, opt.percent_fails, opt.encoder, opt.seed)

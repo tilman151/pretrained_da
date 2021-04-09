@@ -193,6 +193,7 @@ class TestBuildingFunctions(unittest.TestCase):
             0.5,
             self.config,
             self.pretraining_config,
+            "cnn",
             mode,
             False,
             1,
@@ -230,6 +231,7 @@ class TestBuildingFunctions(unittest.TestCase):
             self.config,
             self.pretraining_config,
             mock_datamodule().window_size,
+            "cnn",
             False,
             True,
         )
@@ -247,7 +249,9 @@ class TestBuildingFunctions(unittest.TestCase):
         )
 
     def _check_pretraining_from_config(self, building_func, mock_pretraining):
-        building_func(self.config, self.pretraining_config, 30, False, use_adaption=True)
+        building_func(
+            self.config, self.pretraining_config, 30, "cnn", False, use_adaption=True
+        )
         mock_pretraining.assert_called_with(
             in_channels=14,
             seq_len=30,
@@ -255,6 +259,7 @@ class TestBuildingFunctions(unittest.TestCase):
             kernel_size=3,
             base_filters=self.config["base_filters"],
             latent_dim=self.config["latent_dim"],
+            encoder="cnn",
             dropout=self.pretraining_config["dropout"],
             domain_tradeoff=self.pretraining_config["domain_tradeoff"],
             domain_disc_dim=self.config["latent_dim"],
@@ -263,7 +268,9 @@ class TestBuildingFunctions(unittest.TestCase):
             weight_decay=0.0,
             record_embeddings=False,
         )
-        building_func(self.config, self.pretraining_config, 30, False, use_adaption=False)
+        building_func(
+            self.config, self.pretraining_config, 30, "cnn", False, use_adaption=False
+        )
         mock_pretraining.assert_called_with(
             in_channels=14,
             seq_len=30,
@@ -271,6 +278,7 @@ class TestBuildingFunctions(unittest.TestCase):
             kernel_size=3,
             base_filters=self.config["base_filters"],
             latent_dim=self.config["latent_dim"],
+            encoder="cnn",
             dropout=self.pretraining_config["dropout"],
             domain_tradeoff=0.0,
             domain_disc_dim=self.config["latent_dim"],
@@ -296,7 +304,7 @@ class TestBuildingFunctions(unittest.TestCase):
         mock_logger.return_value = "mock_logger"
         mock_checkpoint.return_value = "mock_checkpoint"
         with self.subTest("no_encoder"):
-            build.build_baseline(2, 1.0, self.config, None, 1, 42, "version")
+            build.build_baseline(2, 1.0, self.config, "cnn", None, 1, 42, "version")
             mock_logger.assert_called_with(
                 get_logdir(),
                 loggers.baseline_experiment_name(2),
@@ -316,10 +324,13 @@ class TestBuildingFunctions(unittest.TestCase):
             mock_baseline_from_config.assert_called_with(
                 self.config,
                 mock_datamodule().window_size,
+                "cnn",
                 None,
             )
         with self.subTest("with_encoder"):
-            build.build_baseline(2, 1.0, self.config, "encoder_path", 1, 42, "version")
+            build.build_baseline(
+                2, 1.0, self.config, "cnn", "encoder_path", 1, 42, "version"
+            )
             mock_build_trainer.assert_called_with(
                 "mock_logger",
                 "mock_checkpoint",
@@ -334,17 +345,18 @@ class TestBuildingFunctions(unittest.TestCase):
             mock_baseline_from_config.assert_called_with(
                 self.config,
                 mock_datamodule().window_size,
+                "cnn",
                 "encoder_path",
             )
 
     @mock.patch("lightning.baseline.Baseline")
     def test_build_baseline_from_config(self, mock_baseline):
         with self.subTest("no_encoder"):
-            build.build_baseline_from_config(self.config, 30, None)
+            build.build_baseline_from_config(self.config, 30, "cnn", None)
             self._assert_baseline_build_correctly(mock_baseline)
             mock_baseline().load_encoder.assert_not_called()
         with self.subTest("with_encoder"):
-            build.build_baseline_from_config(self.config, 30, "encoder_path")
+            build.build_baseline_from_config(self.config, 30, "cnn", "encoder_path")
             self._assert_baseline_build_correctly(mock_baseline)
             mock_baseline().load_encoder.assert_called_with("encoder_path")
 
@@ -360,4 +372,5 @@ class TestBuildingFunctions(unittest.TestCase):
             optim_type="adam",
             lr=self.config["lr"],
             record_embeddings=False,
+            encoder="cnn",
         )

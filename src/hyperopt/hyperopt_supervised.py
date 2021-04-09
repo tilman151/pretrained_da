@@ -15,12 +15,10 @@ def tune_supervised(config, source, arch_config):
     arch_config.update(config)
 
     logger = pl_loggers.TensorBoardLogger(
-            _get_hyperopt_logdir(),
-            loggers.baseline_experiment_name(source),
+        _get_hyperopt_logdir(),
+        loggers.baseline_experiment_name(source),
     )
-    checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        monitor="val/regression_loss"
-    )
+    checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor="val/regression_loss")
     tune_callback = TuneReportCallback(
         {
             "reg_loss": "val/regression_loss",
@@ -39,9 +37,11 @@ def tune_supervised(config, source, arch_config):
     )
 
     data = datasets.BaselineDataModule(
-            fd_source=source, batch_size=arch_config["batch_size"]
+        fd_source=source, batch_size=arch_config["batch_size"]
     )
-    model = building.build_baseline_from_config(arch_config, data.window_size, None)
+    model = building.build_baseline_from_config(
+        arch_config, data.window_size, "cnn", None
+    )
     building.add_hparams(model, data, None)
 
     trainer.fit(model, datamodule=data)
@@ -95,9 +95,13 @@ def optimize_supervised(source, arch_config, num_trials):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Hyperparameter optimization for supervised training")
+    parser = argparse.ArgumentParser(
+        description="Hyperparameter optimization for supervised training"
+    )
     parser.add_argument("--source", type=int, required=True, help="source FD number")
-    parser.add_argument("--arch_config", required=True, help="path to architecture base config")
+    parser.add_argument(
+        "--arch_config", required=True, help="path to architecture base config"
+    )
     parser.add_argument(
         "--num_trials", type=int, required=True, help="number of hyperopt trials"
     )

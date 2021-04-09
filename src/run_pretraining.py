@@ -12,6 +12,7 @@ def run(
     percent_fail_runs,
     arch_config,
     config,
+    encoder,
     mode,
     record_embeddings,
     seed,
@@ -25,6 +26,7 @@ def run(
         percent_fail_runs,
         arch_config,
         config,
+        encoder,
         mode,
         record_embeddings,
         gpu,
@@ -57,6 +59,7 @@ def run_multiple(
     fails,
     arch_config,
     config,
+    encoder,
     mode,
     record_embeddings,
     replications,
@@ -80,6 +83,7 @@ def run_multiple(
                     f,
                     arch_config,
                     config,
+                    encoder,
                     mode,
                     record_embeddings,
                     s,
@@ -112,6 +116,12 @@ if __name__ == "__main__":
     )
     parser.add_argument("--config", required=True, help="path to config file")
     parser.add_argument(
+        "--encoder",
+        default="cnn",
+        choices=["cnn", "lstm"],
+        help="encoder type",
+    )
+    parser.add_argument(
         "--mode",
         default="metric",
         choices=["metric", "autoencoder"],
@@ -137,6 +147,7 @@ if __name__ == "__main__":
         opt.fails,
         _arch_config,
         _config,
+        opt.encoder,
         opt.mode,
         opt.record_embeddings,
         opt.replications,
