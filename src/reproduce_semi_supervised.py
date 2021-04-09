@@ -12,15 +12,13 @@ script_path = os.path.dirname(__file__)
 config_root = os.path.join(script_path, "..", "configs")
 
 
-def reproduce(base_version, master_seed):
+def reproduce(base_version, percent_fails, percent_broken, master_seed):
     ray.init()
 
     if base_version is None:
         base_version = datetime.now().timestamp()
     error_log = []
     fds = [1, 2, 3, 4]
-    percent_fails = [1.0, 0.4, 0.2, 0.1, 0.02]
-    percent_broken = [0.8]
     random.seed(master_seed)
     seeds = [
         [
@@ -75,8 +73,20 @@ if __name__ == "__main__":
         "base_version", default=None, help="common prefix for the version tag"
     )
     parser.add_argument(
+        "--percent_fails",
+        nargs="*",
+        default=[1.0, 0.4, 0.2, 0.1, 0.02],
+        help="percentage of failed runs",
+    )
+    parser.add_argument(
+        "--percent_broken",
+        nargs="*",
+        default=[1.0, 0.8, 0.6, 0.4, 0.2],
+        help="percentage of degradation of unfailed runs",
+    )
+    parser.add_argument(
         "--seed", default=21, help="master seed used to produce all other seeds"
     )
     opt = parser.parse_args()
 
-    reproduce(opt.base_version, opt.seed)
+    reproduce(opt.base_version, opt.percent_fails, opt.percent_broken, opt.seed)
