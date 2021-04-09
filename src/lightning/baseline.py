@@ -18,6 +18,7 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         optim_type,
         lr,
         record_embeddings=False,
+        encoder="cnn",
     ):
         super().__init__()
 
@@ -30,17 +31,9 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         self.optim_type = optim_type
         self.lr = lr
         self.record_embeddings = record_embeddings
+        self.encoder_type = encoder
 
-        self.encoder = networks.Encoder(
-            self.in_channels,
-            self.base_filters,
-            self.kernel_size,
-            self.num_layers,
-            self.latent_dim,
-            self.seq_len,
-            dropout=0,
-            norm_outputs=False,
-        )
+        self.encoder = self._get_encoder()
         self.regressor = networks.Regressor(latent_dim)
 
         self.criterion_regression = metrics.RMSELoss(num_elements=0)
@@ -49,6 +42,36 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         self.regression_metrics = {i: metrics.RMSELoss() for i in range(1, 5)}
 
         self.save_hyperparameters()
+
+    def _get_encoder(self):
+        if self.encoder_type == "cnn":
+            encoder = networks.Encoder(
+                self.in_channels,
+                self.base_filters,
+                self.kernel_size,
+                self.num_layers,
+                self.latent_dim,
+                self.seq_len,
+                dropout=0,
+                norm_outputs=False,
+            )
+        elif self.encoder_type == "lstm":
+            encoder = networks.EncoderEllefsenEtAl(
+                self.in_channels,
+                self.base_filters,
+                self.kernel_size,
+                self.num_layers,
+                self.latent_dim,
+                self.seq_len,
+                dropout=0,
+                norm_outputs=False,
+            )
+        else:
+            raise ValueError(
+                f"Unknown encoder type {self.encoder}. Use either 'cnn' or 'lstm'."
+            )
+
+        return encoder
 
     def add_data_hparams(self, data):
         self.hparams.update(data.hparams)
