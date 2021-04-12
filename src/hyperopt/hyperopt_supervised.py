@@ -11,7 +11,7 @@ import datasets
 from lightning import loggers
 
 
-def tune_supervised(config, source, arch_config):
+def tune_supervised(config, source, arch_config, encoder):
     arch_config.update(config)
 
     logger = pl_loggers.TensorBoardLogger(
@@ -40,7 +40,7 @@ def tune_supervised(config, source, arch_config):
         fd_source=source, batch_size=arch_config["batch_size"]
     )
     model = building.build_baseline_from_config(
-        arch_config, data.window_size, "cnn", None
+        arch_config, data.window_size, encoder, None
     )
     building.add_hparams(model, data, None)
 
@@ -54,7 +54,7 @@ def _get_hyperopt_logdir():
     return log_dir
 
 
-def optimize_supervised(source, arch_config, num_trials):
+def optimize_supervised(source, arch_config, encoder, num_trials):
     config = {
         "dropout": tune.quniform(0.0, 0.5, 0.1),
         "lr": tune.qloguniform(1e-4, 1e-1, 5e-5),
@@ -73,6 +73,7 @@ def optimize_supervised(source, arch_config, num_trials):
         tune_supervised,
         source=source,
         arch_config=arch_config,
+        encoder=encoder,
     )
     analysis = tune.run(
         tune_func,
@@ -103,9 +104,15 @@ if __name__ == "__main__":
         "--arch_config", required=True, help="path to architecture base config"
     )
     parser.add_argument(
+        "--encoder",
+        default="cnn",
+        choices=["cnn", "lstm"],
+        help="encoder type",
+    )
+    parser.add_argument(
         "--num_trials", type=int, required=True, help="number of hyperopt trials"
     )
     opt = parser.parse_args()
 
     _arch_config = building.load_config(opt.arch_config)
-    optimize_supervised(opt.source, _arch_config, opt.num_trials)
+    optimize_supervised(opt.source, _arch_config, opt.encoder, opt.num_trials)
