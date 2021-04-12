@@ -11,7 +11,7 @@ import datasets
 from lightning import loggers
 
 
-def tune_pretraining(config, arch_config, source, percent_broken):
+def tune_pretraining(config, arch_config, source, percent_broken, encoder):
     best_scores = []
     for i in range(5):
         logger = pl_loggers.TensorBoardLogger(
@@ -42,7 +42,7 @@ def tune_pretraining(config, arch_config, source, percent_broken):
             arch_config,
             config,
             data.window_size,
-            encoder="cnn",
+            encoder=encoder,
             record_embeddings=False,
             use_adaption=False,
         )
@@ -64,7 +64,7 @@ def _get_hyperopt_logdir():
     return log_dir
 
 
-def optimize_pretraining(source, percent_broken, arch_config, num_trials):
+def optimize_pretraining(source, percent_broken, arch_config, encoder, num_trials):
     config = {
         "domain_tradeoff": tune.choice([0.0]),
         "dropout": tune.quniform(0.0, 0.5, 0.1),
@@ -84,6 +84,7 @@ def optimize_pretraining(source, percent_broken, arch_config, num_trials):
         arch_config=arch_config,
         source=source,
         percent_broken=percent_broken,
+        encoder=encoder,
     )
     analysis = tune.run(
         tune_func,
@@ -115,9 +116,17 @@ if __name__ == "__main__":
     )
     parser.add_argument("arch_config_path", help="path to architecture config JSON")
     parser.add_argument(
+        "--encoder",
+        default="cnn",
+        choices=["cnn", "lstm"],
+        help="encoder type",
+    )
+    parser.add_argument(
         "--num_trials", type=int, required=True, help="number of hyperopt trials"
     )
     opt = parser.parse_args()
 
     _arch_config = building.load_config(opt.arch_config_path)
-    optimize_pretraining(opt.source, opt.percent_broken, _arch_config, opt.num_trials)
+    optimize_pretraining(
+        opt.source, opt.percent_broken, _arch_config, opt.encoder, opt.num_trials
+    )
