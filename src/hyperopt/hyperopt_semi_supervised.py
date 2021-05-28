@@ -11,7 +11,7 @@ import datasets
 from lightning import loggers
 
 
-def tune_pretraining(config, arch_config, source, percent_broken, encoder):
+def tune_pretraining(config, arch_config, source, percent_broken, encoder, mode):
     best_scores = []
     for i in range(5):
         logger = pl_loggers.TensorBoardLogger(
@@ -38,14 +38,24 @@ def tune_pretraining(config, arch_config, source, percent_broken, encoder):
             min_distance=config["min_distance"],
             truncate_val=True,
         )
-        model = building.build_pretraining_from_config(
-            arch_config,
-            config,
-            data.window_size,
-            encoder=encoder,
-            record_embeddings=False,
-            use_adaption=False,
-        )
+        if mode == "metric":
+            model = building.build_pretraining_from_config(
+                arch_config,
+                config,
+                data.window_size,
+                encoder=encoder,
+                record_embeddings=False,
+                use_adaption=False,
+            )
+        else:
+            model = building.build_autoencoder_from_config(
+                arch_config,
+                config,
+                data.window_size,
+                encoder=encoder,
+                record_embeddings=False,
+                use_adaption=False,
+            )
         building.add_hparams(model, data, 42)
 
         trainer.fit(model, datamodule=data)
@@ -64,7 +74,7 @@ def _get_hyperopt_logdir():
     return log_dir
 
 
-def optimize_pretraining(source, percent_broken, arch_config, encoder, num_trials):
+def optimize_pretraining(source, percent_broken, arch_config, encoder, mode, num_trials):
     config = {
         "domain_tradeoff": tune.choice([0.0]),
         "dropout": tune.quniform(0.0, 0.5, 0.1),
@@ -85,6 +95,7 @@ def optimize_pretraining(source, percent_broken, arch_config, encoder, num_trial
         source=source,
         percent_broken=percent_broken,
         encoder=encoder,
+        mode=mode,
     )
     analysis = tune.run(
         tune_func,
@@ -122,11 +133,22 @@ if __name__ == "__main__":
         help="encoder type",
     )
     parser.add_argument(
+        "--mode",
+        choices=["metric", "autoencoder"],
+        default="metric",
+        help="metric or autoencoder pretraining mode",
+    )
+    parser.add_argument(
         "--num_trials", type=int, required=True, help="number of hyperopt trials"
     )
     opt = parser.parse_args()
 
     _arch_config = building.load_config(opt.arch_config_path)
     optimize_pretraining(
-        opt.source, opt.percent_broken, _arch_config, opt.encoder, opt.num_trials
+        opt.source,
+        opt.percent_broken,
+        _arch_config,
+        opt.encoder,
+        opt.mode,
+        opt.num_trials,
     )
