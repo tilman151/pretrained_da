@@ -12,13 +12,14 @@ script_path = os.path.dirname(__file__)
 config_root = os.path.join(script_path, "..", "configs")
 
 
-def reproduce(base_version, percent_fails, percent_broken, encoder, master_seed):
+def reproduce(base_version, percent_fails, percent_broken, encoder, mode, master_seed):
     ray.init()
 
     if base_version is None:
         base_version = datetime.now().timestamp()
     error_log = []
     fds = [1, 2, 3, 4]
+    pre_mode = "pre" if mode == "metric" else "ae"
     random.seed(master_seed)
     seeds = [
         [
@@ -29,9 +30,9 @@ def reproduce(base_version, percent_fails, percent_broken, encoder, master_seed)
     ]
 
     for num_fd, fd in enumerate(fds):
-        arch_config_path = os.path.join(config_root, f"baseline_fd{fd}.json")
+        arch_config_path = os.path.join(config_root, f"{encoder}_fd{fd}.json")
         arch_config = building.load_config(arch_config_path)
-        pre_config_path = os.path.join(config_root, f"baseline_pre_fd{fd}.json")
+        pre_config_path = os.path.join(config_root, f"{encoder}_{pre_mode}_fd{fd}.json")
         pre_config = building.load_config(pre_config_path)
         for num_broken, broken in enumerate(percent_broken):
             for num_fails, fails in enumerate(percent_fails):
@@ -45,7 +46,7 @@ def reproduce(base_version, percent_fails, percent_broken, encoder, master_seed)
                         pre_config,
                         pretrain=True,
                         encoder=encoder,
-                        mode="metric",
+                        mode=mode,
                         record_embeddings=False,
                         replications=10,
                         gpu=[0],
@@ -92,10 +93,21 @@ if __name__ == "__main__":
         help="encoder type",
     )
     parser.add_argument(
+        "--mode",
+        default="metric",
+        choices=["metric", "autoencoder"],
+        help="metric or autoencoder pre-training mode",
+    )
+    parser.add_argument(
         "--seed", default=21, help="master seed used to produce all other seeds"
     )
     opt = parser.parse_args()
 
     reproduce(
-        opt.base_version, opt.percent_fails, opt.percent_broken, opt.encoder, opt.seed
+        opt.base_version,
+        opt.percent_fails,
+        opt.percent_broken,
+        opt.encoder,
+        opt.mode,
+        opt.seed,
     )
