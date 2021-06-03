@@ -83,7 +83,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--percent_broken",
         nargs="*",
-        default=[1.0, 0.8, 0.6, 0.4, 0.2],
+        type=float,
+        default=[0.8, 0.6, 0.4],
         help="percentage of degradation of unfailed runs",
     )
     parser.add_argument(
