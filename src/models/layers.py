@@ -1,4 +1,7 @@
+from typing import Union
+
 import torch
+from pytorch_probgraph import UnitLayer
 from torch import nn as nn
 
 
@@ -38,3 +41,50 @@ class GradientReversalLayer(nn.Module):
     def forward(self, inputs):
         """Perform forward pass of gradient reversal."""
         return gradient_reversal(inputs)
+
+
+class RectifiedLinearLayer(UnitLayer):
+    """
+    A UnitLayer of rectified linear units.
+    """
+
+    def __init__(self, bias: torch.Tensor):
+        """
+        :param bias: Bias for the ReLU unit.
+        """
+        super().__init__()
+        self.register_parameter("bias", torch.nn.Parameter(bias))
+
+    def mean_cond(
+        self, interaction: Union[torch.Tensor, None] = None, N: int = 1
+    ) -> torch.Tensor:
+        return nn.functional.relu(interaction + self.bias)
+
+    def sample_cond(
+        self, interaction: Union[torch.Tensor, None] = None, N: int = 1
+    ) -> torch.Tensor:
+        interaction = interaction + self.bias
+        return nn.functional.relu(interaction + torch.sigmoid(interaction))
+
+    def transform(self, input: torch.Tensor) -> torch.Tensor:
+        return input
+
+    def transform_invert(self, transformed_input: torch.Tensor) -> torch.Tensor:
+        return transformed_input
+
+    def logprob_cond(
+        self, input: torch.Tensor, interaction: Union[torch.Tensor, float] = 0.0
+    ) -> torch.Tensor:
+        raise NotImplementedError
+
+    def logprob_joint(self, input: torch.Tensor) -> torch.Tensor:
+        return torch.sum(input * self.bias, dim=list(range(1, len(input.shape))))
+
+    def free_energy(self, interaction: torch.Tensor) -> torch.Tensor:
+        raise NotImplementedError
+
+    def backward(
+        self, input: torch.Tensor, factor: Union[torch.Tensor, float] = 1.0
+    ) -> None:
+        if self.bias.requires_grad:
+            self.bias.backward((factor * input).mean(dim=0, keepdim=True).detach())
