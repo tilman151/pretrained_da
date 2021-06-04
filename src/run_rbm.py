@@ -87,7 +87,8 @@ def ray_train(source, percent_broken, failed_idx, arch_config, encoder, s, gpu, 
 
 def run_pretraining(source, percent_broken, failed_idx, arch_config, gpu):
     print("Pre-train RBM layer...")
-    rbm: RestrictedBoltzmannMachineCD = building.build_rbm(14, 14)
+    device = torch.device(f"cuda:{gpu}")
+    rbm: RestrictedBoltzmannMachineCD = building.build_rbm(14, 14).to(device)
     dm = building.build_datamodule(
         source,
         None,
@@ -103,15 +104,16 @@ def run_pretraining(source, percent_broken, failed_idx, arch_config, gpu):
     dm.setup()
     data = (torch.cat([anchor, query]) for anchor, query, *_ in dm.train_dataloader())
     adam = torch.optim.Adam(rbm.parameters(), lr=1e-4)
-    rbm.train(data, epochs=1, optimizer=adam, device="cpu:0")
+    rbm.train(data, epochs=5, optimizer=adam, device=device)
 
     data = (torch.cat([anchor, query]) for anchor, query, *_ in dm.val_dataloader()[0])
     recon_error = 0
     num_elem = 0
     with torch.no_grad():
         for batch in data:
+            batch = batch.to(device)
             recon = rbm.reconstruct(visible_input=batch)
-            recon_error += torch.sum((batch - recon) ** 2).item()
+            recon_error += torch.sum((batch - recon) ** 2).cpu().item()
             num_elem += len(batch)
         recon_error /= num_elem
 
