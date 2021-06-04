@@ -12,19 +12,19 @@ LIST_PATTERN = re.compile(r".?\d{1,3}")
 VERSION_PATTERN = re.compile(r".*?(@(?P<percent_broken>.*))?@(?P<percent_fail_runs>.*)")
 
 
-def export_all(mlflow_uri, tag):
+def export_all(mlflow_uri, tags):
     """Export all transfer and baseline experiments to CSV."""
     client = mlflow.tracking.MlflowClient(mlflow_uri)
 
     print("Export baseline experiments...")
     df = export_matching_experiments(
-        client, "cmapss_.{3,5}_baseline$", tag, _runs_of_semi_supervised
+        client, "cmapss_.{3,5}_baseline$", tags, _runs_of_semi_supervised
     )
     if df is not None:
         df.to_csv("semi_supervised.csv")
 
 
-def export_matching_experiments(client, exp_name_regex, tag, func):
+def export_matching_experiments(client, exp_name_regex, tags, func):
     regex = re.compile(exp_name_regex)
     experiments = client.list_experiments()
     filtered_experiments = [e for e in experiments if regex.match(e.name) is not None]
@@ -32,7 +32,7 @@ def export_matching_experiments(client, exp_name_regex, tag, func):
     df = []
     for e in filtered_experiments:
         print('Evaluate experiment "%s" with id %s' % (e.name, e.experiment_id))
-        df.append(func(client, e, tag))
+        df.append(func(client, e, tags))
     if df:
         df = pd.concat(df)
     else:
@@ -41,9 +41,9 @@ def export_matching_experiments(client, exp_name_regex, tag, func):
     return df
 
 
-def _runs_of_semi_supervised(client, e, tag):
+def _runs_of_semi_supervised(client, e, tags):
     replications = _get_replications(client, e)
-    replications = _filter_complete_with_tag(replications, tag)
+    replications = _filter_complete_with_tag(replications, tags)
     df = pd.DataFrame(
         np.zeros((len(replications), 6)),
         columns=[
@@ -61,7 +61,7 @@ def _runs_of_semi_supervised(client, e, tag):
             run.data.params["fd_source"],
             _get_num_labeled(run.data.params["percent_fail_runs"]),
             _get_percent_broken(run.data.tags["version"]),
-            "pretrained_checkpoint" in run.data.params,
+            _get_pretraining_mode(run),
         ]
         test_rmse = _get_test_value(f"regression_loss_fd{statics[0]}", run)
         val_rmse = _get_val_value(client, "regression_loss", "regression_loss", run)
@@ -78,11 +78,11 @@ def _get_replications(client, experiment):
     return runs
 
 
-def _filter_complete_with_tag(replications, tag):
+def _filter_complete_with_tag(replications, tags):
     versions = [
         r.data.tags["version"]
         for r in replications
-        if r.data.tags["version"].startswith(tag)
+        if any(r.data.tags["version"].startswith(t) for t in tags)
     ]
     versions, version_counts = np.unique(versions, return_counts=True)
     versions = versions[version_counts == 10]
@@ -93,6 +93,18 @@ def _filter_complete_with_tag(replications, tag):
 
 def _get_num_labeled(percent_labeled):
     return len(LIST_PATTERN.findall(percent_labeled))
+
+
+def _get_pretraining_mode(run):
+    version = run.data.tags["version"]
+    if "baseline" in version:
+        return "no pretraining"
+    elif "autoencoder" in version:
+        return "autoencoder"
+    elif "rbm" in version:
+        return "rbm"
+    else:
+        return "metric"
 
 
 def _get_percent_broken(version):
@@ -137,7 +149,9 @@ if __name__ == "__main__":
         description="Exports semi_supervised experiments to CSV"
     )
     parser.add_argument("mlflow_uri", help="URI for MLFlow Server.")
-    parser.add_argument("--tag", "-t", help="MLFlow tag prefix of runs to export")
+    parser.add_argument(
+        "--tags", "-t", nargs="+", help="MLFlow tag prefix of runs to export"
+    )
     opt = parser.parse_args()
 
-    export_all(opt.mlflow_uri, opt.tag)
+    export_all(opt.mlflow_uri, opt.tags)
