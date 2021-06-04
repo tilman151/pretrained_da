@@ -5,7 +5,8 @@ import random
 import ray
 
 import building
-from run_semi_supervised import run
+from run_semi_supervised import run as run_ae_or_metric
+from run_rbm import run as run_rbm
 
 
 script_path = os.path.dirname(__file__)
@@ -44,14 +45,10 @@ def reproduce(base_version, percent_fails, percent_broken, encoder, mode, master
                         fails,
                         arch_config,
                         pre_config,
-                        pretrain=True,
-                        encoder=encoder,
-                        mode=mode,
-                        record_embeddings=False,
-                        replications=10,
-                        gpu=[0],
-                        master_seed=seed,
-                        version=f"{base_version}_pretrained@{broken:.2f}@{fails:.2f}",
+                        encoder,
+                        mode,
+                        seed,
+                        base_version,
                     )
                 except Exception as e:
                     error_log.append(e)
@@ -63,6 +60,37 @@ def reproduce(base_version, percent_fails, percent_broken, encoder, mode, master
             print(type(e), e)
     else:
         print("Everything went well.")
+
+
+def run(fd, broken, fails, arch_config, pre_config, encoder, mode, seed, base_version):
+    if mode == "rbm":
+        run_rbm(
+            fd,
+            broken,
+            fails,
+            arch_config,
+            encoder,
+            replications=10,
+            gpu=0,
+            master_seed=seed,
+            version=f"{base_version}_pretrained@{broken:.2f}@{fails:.2f}",
+        )
+    else:
+        run_ae_or_metric(
+            fd,
+            broken,
+            fails,
+            arch_config,
+            pre_config,
+            pretrain=True,
+            encoder=encoder,
+            mode=mode,
+            record_embeddings=False,
+            replications=10,
+            gpu=[0],
+            master_seed=seed,
+            version=f"{base_version}_pretrained@{broken:.2f}@{fails:.2f}",
+        )
 
 
 if __name__ == "__main__":
@@ -96,7 +124,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode",
         default="metric",
-        choices=["metric", "autoencoder"],
+        choices=["metric", "autoencoder", "rbm"],
         help="metric or autoencoder pre-training mode",
     )
     parser.add_argument(
