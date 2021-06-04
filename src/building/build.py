@@ -1,8 +1,15 @@
 import pytorch_lightning as pl
+import torch
+from pytorch_probgraph import (
+    GaussianLayer,
+    InteractionLinear,
+    RestrictedBoltzmannMachineCD,
+)
 
 import datasets
 from building.build_common import get_logdir, add_hparams, build_trainer
 from lightning import autoencoder, baseline, dann, loggers, pretraining
+from models.layers import RectifiedLinearLayer
 
 
 def build_transfer(
@@ -154,7 +161,7 @@ def build_pretraining(
     truncate_val = not record_embeddings
     distance_mode = config["distance_mode"]
     min_distance = config["min_distance"] if "min_distance" in config else 1
-    data = _build_datamodule(
+    data = build_datamodule(
         source,
         target,
         percent_broken,
@@ -191,7 +198,7 @@ def build_pretraining(
     return trainer, data, model
 
 
-def _build_datamodule(
+def build_datamodule(
     source,
     target,
     percent_broken,
@@ -200,12 +207,14 @@ def _build_datamodule(
     truncate_val,
     distance_mode,
     min_distance,
+    window_size=None,
 ):
     if target is None:
         return datasets.PretrainingBaselineDataModule(
             fd_source=source,
             num_samples=25000,
             batch_size=batch_size,
+            window_size=window_size,
             min_distance=min_distance,
             percent_broken=percent_broken,
             percent_fail_runs=percent_fail_runs,
@@ -218,6 +227,7 @@ def _build_datamodule(
             fd_target=target,
             num_samples=50000,
             batch_size=batch_size,
+            window_size=window_size,
             min_distance=min_distance,
             percent_broken=percent_broken,
             percent_fail_runs=percent_fail_runs,
@@ -270,3 +280,22 @@ def build_autoencoder_from_config(
     )
 
     return model
+
+
+def build_rbm(in_units, out_units, he_init=False):
+    l0bias = torch.zeros([1, in_units, 1])
+    l0bias.requires_grad = False
+    l1bias = torch.zeros([1, out_units])
+    l1bias.requires_grad = True
+
+    l0 = GaussianLayer(l0bias, torch.ones_like(l0bias))
+    l1 = RectifiedLinearLayer(l1bias)
+
+    i0 = InteractionLinear(l0.bias.shape[1:], l1.bias.shape[1:])
+    if he_init:
+        torch.nn.init.kaiming_uniform_(i0.weight, nonlinearity="relu")
+
+    # build the RBM
+    rbm = RestrictedBoltzmannMachineCD(l0, l1, i0, ksteps=1)
+
+    return rbm

@@ -77,6 +77,28 @@ class Encoder(nn.Module):
         return outputs
 
 
+class RbmWrapper(nn.Module):
+    def __init__(self, weight, bias, inner):
+        super().__init__()
+
+        self.inner = inner
+        self.layer = nn.Conv1d(weight.shape[0], weight.shape[1], kernel_size=1)
+        self.layer.weight.data = weight.unsqueeze(-1)
+        self.layer.bias.data = bias.squeeze(0)
+        self.relu = nn.ReLU(True)
+
+    def forward(self, inputs):
+        inputs = self.layer(inputs)
+        inputs = self.inner(inputs)
+        outputs = self.relu(inputs)
+
+        return outputs
+
+    @classmethod
+    def from_rbm(cls, rbm, inner):
+        return cls(rbm.interaction.weight, rbm.hidden.bias, inner)
+
+
 class EncoderEllefsenEtAl(nn.Module):
     def __init__(
         self,

@@ -7,4 +7,6 @@ from .build import (
     build_pretraining_from_config,
     build_autoencoder_from_config,
     build_baseline_from_config,
+    build_rbm,
+    build_datamodule,
 )
