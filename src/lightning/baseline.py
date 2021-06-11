@@ -15,9 +15,9 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         kernel_size,
         base_filters,
         latent_dim,
-        dropout,
-        optim_type,
-        lr,
+        dropout=0.0,
+        optim_type="adam",
+        lr=0.001,
         record_embeddings=False,
         encoder="cnn",
     ):
