@@ -27,3 +27,9 @@ class LoadEncoderMixin:
         }
 
         return encoder_state
+
+    def load_from_rbm(self, rbm):
+        first_conv = self.encoder.layers[0]
+        first_bn = self.encoder.layers[1]
+        first_conv.weight.data = rbm.interaction.module.weight.data
+        first_bn.bias.data = rbm.hidden.bias.data

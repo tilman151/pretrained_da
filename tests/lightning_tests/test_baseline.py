@@ -3,6 +3,7 @@ from unittest import mock
 
 import torch
 
+import building
 from lightning import baseline
 
 
@@ -166,6 +167,30 @@ class TestCnnBaseline(unittest.TestCase, TestBaselineTemplate):
             optim_type="adam",
             lr=0.01,
         )
+
+    def test_load_from_rbm(self):
+        self.net.encoder.layers[1].bias.data = torch.randn_like(
+            self.net.encoder.layers[1].bias.data
+        )
+        rbm = building.build_rbm(14, 16)
+        self.assertNotEqual(
+            0,
+            torch.dist(rbm.interaction.module.weight, self.net.encoder.layers[0].weight),
+        )
+        self.assertNotEqual(
+            0, torch.dist(rbm.hidden.bias, self.net.encoder.layers[1].bias)
+        )
+        self.assertTrue(self.net.encoder.layers[0].weight.requires_grad)
+        self.assertTrue(self.net.encoder.layers[1].bias.requires_grad)
+
+        self.net.load_from_rbm(rbm)
+        self.assertEqual(
+            0,
+            torch.dist(rbm.interaction.module.weight, self.net.encoder.layers[0].weight),
+        )
+        self.assertEqual(0, torch.dist(rbm.hidden.bias, self.net.encoder.layers[1].bias))
+        self.assertTrue(self.net.encoder.layers[0].weight.requires_grad)
+        self.assertTrue(self.net.encoder.layers[1].bias.requires_grad)
 
 
 class TestLstmBaseline(unittest.TestCase, TestBaselineTemplate):

@@ -1,15 +1,14 @@
 import pytorch_lightning as pl
 import torch
 from pytorch_probgraph import (
-    GaussianLayer,
-    InteractionLinear,
+    InteractionModule,
     RestrictedBoltzmannMachineCD,
 )
 
 import datasets
-from building.build_common import get_logdir, add_hparams, build_trainer
+from building.build_common import add_hparams, build_trainer, get_logdir
 from lightning import autoencoder, baseline, dann, loggers, pretraining
-from models.layers import RectifiedLinearLayer
+from models.layers import GaussianSequenceLayer, RectifiedLinearLayer
 
 
 def build_transfer(
@@ -284,14 +283,16 @@ def build_autoencoder_from_config(
 
 def build_rbm(in_units, out_units, he_init=False):
     l0bias = torch.zeros([1, in_units, 1])
-    l0bias.requires_grad = False
-    l1bias = torch.zeros([1, out_units])
+    l0bias.requires_grad = True
+    l1bias = torch.zeros([1, out_units, 1])
     l1bias.requires_grad = True
 
-    l0 = GaussianLayer(l0bias, torch.ones_like(l0bias))
+    l0 = GaussianSequenceLayer(l0bias, torch.ones_like(l0bias))
+    l0.logsigma.requires_grad = False
     l1 = RectifiedLinearLayer(l1bias)
 
-    i0 = InteractionLinear(l0.bias.shape[1:], l1.bias.shape[1:])
+    module = torch.nn.Conv1d(14, out_units, kernel_size=3, bias=False)
+    i0 = InteractionModule(module, l0.bias.shape[1:])
     if he_init:
         torch.nn.init.kaiming_uniform_(i0.weight, nonlinearity="relu")
 

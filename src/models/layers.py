@@ -1,7 +1,7 @@
 from typing import Union
 
 import torch
-from pytorch_probgraph import UnitLayer
+from pytorch_probgraph import GaussianLayer, UnitLayer
 from torch import nn as nn
 
 
@@ -87,4 +87,20 @@ class RectifiedLinearLayer(UnitLayer):
         self, input: torch.Tensor, factor: Union[torch.Tensor, float] = 1.0
     ) -> None:
         if self.bias.requires_grad:
-            self.bias.backward((factor * input).mean(dim=0, keepdim=True).detach())
+            grad_bias = (factor * input).mean(dim=0, keepdim=True)
+            grad_bias = grad_bias.mean(dim=-1, keepdim=True)
+            self.bias.backward(grad_bias.detach())
+
+
+class GaussianSequenceLayer(GaussianLayer):
+    def backward(
+        self, input: torch.Tensor, factor: Union[torch.Tensor, float] = 1.0
+    ) -> None:
+        if self.bias.requires_grad:
+            grad_bias = (factor * input).sum(dim=0, keepdim=True) / input.shape[0]
+            grad_bias = grad_bias.sum(dim=-1, keepdim=True) / input.shape[-1]
+            self.bias.backward(grad_bias.detach())
+        if self.logsigma.requires_grad:
+            var = (input ** 2).sum(dim=0, keepdim=True) / input.shape[0]
+            grad_logsigma = factor * var * torch.exp(-2 * self.logsigma) - 1.0
+            self.logsigma.backward(grad_logsigma.detach())

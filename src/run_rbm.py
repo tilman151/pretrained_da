@@ -8,7 +8,6 @@ from sklearn.model_selection import ShuffleSplit
 
 import building
 from datasets.loader import CMAPSSLoader
-from models.networks import RbmWrapper
 
 
 def run(
@@ -38,7 +37,7 @@ def run(
     process_ids = []
     for (failed_idx, _), s in zip(splitter.split(run_idx), seeds):
         process_ids.append(
-            ray_train.remote(
+            ray_train(  # .remote(
                 source,
                 percent_broken,
                 failed_idx,
@@ -64,7 +63,7 @@ class AllDataSplitter:
             yield list(x), []
 
 
-@ray.remote(num_cpus=3, num_gpus=0.5)
+# @ray.remote(num_cpus=3, num_gpus=0.5)
 def ray_train(source, percent_broken, failed_idx, arch_config, encoder, s, gpu, version):
     pretrained_rbm = run_pretraining(
         source,
@@ -88,7 +87,6 @@ def ray_train(source, percent_broken, failed_idx, arch_config, encoder, s, gpu, 
 def run_pretraining(source, percent_broken, failed_idx, arch_config, gpu):
     print("Pre-train RBM layer...")
     device = torch.device(f"cuda:{gpu}")
-    rbm: RestrictedBoltzmannMachineCD = building.build_rbm(14, 14).to(device)
     dm = building.build_datamodule(
         source,
         None,
@@ -98,11 +96,13 @@ def run_pretraining(source, percent_broken, failed_idx, arch_config, gpu):
         truncate_val=True,
         distance_mode="linear",
         min_distance=1,
-        window_size=1,
     )
     dm.prepare_data()
     dm.setup()
     data = (torch.cat([anchor, query]) for anchor, query, *_ in dm.train_dataloader())
+    rbm: RestrictedBoltzmannMachineCD = building.build_rbm(
+        14, arch_config["base_filters"]
+    ).to(device)
     adam = torch.optim.Adam(rbm.parameters(), lr=1e-4)
     rbm.train(data, epochs=5, optimizer=adam, device=device)
 
@@ -115,7 +115,7 @@ def run_pretraining(source, percent_broken, failed_idx, arch_config, gpu):
             recon = rbm.reconstruct(visible_input=batch)
             recon_error += torch.sum((batch - recon) ** 2).cpu().item()
             num_elem += len(batch)
-        recon_error /= num_elem
+        recon_error /= num_elem * dm.window_size
 
     print(f"Recon error: {recon_error:.2f}")
 
@@ -127,7 +127,7 @@ def run_baseline(source, fails, config, encoder, seed, gpu, pretrained_rbm, vers
         source, fails, config, encoder, None, gpu, seed, version
     )
     model.hparams["encoder"] = f"rbm_{encoder}"
-    model.encoder = RbmWrapper.from_rbm(pretrained_rbm, model.encoder)
+    model.load_from_rbm(pretrained_rbm)
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
 
