@@ -172,6 +172,8 @@ class TestCnnBaseline(unittest.TestCase, TestBaselineTemplate):
         self.net.encoder.layers[1].bias.data = torch.randn_like(
             self.net.encoder.layers[1].bias.data
         )
+        old_weight_shape = self.net.encoder.layers[0].weight.shape
+        old_bias_shape = self.net.encoder.layers[1].bias.shape
         rbm = building.build_rbm(14, 16)
         self.assertNotEqual(
             0,
@@ -191,6 +193,8 @@ class TestCnnBaseline(unittest.TestCase, TestBaselineTemplate):
         self.assertEqual(0, torch.dist(rbm.hidden.bias, self.net.encoder.layers[1].bias))
         self.assertTrue(self.net.encoder.layers[0].weight.requires_grad)
         self.assertTrue(self.net.encoder.layers[1].bias.requires_grad)
+        self.assertEqual(old_weight_shape, self.net.encoder.layers[0].weight.shape)
+        self.assertEqual(old_bias_shape, self.net.encoder.layers[1].bias.shape)
 
 
 class TestLstmBaseline(unittest.TestCase, TestBaselineTemplate):
