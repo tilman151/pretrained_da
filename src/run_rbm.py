@@ -37,7 +37,7 @@ def run(
     process_ids = []
     for (failed_idx, _), s in zip(splitter.split(run_idx), seeds):
         process_ids.append(
-            ray_train(  # .remote(
+            ray_train.remote(
                 source,
                 percent_broken,
                 failed_idx,
@@ -63,7 +63,7 @@ class AllDataSplitter:
             yield list(x), []
 
 
-# @ray.remote(num_cpus=3, num_gpus=0.5)
+@ray.remote(num_cpus=3, num_gpus=0.5)
 def ray_train(source, percent_broken, failed_idx, arch_config, encoder, s, gpu, version):
     pretrained_rbm = run_pretraining(
         source,
