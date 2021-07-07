@@ -112,6 +112,7 @@ def ray_train(
         gpu,
         checkpoint,
         version,
+        record_embeddings,
     )
 
 

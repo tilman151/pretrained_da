@@ -81,7 +81,15 @@ def build_dann_from_config(config, seq_len, pretrained_encoder_path, record_embe
 
 
 def build_baseline(
-    source, fails, config, encoder, pretrained_encoder_path, gpu, seed, version
+    source,
+    fails,
+    config,
+    encoder,
+    pretrained_encoder_path,
+    gpu,
+    seed,
+    version,
+    record_embeddings=False,
 ):
     logger = loggers.MLTBLogger(
         get_logdir(), loggers.baseline_experiment_name(source), tag=version
@@ -99,14 +107,16 @@ def build_baseline(
         fd_source=source, batch_size=config["batch_size"], percent_fail_runs=fails
     )
     model = build_baseline_from_config(
-        config, data.window_size, encoder, pretrained_encoder_path
+        config, data.window_size, encoder, pretrained_encoder_path, record_embeddings
     )
     add_hparams(model, data, seed)
 
     return trainer, data, model
 
 
-def build_baseline_from_config(config, seq_len, encoder, pretrained_encoder_path):
+def build_baseline_from_config(
+    config, seq_len, encoder, pretrained_encoder_path, record_embeddings
+):
     model = baseline.Baseline(
         in_channels=14,
         seq_len=seq_len,
@@ -117,7 +127,7 @@ def build_baseline_from_config(config, seq_len, encoder, pretrained_encoder_path
         dropout=config["dropout"],
         optim_type="adam",
         lr=config["lr"],
-        record_embeddings=False,
+        record_embeddings=record_embeddings,
         encoder=encoder,
     )
     if pretrained_encoder_path is not None:

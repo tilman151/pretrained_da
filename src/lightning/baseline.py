@@ -46,7 +46,7 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         self.save_hyperparameters()
 
     def _get_encoder(self):
-        if self.encoder_type == "cnn":
+        if "cnn" in self.encoder_type:
             encoder = networks.Encoder(
                 self.in_channels,
                 self.base_filters,
@@ -57,7 +57,7 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
                 dropout=self.dropout,
                 norm_outputs=False,
             )
-        elif self.encoder_type == "lstm":
+        elif "lstm" in self.encoder_type:
             encoder = networks.EncoderEllefsenEtAl(
                 self.in_channels,
                 self.base_filters,
@@ -70,7 +70,8 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
             )
         else:
             raise ValueError(
-                f"Unknown encoder type {self.encoder}. Use either 'cnn' or 'lstm'."
+                f"Unknown encoder type {self.encoder_type}. "
+                f"Must contain either 'cnn' or 'lstm'."
             )
 
         return encoder
@@ -132,16 +133,18 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         features, labels = batch
         predictions = self(features)
         self.regression_metrics[metric_id].update(predictions, labels)
+        if self.record_embeddings:
+            latent_code = self.encoder(features)
+            self.embedding_metric.update(latent_code, torch.zeros_like(labels), labels)
 
     def validation_epoch_end(self, outputs):
         self.log("val/regression_loss", self.regression_metrics[1].compute())
-
-    def test_epoch_end(self, outputs):
         if self.record_embeddings:
-            self.logger.experiment.add_figure(
-                "test/embeddings", self.embedding_metric.compute(), self.global_step
+            self.logger.log_figure(
+                "val/embeddings", self.embedding_metric.compute(), self.global_step
             )
             self.embedding_metric.reset()
 
+    def test_epoch_end(self, outputs):
         for fd, metric in self.regression_metrics.items():
             self.log(f"test/regression_loss_fd{fd}", metric.compute())

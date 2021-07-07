@@ -4,9 +4,27 @@ from datetime import datetime
 import building
 
 
-def run(source, fails, config, encoder, seed, gpu, pretrained_encoder_path, version):
+def run(
+    source,
+    fails,
+    config,
+    encoder,
+    seed,
+    gpu,
+    pretrained_encoder_path,
+    version,
+    record_embeddings=False,
+):
     trainer, data, model = building.build_baseline(
-        source, fails, config, encoder, pretrained_encoder_path, gpu, seed, version
+        source,
+        fails,
+        config,
+        encoder,
+        pretrained_encoder_path,
+        gpu,
+        seed,
+        version,
+        record_embeddings,
     )
     trainer.fit(model, datamodule=data)
     trainer.test(datamodule=data)
