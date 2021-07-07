@@ -40,7 +40,9 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
 
         self.criterion_regression = metrics.RMSELoss(num_elements=0)
 
-        self.embedding_metric = metrics.EmbeddingViz(20000, self.latent_dim)
+        self.embedding_metric = metrics.EmbeddingViz(
+            20000, self.latent_dim, combined=False
+        )
         self.regression_metrics = {i: metrics.RMSELoss() for i in range(1, 5)}
 
         self.save_hyperparameters()
@@ -140,9 +142,9 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
     def validation_epoch_end(self, outputs):
         self.log("val/regression_loss", self.regression_metrics[1].compute())
         if self.record_embeddings:
-            self.logger.log_figure(
-                "val/embeddings", self.embedding_metric.compute(), self.global_step
-            )
+            fig_class, fig_rul = self.embedding_metric.compute()
+            self.logger.log_figure("val/embeddings_class", fig_class, self.global_step)
+            self.logger.log_figure("val/embeddings_rul", fig_rul, self.global_step)
             self.embedding_metric.reset()
 
     def test_epoch_end(self, outputs):

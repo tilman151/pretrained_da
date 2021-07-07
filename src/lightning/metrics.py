@@ -7,11 +7,12 @@ from torch import nn as nn
 
 
 class EmbeddingViz(pl.metrics.Metric):
-    def __init__(self, num_elements, embedding_size):
+    def __init__(self, num_elements, embedding_size, combined=True):
         super().__init__()
 
         self.num_elements = num_elements
         self.embedding_size = embedding_size
+        self.combined = combined
 
         self.add_state(
             "embeddings",
@@ -48,36 +49,50 @@ class EmbeddingViz(pl.metrics.Metric):
         logged_ruls = self.ruls[: self.sample_counter].detach().cpu()
         viz_embeddings = umap.UMAP(random_state=42).fit_transform(logged_embeddings)
 
-        fig, (ax_class, ax_rul) = plt.subplots(
-            1, 2, sharex="all", sharey="all", figsize=(20, 10)
-        )
+        if self.combined:
+            fig, (ax_class, ax_rul) = plt.subplots(
+                1, 2, sharex="all", sharey="all", figsize=(20, 10), dpi=300
+            )
+        else:
+            fig_class = plt.figure(figsize=(10, 10), dpi=300)
+            ax_class = fig_class.gca()
+            fig_rul = plt.figure(figsize=(10, 10), dpi=300)
+            ax_rul = fig_rul.gca()
+            fig = [fig_class, fig_rul]
 
-        class_colors = [self.class_cm.colors[c] for c in logged_labels]
-        ax_class.scatter(
-            viz_embeddings[:, 0],
-            viz_embeddings[:, 1],
+        self._scatter_class(ax_class, viz_embeddings, logged_labels)
+        self._scatter_rul(ax_rul, viz_embeddings, logged_ruls)
+
+        return fig
+
+    def _scatter_class(self, ax, embeddings, labels):
+        class_colors = [self.class_cm.colors[c] for c in labels]
+        ax.scatter(
+            embeddings[:, 0],
+            embeddings[:, 1],
             c=class_colors,
             alpha=0.4,
             edgecolors="none",
             s=[4],
+            rasterized=True,
         )
-        ax_class.legend(["Source", "Target"], loc="lower left")
+        ax.legend(["Source", "Target"], loc="lower left")
 
-        ax_rul.scatter(
-            viz_embeddings[:, 0],
-            viz_embeddings[:, 1],
-            c=logged_ruls,
+    def _scatter_rul(self, ax, embeddings, ruls):
+        ax.scatter(
+            embeddings[:, 0],
+            embeddings[:, 1],
+            c=ruls,
             alpha=0.4,
             edgecolors="none",
             s=[4],
+            rasterized=True,
         )
         color_bar = plt.cm.ScalarMappable(
-            mplcolors.Normalize(logged_ruls.min(), logged_ruls.max()), self.rul_cm
+            mplcolors.Normalize(ruls.min(), ruls.max()), self.rul_cm
         )
-        color_bar.set_array(logged_ruls)
+        color_bar.set_array(ruls)
         plt.colorbar(color_bar)
-
-        return fig
 
 
 class RMSELoss(pl.metrics.Metric):

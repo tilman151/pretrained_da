@@ -146,10 +146,11 @@ class MLTBLogger(loggers.LoggerCollection):
         return self._mlflow_logger.run_id
 
     def log_figure(self, tag, figure, step):
-        tmp_file = tempfile.mktemp() + ".png"
+        tag_tail, tag_head = os.path.split(tag)
+        _, tmp_file = tempfile.mkstemp(".pdf", f"{tag_head}_{step:05}_")
         figure.savefig(tmp_file)
         self.mlflow_experiment.log_artifact(
-            self._mlflow_logger.run_id, tmp_file, f"{tag}_{step:05}"
+            self._mlflow_logger.run_id, tmp_file, tag_tail
         )
         self.tf_experiment.add_figure(tag, figure, step)
 
