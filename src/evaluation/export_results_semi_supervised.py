@@ -7,7 +7,6 @@ import mlflow
 import numpy as np
 import pandas as pd
 
-
 LIST_PATTERN = re.compile(r".?\d{1,3}")
 VERSION_PATTERN = re.compile(r".*?(@(?P<percent_broken>.*))?@(?P<percent_fail_runs>.*)")
 
@@ -45,7 +44,7 @@ def _runs_of_semi_supervised(client, e, tags):
     replications = _get_replications(client, e)
     replications = _filter_complete_with_tag(replications, tags)
     df = pd.DataFrame(
-        np.zeros((len(replications), 6)),
+        np.zeros((len(replications), 7)),
         columns=[
             "source",
             "num_labeled",
@@ -53,6 +52,7 @@ def _runs_of_semi_supervised(client, e, tags):
             "pretrained",
             "test",
             "val",
+            "score",
         ],
         index=[e.name] * len(replications),
     )
@@ -64,15 +64,16 @@ def _runs_of_semi_supervised(client, e, tags):
             _get_pretraining_mode(run),
         ]
         test_rmse = _get_test_value(f"regression_loss_fd{statics[0]}", run)
+        test_score = _get_test_value(f"rul_score_fd{statics[0]}", run)
         val_rmse = _get_val_value(client, "regression_loss", "regression_loss", run)
-        df.iloc[i] = statics + [test_rmse, val_rmse]
+        df.iloc[i] = statics + [test_rmse, val_rmse, test_score]
     print("Return %d runs..." % len(df))
 
     return df
 
 
 def _get_replications(client, experiment):
-    runs = client.search_runs(experiment_ids=experiment.experiment_id)
+    runs = client.search_runs(experiment_ids=experiment.experiment_id, max_results=9999)
     print("Found %d top-level runs..." % len(runs))
 
     return runs
