@@ -115,7 +115,7 @@ def build_baseline(
 
 
 def build_baseline_from_config(
-    config, seq_len, encoder, pretrained_encoder_path, record_embeddings
+    config, seq_len, encoder, pretrained_encoder_path, record_embeddings=False
 ):
     model = baseline.Baseline(
         in_channels=14,

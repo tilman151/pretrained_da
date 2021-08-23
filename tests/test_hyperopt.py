@@ -1,9 +1,8 @@
 import unittest
-
 from unittest import mock
 
-import hyperopt.hyperopt_transfer as hyperopt_transfer
 import hyperopt.hyperopt_pretraining as hyperopt_pretraining
+import hyperopt.hyperopt_transfer as hyperopt_transfer
 
 
 @unittest.skip("Only for debugging purposes.")
@@ -52,6 +51,7 @@ class TestPretrainingHyperopt(unittest.TestCase):
             base_filters=arch_config["base_filters"],
             latent_dim=arch_config["latent_dim"],
             dropout=config["dropout"],
+            encoder="cnn",
             domain_tradeoff=config["domain_tradeoff"],
             domain_disc_dim=arch_config["latent_dim"],
             num_disc_layers=arch_config["num_disc_layers"],

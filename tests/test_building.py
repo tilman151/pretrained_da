@@ -1,5 +1,4 @@
 import unittest
-
 from unittest import mock
 
 from building import build, get_logdir
@@ -134,7 +133,7 @@ class TestBuildingFunctions(unittest.TestCase):
     @mock.patch("lightning.loggers.MinEpochModelCheckpoint")
     @mock.patch("lightning.loggers.MLTBLogger")
     @mock.patch("building.build.build_pretraining_from_config")
-    @mock.patch("building.build._build_datamodule")
+    @mock.patch("building.build.build_datamodule")
     @mock.patch("building.build.build_trainer")
     def test_build_pretraining_metric(
         self,
@@ -156,7 +155,7 @@ class TestBuildingFunctions(unittest.TestCase):
     @mock.patch("lightning.loggers.MinEpochModelCheckpoint")
     @mock.patch("lightning.loggers.MLTBLogger")
     @mock.patch("building.build.build_autoencoder_from_config")
-    @mock.patch("building.build._build_datamodule")
+    @mock.patch("building.build.build_datamodule")
     @mock.patch("building.build.build_trainer")
     def test_build_pretraining_autoencoder(
         self,
@@ -326,6 +325,7 @@ class TestBuildingFunctions(unittest.TestCase):
                 mock_datamodule().window_size,
                 "cnn",
                 None,
+                False,
             )
         with self.subTest("with_encoder"):
             build.build_baseline(
@@ -347,6 +347,7 @@ class TestBuildingFunctions(unittest.TestCase):
                 mock_datamodule().window_size,
                 "cnn",
                 "encoder_path",
+                False,
             )
 
     @mock.patch("lightning.baseline.Baseline")

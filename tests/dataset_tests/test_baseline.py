@@ -5,7 +5,6 @@ import torch.utils.data
 from torch.utils.data import RandomSampler, SequentialSampler
 
 import datasets
-
 from tests.dataset_tests.templates import PretrainingDataModuleTemplate
 
 
@@ -82,7 +81,10 @@ class TestCMAPSSBaseline(unittest.TestCase):
 
     def test_fail_runs_passed_correctly(self):
         for i in range(1, 5):
-            self.assertEqual(0.8, self.dataset.cmapss[i].percent_fail_runs)
+            if i == self.dataset.fd_source:
+                self.assertEqual(0.8, self.dataset.cmapss[i].percent_fail_runs)
+            else:
+                self.assertIsNone(self.dataset.cmapss[i].percent_fail_runs)
 
 
 class TestPretrainingBaselineDataModuleFullData(
