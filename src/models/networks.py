@@ -38,7 +38,9 @@ class Encoder(nn.Module):
 
     def _build_encoder(self):
         sequence = [
-            nn.Conv1d(self.in_channels, self.base_filters, self.kernel_size, bias=False),
+            nn.Conv1d(
+                self.in_channels, self.base_filters, self.kernel_size, bias=False
+            ),
             nn.BatchNorm1d(self.base_filters),
             nn.ReLU(True),
         ]
@@ -46,10 +48,14 @@ class Encoder(nn.Module):
             in_filters = min(i * self.base_filters, 64)
             out_filters = min((i + 1) * self.base_filters, 64)
             use_padding = i % 2 == 1
-            sequence.extend(self._build_conv_layer(in_filters, out_filters, use_padding))
+            sequence.extend(
+                self._build_conv_layer(in_filters, out_filters, use_padding)
+            )
 
         cut_off = self.num_layers // 2 * (self.kernel_size - (self.kernel_size % 2))
-        flat_dim = (self.seq_len - cut_off) * min(self.num_layers * self.base_filters, 64)
+        flat_dim = (self.seq_len - cut_off) * min(
+            self.num_layers * self.base_filters, 64
+        )
         sequence.extend([nn.Flatten(), nn.Linear(flat_dim, self.latent_dim)])
 
         return nn.Sequential(*sequence)
@@ -217,11 +223,15 @@ class Decoder(nn.Module):
             in_filters = min((i + 1) * self.base_filters, 64)
             out_filters = min(i * self.base_filters, 64)
             use_padding = i % 2 == 1
-            sequence.extend(self._build_conv_layer(in_filters, out_filters, use_padding))
+            sequence.extend(
+                self._build_conv_layer(in_filters, out_filters, use_padding)
+            )
 
         sequence.extend(
             [
-                nn.ConvTranspose1d(self.base_filters, self.in_channels, self.kernel_size),
+                nn.ConvTranspose1d(
+                    self.base_filters, self.in_channels, self.kernel_size
+                ),
                 nn.Tanh(),
             ]
         )
@@ -239,7 +249,9 @@ class Decoder(nn.Module):
             )
         else:
             layer.append(
-                nn.ConvTranspose1d(in_filters, out_filters, self.kernel_size, bias=False)
+                nn.ConvTranspose1d(
+                    in_filters, out_filters, self.kernel_size, bias=False
+                )
             )
         layer.extend(
             [

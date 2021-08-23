@@ -18,7 +18,9 @@ def tune_pretraining(config, arch_config, source, percent_broken, encoder, mode)
             _get_hyperopt_logdir(),
             loggers.semi_supervised_hyperopt_name(source, percent_broken),
         )
-        checkpoint_callback = pl.callbacks.ModelCheckpoint(monitor="val/checkpoint_score")
+        checkpoint_callback = pl.callbacks.ModelCheckpoint(
+            monitor="val/checkpoint_score"
+        )
         trainer = building.build_trainer(
             logger,
             checkpoint_callback,
@@ -74,7 +76,9 @@ def _get_hyperopt_logdir():
     return log_dir
 
 
-def optimize_pretraining(source, percent_broken, arch_config, encoder, mode, num_trials):
+def optimize_pretraining(
+    source, percent_broken, arch_config, encoder, mode, num_trials
+):
     config = {
         "domain_tradeoff": tune.choice([0.0]),
         "dropout": tune.quniform(0.0, 0.5, 0.1),

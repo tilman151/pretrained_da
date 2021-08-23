@@ -80,7 +80,9 @@ class CMAPSSDataModule(pl.LightningDataModule):
             features = torch.cat(features)
             targets = torch.cat(targets)
         else:
-            features = torch.empty(0, len(self._loader.feature_select), self.window_size)
+            features = torch.empty(
+                0, len(self._loader.feature_select), self.window_size
+            )
             targets = torch.empty(0)
 
         return features, targets
@@ -286,7 +288,9 @@ class AdaptionDataset(Dataset):
         self._rng = np.random.default_rng(seed=42)
         if self.deterministic:
             self._get_target_idx = self._get_deterministic_target_idx
-            self._target_idx = [self._get_random_target_idx(_) for _ in range(len(self))]
+            self._target_idx = [
+                self._get_random_target_idx(_) for _ in range(len(self))
+            ]
         else:
             self._get_target_idx = self._get_random_target_idx
             self._target_idx = None

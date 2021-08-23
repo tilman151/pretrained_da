@@ -241,7 +241,9 @@ def method_plot(df, baseline_rul, baseline_mse, method):
     method_df = df[df["method"] == method]
 
     method_df["percent_broken"] = method_df["percent_broken"].round().astype(np.int)
-    method_df["percent_fail_runs"] = method_df["percent_fail_runs"].round().astype(np.int)
+    method_df["percent_fail_runs"] = (
+        method_df["percent_fail_runs"].round().astype(np.int)
+    )
 
     if baseline_rul is not None:
         plotnine.ylim = (2, 10)

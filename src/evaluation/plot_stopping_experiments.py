@@ -1,6 +1,6 @@
-import plotnine
-import pandas as pd
 import numpy as np
+import pandas as pd
+import plotnine
 from scipy.stats import wilcoxon
 from tabulate import tabulate
 

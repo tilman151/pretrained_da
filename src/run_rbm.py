@@ -64,7 +64,9 @@ class AllDataSplitter:
 
 
 @ray.remote(num_cpus=3, num_gpus=0.5)
-def ray_train(source, percent_broken, failed_idx, arch_config, encoder, s, gpu, version):
+def ray_train(
+    source, percent_broken, failed_idx, arch_config, encoder, s, gpu, version
+):
     pretrained_rbm = run_pretraining(
         source,
         percent_broken,

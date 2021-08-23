@@ -211,7 +211,9 @@ def _mark_best(df, argmins):
         for col_idx in row.index:
             min_idx = int(argmins.loc[percent_broken, col_idx])  #
             if min_idx > -1:
-                stripped_value = df.loc[percent_broken, col_idx].iloc[min_idx].strip("$")
+                stripped_value = (
+                    df.loc[percent_broken, col_idx].iloc[min_idx].strip("$")
+                )
                 df.loc[percent_broken, col_idx].iloc[
                     min_idx
                 ] = f"$\mathbf{{{stripped_value}}}$"

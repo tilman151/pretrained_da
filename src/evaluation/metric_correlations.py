@@ -1,7 +1,7 @@
+import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
 import scipy.stats
-import matplotlib.pyplot as plt
 
 
 def calc_correlation_between_metrics(run_id, metrics, mlflow_uri):

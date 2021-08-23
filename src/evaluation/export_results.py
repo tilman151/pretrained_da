@@ -18,7 +18,9 @@ def export_all(mlflow_uri):
         df.to_csv("transfer.csv")
 
     print("Export baseline experiments...")
-    df = export_matching_experiments(client, "cmapss_.{3,5}_baseline$", _runs_of_baseline)
+    df = export_matching_experiments(
+        client, "cmapss_.{3,5}_baseline$", _runs_of_baseline
+    )
     if df is not None:
         df.to_csv("baseline.csv")
 
@@ -48,7 +50,9 @@ def _runs_of_baseline(client, e):
         index=[e.name] * len(replications),
     )
     for i, run in enumerate(replications):
-        best_rmse = [_get_test_value(f"regression_loss_fd{i}", run) for i in range(1, 5)]
+        best_rmse = [
+            _get_test_value(f"regression_loss_fd{i}", run) for i in range(1, 5)
+        ]
         df.iloc[i] = best_rmse
     print("Return %d runs..." % len(df))
 

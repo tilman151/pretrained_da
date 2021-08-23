@@ -1,10 +1,10 @@
 import os
 import pickle
+import re
 import warnings
 from typing import Iterable, List, Tuple, Union
 
 import numpy as np
-import re
 import sklearn.preprocessing as scalers
 import torch
 from tqdm import tqdm
@@ -67,7 +67,10 @@ class AbstractLoader:
         return features, targets
 
     def _trunc_broken_by_percentage(
-        self, features: List[np.ndarray], targets: List[np.ndarray], percent_broken: float
+        self,
+        features: List[np.ndarray],
+        targets: List[np.ndarray],
+        percent_broken: float,
     ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         for i, run in enumerate(features):
             num_cycles = int(percent_broken * len(run))

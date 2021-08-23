@@ -44,7 +44,9 @@ class EmbeddingViz(pl.metrics.Metric):
 
     def compute(self):
         """Compute UMAP and plot points to 2d scatter plot."""
-        logged_embeddings = self.embeddings[: self.sample_counter].detach().cpu().numpy()
+        logged_embeddings = (
+            self.embeddings[: self.sample_counter].detach().cpu().numpy()
+        )
         logged_labels = self.labels[: self.sample_counter].detach().cpu().int()
         logged_ruls = self.ruls[: self.sample_counter].detach().cpu()
         viz_embeddings = umap.UMAP(random_state=42).fit_transform(logged_embeddings)
