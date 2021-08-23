@@ -109,7 +109,9 @@ class TestDAAN(unittest.TestCase):
             target_domain_pred, torch.zeros_like(target_domain_pred)
         )
         domain_loss = (source_domain_loss + target_domain_loss) / 2
-        expected_overall_loss = regression_loss + self.net.domain_trade_off * domain_loss
+        expected_overall_loss = (
+            regression_loss + self.net.domain_trade_off * domain_loss
+        )
 
         actual_overall_loss = self.net.training_step((source, source_labels, target), 0)
         self.assertAlmostEqual(

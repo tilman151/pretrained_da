@@ -50,7 +50,9 @@ def test_significance(result_path):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Plot results of stopping experiments.")
+    parser = argparse.ArgumentParser(
+        description="Plot results of stopping experiments."
+    )
     parser.add_argument("result_path", help="path to the result CSV")
     opt = parser.parse_args()
 

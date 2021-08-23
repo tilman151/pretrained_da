@@ -297,7 +297,9 @@ class CMAPSSLoader(AbstractLoader):
 
 class FEMTOLoader(AbstractLoader):
     DATA_ROOT = os.path.normpath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "data", "FEMTOBearingDataSet")
+        os.path.join(
+            os.path.dirname(__file__), "..", "..", "data", "FEMTOBearingDataSet"
+        )
     )
 
     def __init__(

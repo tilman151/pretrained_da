@@ -21,7 +21,8 @@ class TestCMAPSSAdaption(unittest.TestCase):
                 self.dataset.target.window_size, self.dataset.source.window_size
             )
             self.assertEqual(
-                self.dataset.target.window_size, self.dataset.target_truncated.window_size
+                self.dataset.target.window_size,
+                self.dataset.target_truncated.window_size,
             )
 
         with self.subTest(case="smaller2bigger"):
@@ -37,7 +38,9 @@ class TestCMAPSSAdaption(unittest.TestCase):
         self.assertEqual(self.dataset.target.window_size, self.dataset.window_size)
         self.assertEqual(40, dataset.target.window_size)
         self.assertEqual(dataset.target.window_size, dataset.source.window_size)
-        self.assertEqual(dataset.target.window_size, dataset.target_truncated.window_size)
+        self.assertEqual(
+            dataset.target.window_size, dataset.target_truncated.window_size
+        )
 
     def test_val_source_target_order(self):
         val_source_loader, val_target_loader, _ = self.dataset.val_dataloader()
@@ -121,7 +124,9 @@ class TestCMAPSSAdaption(unittest.TestCase):
         self.assertEqual(dataset.distance_mode, data_loader.dataset.mode)
 
 
-class TestPretrainingDataModuleFullData(unittest.TestCase, PretrainingDataModuleTemplate):
+class TestPretrainingDataModuleFullData(
+    unittest.TestCase, PretrainingDataModuleTemplate
+):
     def setUp(self):
         self.dataset = datasets.PretrainingAdaptionDataModule(
             3, 2, num_samples=10000, batch_size=16, min_distance=2
@@ -167,7 +172,9 @@ class TestPretrainingDataModuleFullData(unittest.TestCase, PretrainingDataModule
         self.assertEqual(0.5, dataset.target.percent_fail_runs)
 
 
-class TestPretrainingDataModuleLowData(unittest.TestCase, PretrainingDataModuleTemplate):
+class TestPretrainingDataModuleLowData(
+    unittest.TestCase, PretrainingDataModuleTemplate
+):
     def setUp(self):
         self.dataset = datasets.PretrainingAdaptionDataModule(
             1, 3, num_samples=10000, batch_size=16, percent_broken=0.2

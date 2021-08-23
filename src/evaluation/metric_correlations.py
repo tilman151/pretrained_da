@@ -16,7 +16,9 @@ def calc_correlation_between_metrics(run_id, metrics, mlflow_uri):
         for second in metrics:
             print(
                 f"{first} vs. {second}: ",
-                scipy.stats.spearmanr(metric_histories[first], metric_histories[second]),
+                scipy.stats.spearmanr(
+                    metric_histories[first], metric_histories[second]
+                ),
             )
             plt.scatter(metric_histories[first], metric_histories[second])
             plt.savefig(f"{first}_vs_{second}.png")

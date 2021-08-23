@@ -141,7 +141,9 @@ class TestUnsupervisedPretraining:
         self.assertEqual(paired_batches, self.net.regression_metric.sample_counter)
         self.assertEqual(paired_batches, self.net.domain_metric.sample_counter)
 
-    def _mock_predictions(self, anchor_embeddings, query_embeddings, domain_predictions):
+    def _mock_predictions(
+        self, anchor_embeddings, query_embeddings, domain_predictions
+    ):
         embeddings = torch.cat([anchor_embeddings, query_embeddings], dim=1)
         self.net.encoder.forward = mock.MagicMock(side_effect=embeddings)
         self.net.domain_disc.forward = mock.MagicMock(side_effect=domain_predictions)
