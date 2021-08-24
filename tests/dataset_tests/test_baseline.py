@@ -29,7 +29,9 @@ class TestCMAPSSBaseline(CmapssTestTemplate, unittest.TestCase):
     def test_default_window_size(self):
         window_sizes = [30, 20, 30, 15]
         for i, win in enumerate(window_sizes, start=1):
-            dataset = datasets.BaselineDataModule(i, batch_size=16, percent_fail_runs=0.8)
+            dataset = datasets.BaselineDataModule(
+                i, batch_size=16, percent_fail_runs=0.8
+            )
             for fd in dataset.cmapss.values():
                 self.assertEqual(win, fd.window_size)
 

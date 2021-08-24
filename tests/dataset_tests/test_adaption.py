@@ -41,7 +41,9 @@ class TestCMAPSSAdaption(CmapssTestTemplate, unittest.TestCase):
         self.assertEqual(self.dataset.target.window_size, self.dataset.window_size)
         self.assertEqual(40, dataset.target.window_size)
         self.assertEqual(dataset.target.window_size, dataset.source.window_size)
-        self.assertEqual(dataset.target.window_size, dataset.target_truncated.window_size)
+        self.assertEqual(
+            dataset.target.window_size, dataset.target_truncated.window_size
+        )
 
     def test_val_source_target_order(self):
         val_source_loader, val_target_loader, _ = self.dataset.val_dataloader()

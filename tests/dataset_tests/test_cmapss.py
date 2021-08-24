@@ -6,8 +6,7 @@ import torch
 from torch.utils.data import TensorDataset
 
 import datasets
-from datasets import cmapss
-from datasets import loader
+from datasets import cmapss, loader
 from tests.dataset_tests.templates import CmapssTestTemplate
 
 
@@ -63,16 +62,22 @@ class TestCMAPSS(CmapssTestTemplate, unittest.TestCase):
         )
         dataset.prepare_data()
         dataset.setup()
-        self.assertGreater(len(full_dataset.data["dev"][0]), len(dataset.data["dev"][0]))
+        self.assertGreater(
+            len(full_dataset.data["dev"][0]), len(dataset.data["dev"][0])
+        )
         self.assertEqual(len(full_dataset.data["val"][0]), len(dataset.data["val"][0]))
-        self.assertEqual(len(full_dataset.data["test"][0]), len(dataset.data["test"][0]))
+        self.assertEqual(
+            len(full_dataset.data["test"][0]), len(dataset.data["test"][0])
+        )
 
         dataset = cmapss.CMAPSSDataModule(
             fd=1, batch_size=4, window_size=30, percent_broken=0.2
         )
         dataset.prepare_data()
         dataset.setup()
-        self.assertGreater(len(full_dataset.data["dev"][0]), len(dataset.data["dev"][0]))
+        self.assertGreater(
+            len(full_dataset.data["dev"][0]), len(dataset.data["dev"][0])
+        )
         self.assertAlmostEqual(
             0.2,
             len(dataset.data["dev"][0]) / len(full_dataset.data["dev"][0]),
@@ -92,7 +97,9 @@ class TestCMAPSS(CmapssTestTemplate, unittest.TestCase):
         )  # First target has to be equal
 
     def test_truncation_passed_correctly(self):
-        dataset = cmapss.CMAPSSDataModule(1, 4, percent_broken=0.2, percent_fail_runs=0.5)
+        dataset = cmapss.CMAPSSDataModule(
+            1, 4, percent_broken=0.2, percent_fail_runs=0.5
+        )
         self.assertEqual(dataset.percent_broken, dataset._loader.percent_broken)
         self.assertEqual(dataset.percent_fail_runs, dataset._loader.percent_fail_runs)
 
@@ -111,9 +118,13 @@ class TestCMAPSS(CmapssTestTemplate, unittest.TestCase):
         self.assertEqual(128, cmapss_dataset.batch_size)
 
     def test_empty_dataset(self):
-        dataset = cmapss.CMAPSSDataModule(1, 4, percent_broken=0.2, percent_fail_runs=0.0)
+        dataset = cmapss.CMAPSSDataModule(
+            1, 4, percent_broken=0.2, percent_fail_runs=0.0
+        )
         dataset.setup()
-        dataset = cmapss.CMAPSSDataModule(1, 4, percent_broken=0.0, percent_fail_runs=0.5)
+        dataset = cmapss.CMAPSSDataModule(
+            1, 4, percent_broken=0.0, percent_fail_runs=0.5
+        )
         dataset.setup()
 
 
@@ -200,7 +211,9 @@ class TestPairedDataset(unittest.TestCase):
 
     def test_pair_func_selection(self):
         with self.subTest("default"):
-            data = datasets.cmapss.PairedCMAPSS([self.cmapss_normal], "dev", 512, 1, True)
+            data = datasets.cmapss.PairedCMAPSS(
+                [self.cmapss_normal], "dev", 512, 1, True
+            )
             self.assertEqual(data._get_pair_idx, data._get_pair_func)
         with self.subTest("piecewise"):
             data = datasets.cmapss.PairedCMAPSS(
