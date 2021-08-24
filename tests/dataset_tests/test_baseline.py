@@ -5,10 +5,13 @@ import torch.utils.data
 from torch.utils.data import RandomSampler, SequentialSampler
 
 import datasets
-from tests.dataset_tests.templates import PretrainingDataModuleTemplate
+from tests.dataset_tests.templates import (
+    CmapssTestTemplate,
+    PretrainingDataModuleTemplate,
+)
 
 
-class TestCMAPSSBaseline(unittest.TestCase):
+class TestCMAPSSBaseline(CmapssTestTemplate, unittest.TestCase):
     def setUp(self):
         self.dataset = datasets.BaselineDataModule(
             3, batch_size=16, percent_fail_runs=0.8
@@ -26,9 +29,7 @@ class TestCMAPSSBaseline(unittest.TestCase):
     def test_default_window_size(self):
         window_sizes = [30, 20, 30, 15]
         for i, win in enumerate(window_sizes, start=1):
-            dataset = datasets.BaselineDataModule(
-                i, batch_size=16, percent_fail_runs=0.8
-            )
+            dataset = datasets.BaselineDataModule(i, batch_size=16, percent_fail_runs=0.8)
             for fd in dataset.cmapss.values():
                 self.assertEqual(win, fd.window_size)
 
@@ -90,7 +91,7 @@ class TestCMAPSSBaseline(unittest.TestCase):
 
 
 class TestPretrainingBaselineDataModuleFullData(
-    unittest.TestCase, PretrainingDataModuleTemplate
+    CmapssTestTemplate, PretrainingDataModuleTemplate, unittest.TestCase
 ):
     def setUp(self):
         self.dataset = datasets.PretrainingBaselineDataModule(
@@ -178,7 +179,7 @@ class TestPretrainingBaselineDataModuleFullData(
 
 
 class TestPretrainingBaselineDataModuleLowData(
-    unittest.TestCase, PretrainingDataModuleTemplate
+    CmapssTestTemplate, PretrainingDataModuleTemplate, unittest.TestCase
 ):
     def setUp(self):
         self.dataset = datasets.PretrainingBaselineDataModule(

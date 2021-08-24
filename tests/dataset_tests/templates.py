@@ -1,7 +1,40 @@
+import os
+import zipfile
+
 import torch
 from torch.utils.data import TensorDataset
 
 from datasets.cmapss import PairedCMAPSS
+
+
+class CmapssTestTemplate:
+    @classmethod
+    def setUpClass(cls):
+        script_path = os.path.dirname(__file__)
+        data_path = os.path.join(script_path, "..", "..", "data", "CMAPSS")
+        if "train_FD001.txt" not in os.listdir(data_path):
+            print("Extract CMAPSS data...")
+            data_zip = os.path.join(data_path, "CMAPSSData.zip")
+            with zipfile.ZipFile(data_zip) as zip_file:
+                zip_file.extractall(data_path)
+
+
+class FemtoTestTemplate:
+    @classmethod
+    def setUpClass(cls):
+        script_path = os.path.dirname(__file__)
+        data_path = os.path.join(script_path, "..", "..", "data", "FEMTOBearingDataSet")
+        if "Test_set" not in os.listdir(data_path):
+            print("Extract FEMTO data...")
+            test_zip = os.path.join(data_path, "TestSet.zip")
+            with zipfile.ZipFile(test_zip) as zip_file:
+                zip_file.extractall(data_path)
+            train_zip = os.path.join(data_path, "Training_set.zip")
+            with zipfile.ZipFile(train_zip) as zip_file:
+                zip_file.extractall(data_path)
+            val_zip = os.path.join(data_path, "Validation_Set.zip")
+            with zipfile.ZipFile(val_zip) as zip_file:
+                zip_file.extractall(data_path)
 
 
 class PretrainingDataModuleTemplate:

@@ -6,9 +6,10 @@ import torch
 import numpy as np
 
 from datasets import loader
+from tests.dataset_tests.templates import CmapssTestTemplate, FemtoTestTemplate
 
 
-class TestCMAPSSLoader(unittest.TestCase):
+class TestCMAPSSLoader(CmapssTestTemplate, unittest.TestCase):
     NUM_CHANNELS = len(loader.CMAPSSLoader.DEFAULT_CHANNELS)
 
     def test_run_shape_and_dtype(self):
@@ -133,18 +134,14 @@ class TestCMAPSSLoader(unittest.TestCase):
                 )
                 trunc_dev, trunc_dev_targets = truncated_dataset.load_split("dev")
                 self.assertLessEqual(max(torch.max(r).item() for r in trunc_dev), 1.0)
-                self.assertGreaterEqual(
-                    min(torch.min(r).item() for r in trunc_dev), -1.0
-                )
+                self.assertGreaterEqual(min(torch.min(r).item() for r in trunc_dev), -1.0)
 
                 truncated_dataset = loader.CMAPSSLoader(
                     fd=i, window_size=30, percent_broken=0.2
                 )
                 trunc_dev, trunc_dev_targets = truncated_dataset.load_split("dev")
                 self.assertLessEqual(max(torch.max(r).item() for r in trunc_dev), 1.0)
-                self.assertGreaterEqual(
-                    min(torch.min(r).item() for r in trunc_dev), -1.0
-                )
+                self.assertGreaterEqual(min(torch.min(r).item() for r in trunc_dev), -1.0)
 
     def test_truncation_by_index(self):
         full_dataset = loader.CMAPSSLoader(1)
@@ -156,18 +153,14 @@ class TestCMAPSSLoader(unittest.TestCase):
         self.assertEqual(len(indices), len(trunc_train))
         self.assertEqual(len(indices), len(trunc_train_targets))
         for trunc_idx, full_idx in enumerate(indices):
-            self.assertEqual(
-                0, torch.dist(full_train[full_idx], trunc_train[trunc_idx])
-            )
+            self.assertEqual(0, torch.dist(full_train[full_idx], trunc_train[trunc_idx]))
             self.assertEqual(
                 0,
-                torch.dist(
-                    full_train_targets[full_idx], trunc_train_targets[trunc_idx]
-                ),
+                torch.dist(full_train_targets[full_idx], trunc_train_targets[trunc_idx]),
             )
 
 
-class TestFEMTOLoader(unittest.TestCase):
+class TestFEMTOLoader(FemtoTestTemplate, unittest.TestCase):
     NUM_CHANNELS = 2
 
     def test_run_shape_and_dtype(self):
@@ -236,9 +229,7 @@ class TestFEMTOLoader(unittest.TestCase):
             self.assertEqual(len(full_run), len(trunc_run))
 
     @unittest.skip("No val set yet.")
-    @mock.patch(
-        "datasets.loader.CMAPSSLoader._truncate_runs", wraps=lambda x, y: (x, y)
-    )
+    @mock.patch("datasets.loader.CMAPSSLoader._truncate_runs", wraps=lambda x, y: (x, y))
     def test_val_truncation(self, mock_truncate):
         dataset = loader.CMAPSSLoader(fd=1, window_size=30)
         with self.subTest(truncate_val=False):
@@ -297,7 +288,7 @@ class TestFEMTOLoader(unittest.TestCase):
         self.assertEqual(0, torch.dist(full_train_targets[1], trunc_train_targets[0]))
 
 
-class TestFEMTOPreperator(unittest.TestCase):
+class TestFEMTOPreperator(FemtoTestTemplate, unittest.TestCase):
     NUM_SAMPLES = {
         1: {"train": 3674, "test": 10973},
         2: {"train": 1708, "test": 5948},

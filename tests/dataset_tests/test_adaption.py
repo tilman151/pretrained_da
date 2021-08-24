@@ -5,10 +5,13 @@ from torch.utils.data import TensorDataset
 
 import datasets
 import datasets.cmapss
-from tests.dataset_tests.templates import PretrainingDataModuleTemplate
+from tests.dataset_tests.templates import (
+    CmapssTestTemplate,
+    PretrainingDataModuleTemplate,
+)
 
 
-class TestCMAPSSAdaption(unittest.TestCase):
+class TestCMAPSSAdaption(CmapssTestTemplate, unittest.TestCase):
     def setUp(self):
         self.dataset = datasets.DomainAdaptionDataModule(3, 2, batch_size=16)
         self.dataset.prepare_data()
@@ -38,9 +41,7 @@ class TestCMAPSSAdaption(unittest.TestCase):
         self.assertEqual(self.dataset.target.window_size, self.dataset.window_size)
         self.assertEqual(40, dataset.target.window_size)
         self.assertEqual(dataset.target.window_size, dataset.source.window_size)
-        self.assertEqual(
-            dataset.target.window_size, dataset.target_truncated.window_size
-        )
+        self.assertEqual(dataset.target.window_size, dataset.target_truncated.window_size)
 
     def test_val_source_target_order(self):
         val_source_loader, val_target_loader, _ = self.dataset.val_dataloader()
@@ -125,7 +126,7 @@ class TestCMAPSSAdaption(unittest.TestCase):
 
 
 class TestPretrainingDataModuleFullData(
-    unittest.TestCase, PretrainingDataModuleTemplate
+    CmapssTestTemplate, PretrainingDataModuleTemplate, unittest.TestCase
 ):
     def setUp(self):
         self.dataset = datasets.PretrainingAdaptionDataModule(
@@ -173,7 +174,7 @@ class TestPretrainingDataModuleFullData(
 
 
 class TestPretrainingDataModuleLowData(
-    unittest.TestCase, PretrainingDataModuleTemplate
+    CmapssTestTemplate, PretrainingDataModuleTemplate, unittest.TestCase
 ):
     def setUp(self):
         self.dataset = datasets.PretrainingAdaptionDataModule(
