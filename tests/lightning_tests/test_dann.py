@@ -151,8 +151,8 @@ class TestDAAN(unittest.TestCase):
     @mock.patch("pytorch_lightning.LightningModule.log")
     @torch.no_grad()
     def test_metric_reduction(self, mock_log):
-        source_batches = 600
-        target_batches = 400
+        source_batches = 20
+        target_batches = 10
         score_batches = target_batches
         source_prediction = torch.randn(source_batches, 32) + 30
         target_prediction = torch.randn(target_batches, 32) + 20
@@ -200,8 +200,8 @@ class TestDAAN(unittest.TestCase):
                 self.assertAlmostEqual(expected_value, actual_value, delta=delta)
 
     def test_metric_updates(self):
-        source_batches = 600
-        target_batches = 400
+        source_batches = 20
+        target_batches = 10
         score_batches = target_batches
         num_batches = source_batches + target_batches
         source_prediction = torch.randn(source_batches, 32) + 30

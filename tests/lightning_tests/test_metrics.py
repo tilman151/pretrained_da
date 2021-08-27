@@ -8,25 +8,25 @@ from lightning import metrics
 
 class TestEmbeddingViz(unittest.TestCase):
     def setUp(self):
-        self.metric = metrics.EmbeddingViz(32, 128)
+        self.metric = metrics.EmbeddingViz(num_elements=10, embedding_size=8)
 
     def test_updating(self):
-        embeddings = torch.randn(16, 128)
-        labels = torch.ones(16)
-        ruls = torch.arange(0, 16)
+        embeddings = torch.randn(5, 8)
+        labels = torch.ones(5)
+        ruls = torch.arange(0, 5)
 
         self.metric.update(embeddings, labels, ruls)
         self.metric.update(embeddings, labels, ruls)
 
-        self.assertEqual(0, torch.sum(self.metric.embeddings[:16] - embeddings))
-        self.assertEqual(0, torch.sum(self.metric.labels[:16] - labels))
-        self.assertEqual(0, torch.sum(self.metric.embeddings[16:32] - embeddings))
-        self.assertEqual(0, torch.sum(self.metric.labels[16:32] - labels))
+        self.assertEqual(0, torch.sum(self.metric.embeddings[:5] - embeddings))
+        self.assertEqual(0, torch.sum(self.metric.labels[:5] - labels))
+        self.assertEqual(0, torch.sum(self.metric.embeddings[5:10] - embeddings))
+        self.assertEqual(0, torch.sum(self.metric.labels[5:10] - labels))
 
     def test_compute(self):
-        embeddings = torch.randn(32, 128)
-        labels = torch.cat([torch.ones(16), torch.zeros(16)])
-        ruls = torch.arange(0, 32)
+        embeddings = torch.randn(10, 8)
+        labels = torch.cat([torch.ones(5), torch.zeros(5)])
+        ruls = torch.arange(0, 10)
 
         self.metric.update(embeddings, labels, ruls)
         fig = self.metric.compute()
@@ -76,7 +76,7 @@ class TestRMSE(unittest.TestCase):
         self.assertEqual(0, self.metric.sizes.sum())
 
     def _add_one_batch(self):
-        batch_size = 100
+        batch_size = 16
         inputs = torch.ones(batch_size) * 2
         targets = torch.zeros_like(inputs)
         summed_squares = torch.sum((inputs - targets) ** 2)
@@ -86,8 +86,8 @@ class TestRMSE(unittest.TestCase):
         return summed_squares, batch_size
 
     def test_compute(self):
-        batch_sizes = [3000, 3000, 3000, 1000]
-        inputs = torch.randn(sum(batch_sizes)) + 100
+        batch_sizes = [16, 32, 32, 16]
+        inputs = torch.randn(sum(batch_sizes)) + 8
         targets = torch.randn_like(inputs)
         expected_rmse = torch.sqrt(torch.mean((inputs - targets) ** 2))
 
@@ -123,7 +123,7 @@ class TestMeanMetric(unittest.TestCase):
         self.assertEqual(0, self.mean_metric.sizes.sum())
 
     def _add_one_batch(self):
-        batch_size = 100
+        batch_size = 16
         loss = torch.tensor(500)
 
         self.mean_metric.update(loss, batch_size)
@@ -131,7 +131,7 @@ class TestMeanMetric(unittest.TestCase):
         return loss, batch_size
 
     def test_compute_mean(self):
-        batch_sizes = [512] * 50 + [100]
+        batch_sizes = [16] * 8 + [32]
         losses = torch.randn(sum(batch_sizes)) + 2
         expected_loss = losses.mean()
 
@@ -143,7 +143,7 @@ class TestMeanMetric(unittest.TestCase):
         self.assertAlmostEqual(expected_loss.item(), actual_loss.item(), places=5)
 
     def test_compute_sum(self):
-        batch_sizes = [512] * 50 + [100]
+        batch_sizes = [16] * 8 + [32]
         losses = torch.randn(sum(batch_sizes)) + 2
         expected_loss = losses.sum()
 

@@ -66,7 +66,7 @@ class TestBaselineTemplate:
     @mock.patch("pytorch_lightning.LightningModule.log")
     @torch.no_grad()
     def test_metric_val_reduction(self, mock_log):
-        source_batches = 600
+        source_batches = 10
         source_prediction = torch.randn(source_batches, 32) + 30
         self._mock_predictions(source_prediction)
 
@@ -81,7 +81,7 @@ class TestBaselineTemplate:
         self._assert_logs(mock_log, expected_logs)
 
     def test_metric_val_updates(self):
-        source_batches = 600
+        source_batches = 10
         source_prediction = torch.randn(source_batches, 32) + 30
         self._mock_predictions(source_prediction)
 
@@ -91,7 +91,7 @@ class TestBaselineTemplate:
     @mock.patch("pytorch_lightning.LightningModule.log")
     @torch.no_grad()
     def test_metric_test_reduction(self, mock_log):
-        source_batches = 600
+        source_batches = 10
         source_prediction = [
             torch.randn(source_batches, 32) + i * 10 for i in range(1, 5)
         ]
@@ -109,7 +109,7 @@ class TestBaselineTemplate:
         self._assert_logs(mock_log, expected_logs)
 
     def test_metric_test_updates(self):
-        source_batches = 600
+        source_batches = 10
         source_prediction = [
             torch.randn(source_batches, 32) + i * 10 for i in range(1, 5)
         ]

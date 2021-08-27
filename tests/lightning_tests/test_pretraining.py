@@ -102,7 +102,7 @@ class TestUnsupervisedPretraining:
     @mock.patch("pytorch_lightning.LightningModule.log")
     @torch.no_grad()
     def test_metric_val_reduction(self, mock_log):
-        paired_batches = 600
+        paired_batches = 10
         embedding_dim = self.encoder_shape[-1]
         anchor_embeddings = torch.randn(paired_batches, 32, embedding_dim)
         query_embeddings = torch.randn(paired_batches, 32, embedding_dim)
@@ -130,7 +130,7 @@ class TestUnsupervisedPretraining:
         self._assert_logs(mock_log, expected_logs)
 
     def test_metric_val_updates(self):
-        paired_batches = 600
+        paired_batches = 10
         embedding_dim = self.encoder_shape[-1]
         anchor_embeddings = torch.randn(paired_batches, 32, embedding_dim)
         query_embeddings = torch.randn(paired_batches, 32, embedding_dim)
