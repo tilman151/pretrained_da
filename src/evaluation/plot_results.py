@@ -316,7 +316,7 @@ def method_tables(df: pd.DataFrame, baseline_rul: pd.DataFrame, baseline_mse, me
 
 def _build_table(baseline_mse, means, stds, metric_name):
     metric_table = means[metric_name].combine(
-        stds[metric_name], func=lambda mean, std: "$%.2f \pm %.2f$" % (mean, std)
+        stds[metric_name], func=lambda mean, std: fr"{mean:.2f} \pm {std:.2f}$"
     )
     metric_table = metric_table.unstack(level=-1).sort_index(level=1, axis=1)
     baseline_mse = baseline_mse.drop(columns=["dataset", "measure", "type"])
@@ -324,7 +324,7 @@ def _build_table(baseline_mse, means, stds, metric_name):
     baseline_mse_stds = baseline_mse.groupby("task").std()
     baseline_mse = baseline_mse_means["value"].combine(
         baseline_mse_stds["value"],
-        func=lambda mean, std: "$%.2f \pm %.2f$" % (mean, std),
+        func=lambda mean, std: fr"{mean:.2f} \pm {std:.2f}$",
     )
     baseline_mse = pd.DataFrame(baseline_mse)
     baseline_mse.columns = ["source only"]

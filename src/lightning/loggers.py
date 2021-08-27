@@ -44,7 +44,10 @@ def transfer_hyperopt_name(source, target, percent_broken):
     assert target in ExperimentNaming, f"Unknown target FD number {target}."
     assert 0 <= percent_broken <= 1, f"Invalid percent broken {percent_broken}."
 
-    return f"hyperopt_{ExperimentNaming[source]}&{ExperimentNaming[target]}@{percent_broken:.2f}"
+    source_name = ExperimentNaming[source]
+    target_name = ExperimentNaming[target]
+
+    return f"hyperopt_{source_name}&{target_name}@{percent_broken:.2f}"
 
 
 def pretraining_hyperopt_name(source, target, percent_broken):
@@ -52,7 +55,10 @@ def pretraining_hyperopt_name(source, target, percent_broken):
     assert target in ExperimentNaming, f"Unknown target FD number {target}."
     assert 0 <= percent_broken <= 1, f"Invalid percent broken {percent_broken}."
 
-    return f"pre_hyperopt_{ExperimentNaming[source]}&{ExperimentNaming[target]}@{percent_broken:.2f}"
+    source_name = ExperimentNaming[source]
+    target_name = ExperimentNaming[target]
+
+    return f"pre_hyperopt_{source_name}&{target_name}@{percent_broken:.2f}"
 
 
 def semi_supervised_hyperopt_name(source, percent_broken):
@@ -79,7 +85,7 @@ class MLTBLogger(loggers.LoggerCollection):
 
         :param log_dir: directory to put the mlruns and tensorboard directories
         :param experiment_name: name for the experiment
-        :param tensorboard_struct: dictionary containing information to refine the tensorboard directory structure
+        :param tensorboard_struct: dict to refine the tensorboard directory structure
         """
         tensorboard_path = os.path.join(log_dir, "tensorboard", experiment_name)
         sub_dirs = self._dirs_from_dict(tensorboard_struct)

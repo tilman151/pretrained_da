@@ -162,12 +162,12 @@ def _generate_table(df: pd.DataFrame, column):
     ).reset_index()
     if column == "score":
         df[column] = df["mean"].combine(
-            df["std"], func=lambda mean, std: f"${mean:.2e} \pm {std:.2e}$"
+            df["std"], func=lambda mean, std: fr"${mean:.2e} \pm {std:.2e}$"
         )
         df[column] = df[column].apply(_replace_power_fmt)
     else:
         df[column] = df["mean"].combine(
-            df["std"], func=lambda mean, std: f"${mean:.2f} \pm {std:.2f}$"
+            df["std"], func=lambda mean, std: fr"${mean:.2f} \pm {std:.2f}$"
         )
     argmins = _get_argmins(df)
     df = df.pivot(
@@ -216,7 +216,7 @@ def _mark_best(df, argmins):
                 )
                 df.loc[percent_broken, col_idx].iloc[
                     min_idx
-                ] = f"$\mathbf{{{stripped_value}}}$"
+                ] = fr"$\mathbf{{{stripped_value}}}$"
 
     return df
 
@@ -239,7 +239,7 @@ def _make_multirows(df):
         if value == 0:
             new_index.append("")
         elif i % 3 == 1:
-            new_index.append(f"\multirow{{3}}{{*}}{{{value}\%}}")
+            new_index.append(fr"\multirow{{3}}{{*}}{{{value}\%}}")
         else:
             new_index.append("")
     df.index = new_index
