@@ -4,10 +4,10 @@ from datetime import datetime
 import ray
 import torch.optim
 from pytorch_probgraph import RestrictedBoltzmannMachineCD
+from rul_datasets.loader import CMAPSSLoader
 from sklearn.model_selection import ShuffleSplit
 
 import building
-from datasets.loader import CMAPSSLoader
 
 
 def run(

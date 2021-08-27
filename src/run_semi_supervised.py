@@ -2,10 +2,10 @@ import random
 from datetime import datetime
 
 import ray
+from rul_datasets.loader import CMAPSSLoader
 from sklearn.model_selection import ShuffleSplit
 
 import building
-from datasets.loader import CMAPSSLoader
 from run_baseline import run as run_baseline
 from run_pretraining import run as run_pretraining
 

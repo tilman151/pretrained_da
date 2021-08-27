@@ -5,8 +5,8 @@ import unittest
 from unittest import mock
 
 import pytorch_lightning as pl
+import rul_datasets as datasets
 
-import datasets
 import lightning.loggers as loggers
 from lightning import baseline
 

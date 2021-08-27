@@ -28,7 +28,7 @@ class TestBuildingFunctions(unittest.TestCase):
     @mock.patch("lightning.loggers.MinEpochModelCheckpoint")
     @mock.patch("lightning.loggers.MLTBLogger")
     @mock.patch("building.build.build_dann_from_config")
-    @mock.patch("datasets.DomainAdaptionDataModule")
+    @mock.patch("rul_datasets.DomainAdaptionDataModule")
     @mock.patch("building.build.build_trainer")
     def test_build_transfer(
         self,
@@ -290,7 +290,7 @@ class TestBuildingFunctions(unittest.TestCase):
     @mock.patch("pytorch_lightning.callbacks.ModelCheckpoint")
     @mock.patch("lightning.loggers.MLTBLogger")
     @mock.patch("building.build.build_baseline_from_config")
-    @mock.patch("datasets.BaselineDataModule")
+    @mock.patch("rul_datasets.BaselineDataModule")
     @mock.patch("building.build.build_trainer")
     def test_build_baseline(
         self,

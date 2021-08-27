@@ -1,11 +1,11 @@
 import pytorch_lightning as pl
+import rul_datasets as datasets
 import torch
 from pytorch_probgraph import (
     InteractionModule,
     RestrictedBoltzmannMachineCD,
 )
 
-import datasets
 from building.build_common import add_hparams, build_trainer, get_logdir
 from lightning import autoencoder, baseline, dann, loggers, pretraining
 from models.layers import GaussianSequenceLayer, RectifiedLinearLayer

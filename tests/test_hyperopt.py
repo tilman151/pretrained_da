@@ -60,7 +60,7 @@ class TestPretrainingHyperopt(unittest.TestCase):
             weight_decay=0.0,
         )
 
-    @mock.patch("datasets.PretrainingAdaptionDataModule")
+    @mock.patch("rul_datasets.PretrainingAdaptionDataModule")
     @mock.patch("pytorch_lightning.Trainer.fit")
     def test_data_creation(self, mock_fit, mock_data):
         arch_config = {
