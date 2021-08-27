@@ -2,13 +2,35 @@ import os
 import shutil
 import tempfile
 import unittest
+from typing import List, Optional
 from unittest import mock
 
 import pytorch_lightning as pl
-import rul_datasets as datasets
+import torch
+from torch.utils.data import DataLoader, TensorDataset
 
 import lightning.loggers as loggers
 from lightning import baseline
+
+
+class DummyDataModule(pl.LightningDataModule):
+    def prepare_data(self, *args, **kwargs):
+        pass
+
+    def setup(self, stage: Optional[str] = None):
+        pass
+
+    def train_dataloader(self, *args, **kwargs) -> DataLoader:
+        return DataLoader(self._dummy_dataset(), batch_size=10, shuffle=True)
+
+    def val_dataloader(self, *args, **kwargs) -> DataLoader:
+        return DataLoader(self._dummy_dataset(), batch_size=10)
+
+    def test_dataloader(self, *args, **kwargs) -> List[DataLoader]:
+        return [DataLoader(self._dummy_dataset(), batch_size=10) for _ in range(4)]
+
+    def _dummy_dataset(self):
+        return TensorDataset(torch.randn(100, 14, 30), torch.rand(100))
 
 
 class TestMLTBLogger(unittest.TestCase):
@@ -45,7 +67,7 @@ class TestMLTBLogger(unittest.TestCase):
             deterministic=True,
             log_every_n_steps=10,
         )
-        data = datasets.BaselineDataModule(fd_source=1, batch_size=512, window_size=30)
+        data = DummyDataModule()
         model = baseline.Baseline(
             in_channels=14,
             seq_len=30,
