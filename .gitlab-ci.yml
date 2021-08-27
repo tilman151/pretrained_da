@@ -14,6 +14,13 @@ black:
   script:
     - black --check ./
 
+flake8:
+  stage: static
+  before_script:
+    - pip install flake8
+  script:
+    - flake8 ./src ./tests
+
 unittest:
   stage: test
   before_script:
