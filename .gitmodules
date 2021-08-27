@@ -1,0 +1,3 @@
+[submodule "rul-datasets"]
+	path = rul-datasets
+	url = git@gitlab.iavgroup.local:tkrokots/rul-datasets.git
