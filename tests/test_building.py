@@ -39,7 +39,6 @@ class TestBuildingFunctions(unittest.TestCase):
         mock_checkpoint,
     ):
         mock_checkpoint.return_value = "mock_checkpoint"
-        mock_logger.return_value = "logger"
 
         with self.subTest("no_encoder"):
             build.build_transfer(2, 1, 0.8, self.config, None, False, 1, 42, "version")
@@ -53,7 +52,7 @@ class TestBuildingFunctions(unittest.TestCase):
                 },
             )
             mock_build_trainer.assert_called_with(
-                "logger",
+                mock_logger(),
                 "mock_checkpoint",
                 max_epochs=200,
                 val_interval=1.0,
@@ -84,7 +83,7 @@ class TestBuildingFunctions(unittest.TestCase):
                 },
             )
             mock_build_trainer.assert_called_with(
-                "logger",
+                mock_logger(),
                 "mock_checkpoint",
                 max_epochs=200,
                 val_interval=1.0,
@@ -183,7 +182,6 @@ class TestBuildingFunctions(unittest.TestCase):
         mock_pretraining_from_config,
         mode,
     ):
-        mock_logger.return_value = "mock_logger"
         mock_checkpoint.return_value = "mock_checkpoint"
         build.build_pretraining(
             2,
@@ -209,7 +207,7 @@ class TestBuildingFunctions(unittest.TestCase):
             },
         )
         mock_build_trainer.assert_called_with(
-            "mock_logger",
+            mock_logger(),
             "mock_checkpoint",
             max_epochs=100,
             val_interval=1.0,
@@ -300,7 +298,6 @@ class TestBuildingFunctions(unittest.TestCase):
         mock_logger,
         mock_checkpoint,
     ):
-        mock_logger.return_value = "mock_logger"
         mock_checkpoint.return_value = "mock_checkpoint"
         with self.subTest("no_encoder"):
             build.build_baseline(2, 1.0, self.config, "cnn", None, 1, 42, "version")
@@ -310,7 +307,7 @@ class TestBuildingFunctions(unittest.TestCase):
                 tag="version",
             )
             mock_build_trainer.assert_called_with(
-                "mock_logger",
+                mock_logger(),
                 "mock_checkpoint",
                 max_epochs=100,
                 val_interval=1.0,
@@ -332,7 +329,7 @@ class TestBuildingFunctions(unittest.TestCase):
                 2, 1.0, self.config, "cnn", "encoder_path", 1, 42, "version"
             )
             mock_build_trainer.assert_called_with(
-                "mock_logger",
+                mock_logger(),
                 "mock_checkpoint",
                 max_epochs=100,
                 val_interval=1.0,
