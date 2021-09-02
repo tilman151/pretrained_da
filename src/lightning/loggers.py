@@ -1,8 +1,11 @@
 import os
 import tempfile
-from typing import Optional
+from datetime import timedelta
+from pathlib import Path
+from typing import Optional, Union
 
-import pytorch_lightning.loggers as loggers
+import pytorch_lightning as pl
+from pytorch_lightning import loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 ExperimentNaming = {1: "one", 2: "two", 3: "three", 4: "four"}
@@ -166,31 +169,45 @@ class MinEpochModelCheckpoint(ModelCheckpoint):
 
     def __init__(
         self,
-        filepath: Optional[str] = None,
+        dirpath: Union[str, Path, None] = None,
+        filename: Optional[str] = None,
         monitor: Optional[str] = None,
         verbose: bool = False,
         save_last: Optional[bool] = None,
-        save_top_k: Optional[int] = None,
+        save_top_k: int = 1,
         save_weights_only: bool = False,
-        mode: str = "auto",
-        period: int = 1,
-        prefix: str = "",
+        mode: str = "min",
+        auto_insert_metric_name: bool = True,
+        every_n_train_steps: Optional[int] = None,
+        train_time_interval: Optional[timedelta] = None,
+        every_n_epochs: Optional[int] = None,
+        save_on_train_epoch_end: Optional[bool] = None,
+        period: Optional[int] = None,
+        every_n_val_epochs: Optional[int] = None,
         min_epochs_before_saving: int = 0,
     ):
         super().__init__(
-            filepath,
+            dirpath,
+            filename,
             monitor,
             verbose,
             save_last,
             save_top_k,
             save_weights_only,
             mode,
+            auto_insert_metric_name,
+            every_n_train_steps,
+            train_time_interval,
+            every_n_epochs,
+            save_on_train_epoch_end,
             period,
-            prefix,
+            every_n_val_epochs,
         )
 
         self.min_epochs_before_saving = min_epochs_before_saving
 
-    def save_checkpoint(self, trainer, pl_module):
+    def save_checkpoint(
+        self, trainer: pl.Trainer, unused: Optional[pl.LightningModule] = None
+    ) -> None:
         if trainer.current_epoch > self.min_epochs_before_saving:
-            super().save_checkpoint(trainer, pl_module)
+            super().save_checkpoint(trainer, unused)

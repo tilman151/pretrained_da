@@ -5,6 +5,7 @@ import torch
 
 import building
 from lightning import baseline
+from tests.lightning_tests import utils
 
 
 class TestBaselineTemplate:
@@ -49,6 +50,7 @@ class TestBaselineTemplate:
         inputs.grad = None
 
     def test_all_parameters_updated(self):
+        utils.mock_logging(self.net)
         optim = torch.optim.SGD(self.net.parameters(), lr=0.1)
 
         loss = self.net.training_step(

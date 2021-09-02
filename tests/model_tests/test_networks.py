@@ -28,10 +28,10 @@ class ModelTestsMixin:
         outputs_back_on_cpu = net_back_on_cpu(self.test_inputs)
 
         self.assertAlmostEqual(
-            0.0, torch.sum(outputs_cpu - outputs_gpu.cpu()).item(), delta=10e-6
+            0.0, torch.sum(outputs_cpu - outputs_gpu.cpu()).item(), delta=1e-5
         )
         self.assertAlmostEqual(
-            0.0, torch.sum(outputs_cpu - outputs_back_on_cpu).item(), delta=10e-6
+            0.0, torch.sum(outputs_cpu - outputs_back_on_cpu).item(), delta=1e-5
         )
 
     def test_batch_independence(self):

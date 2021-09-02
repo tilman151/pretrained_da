@@ -44,7 +44,7 @@ class TestMLTBLogger(unittest.TestCase):
     def test_save_path(self):
         self._run_dummy_training()
         artifact_path = self.logger.checkpoint_path
-        self.assertListEqual(["epoch=0.ckpt"], os.listdir(artifact_path))
+        self.assertListEqual(["epoch=0-step=9.ckpt"], os.listdir(artifact_path))
 
     def test_tensorboard_struct(self):
         self._run_dummy_training()
@@ -57,7 +57,8 @@ class TestMLTBLogger(unittest.TestCase):
         self._run_dummy_training()
         run_id = self.logger._mlflow_logger.run_id
         run = self.logger.mlflow_experiment.get_run(run_id)
-        self.assertDictEqual({"version": "test_tag"}, run.data.tags)
+        self.assertIn("version", run.data.tags)
+        self.assertEqual("test_tag", run.data.tags["version"])
 
     def _run_dummy_training(self):
         trainer = pl.Trainer(

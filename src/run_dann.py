@@ -1,9 +1,9 @@
 import random
+import re
 from datetime import datetime
 
 import mlflow
 import numpy as np
-import re
 
 import building
 
@@ -56,7 +56,7 @@ def _test_for_each_checkpoint_metric(data, trainer):
 
 
 def _get_epoch2ckpt_dict(checkpoint_paths):
-    pattern = re.compile(r"epoch=(?P<epoch>\d+).ckpt")
+    pattern = re.compile(r"epoch=(?P<epoch>\d+)-step=\d+.ckpt")
     d = {}
     for ckpt_path in checkpoint_paths:
         matcher = pattern.search(ckpt_path)

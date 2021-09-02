@@ -4,6 +4,7 @@ from unittest import mock
 import torch
 
 from lightning import autoencoder
+from tests.lightning_tests import utils
 
 
 class TestUnsupervisedPretraining(unittest.TestCase):
@@ -78,7 +79,8 @@ class TestUnsupervisedPretraining(unittest.TestCase):
 
         torch.autograd.set_detect_anomaly(False)
 
-    def test_all_parameters_updated(self):
+    def test_all_parameters_updated(self, *args):
+        utils.mock_logging(self.net)
         optim = torch.optim.SGD(self.net.parameters(), lr=0.1)
 
         inputs = (
