@@ -52,7 +52,7 @@ def tune_pretraining(config, arch_config, source, target, percent_broken):
         record_embeddings=False,
         use_adaption=True,
     )
-    building.add_hparams(model, data, 42)
+    logger.log_hyperparams({"seed": 42})
 
     trainer.fit(model, datamodule=data)
 

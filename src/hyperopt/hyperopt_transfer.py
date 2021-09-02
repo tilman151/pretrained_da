@@ -47,7 +47,7 @@ def tune_transfer(config, source, target, percent_broken):
     model = building.build_dann_from_config(
         config, data.window_size, pretrained_encoder_path=None, record_embeddings=False
     )
-    building.add_hparams(model, data, 42)
+    logger.log_hyperparams({"seed": 42})
 
     trainer.fit(model, datamodule=data)
 

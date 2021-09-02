@@ -6,7 +6,7 @@ from pytorch_probgraph import (
     RestrictedBoltzmannMachineCD,
 )
 
-from building.build_common import add_hparams, build_trainer, get_logdir
+from building.build_common import build_trainer, get_logdir
 from lightning import autoencoder, baseline, dann, loggers, pretraining
 from models.layers import GaussianSequenceLayer, RectifiedLinearLayer
 
@@ -53,7 +53,7 @@ def build_transfer(
     model = build_dann_from_config(
         config, data.window_size, pretrained_encoder_path, record_embeddings
     )
-    add_hparams(model, data, seed)
+    logger.log_hyperparams({"seed": seed})
 
     return trainer, data, model
 
@@ -109,7 +109,7 @@ def build_baseline(
     model = build_baseline_from_config(
         config, data.window_size, encoder, pretrained_encoder_path, record_embeddings
     )
-    add_hparams(model, data, seed)
+    logger.log_hyperparams({"seed": seed})
 
     return trainer, data, model
 
@@ -202,7 +202,7 @@ def build_pretraining(
     else:
         raise ValueError(f"Unrecognized pre-training mode {mode}.")
 
-    add_hparams(model, data, seed)
+    logger.log_hyperparams({"seed": seed})
 
     return trainer, data, model
 

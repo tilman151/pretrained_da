@@ -1,13 +1,13 @@
 import os
 from functools import partial
 
+import datasets
 import pytorch_lightning as pl
 import pytorch_lightning.loggers as pl_loggers
 from ray import tune
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
 import building
-import datasets
 from lightning import loggers
 
 
@@ -42,7 +42,6 @@ def tune_supervised(config, source, arch_config, encoder):
     model = building.build_baseline_from_config(
         arch_config, data.window_size, encoder, None
     )
-    building.add_hparams(model, data, None)
 
     trainer.fit(model, datamodule=data)
 

@@ -1,13 +1,13 @@
 import os
 from functools import partial
 
+import datasets
 import numpy as np
 import pytorch_lightning as pl
 import pytorch_lightning.loggers as pl_loggers
 from ray import tune
 
 import building
-import datasets
 from lightning import loggers
 
 
@@ -58,7 +58,7 @@ def tune_pretraining(config, arch_config, source, percent_broken, encoder, mode)
                 record_embeddings=False,
                 use_adaption=False,
             )
-        building.add_hparams(model, data, 42)
+        logger.log_hyperparams({"seed": 42})
 
         trainer.fit(model, datamodule=data)
         best_scores.append(trainer.checkpoint_callback.best_model_score.item())
