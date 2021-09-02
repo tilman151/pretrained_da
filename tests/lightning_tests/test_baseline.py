@@ -89,7 +89,7 @@ class TestBaselineTemplate:
 
         self._feed_dummy_val(source_batches)
         self.assertEqual(
-            source_batches * 32, self.net.regression_metrics[1].num_elements
+            source_batches * 32, self.net.regression_metrics["1"].num_elements
         )
 
     @mock.patch("pytorch_lightning.LightningModule.log")
@@ -122,7 +122,7 @@ class TestBaselineTemplate:
         self._feed_dummy_test(source_batches)
         for fd in range(1, 5):
             self.assertEqual(
-                source_batches * 32, self.net.regression_metrics[fd].num_elements
+                source_batches * 32, self.net.regression_metrics[str(fd)].num_elements
             )
 
     def _mock_predictions(self, prediction):

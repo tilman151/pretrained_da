@@ -41,7 +41,9 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         self.criterion_regression = metrics.RMSELoss()
 
         self.embedding_metric = metrics.EmbeddingViz(self.latent_dim, combined=False)
-        self.regression_metrics = {i: metrics.RMSELoss() for i in range(1, 5)}
+        self.regression_metrics = torch.nn.ModuleDict(
+            {str(i): metrics.RMSELoss() for i in range(1, 5)}
+        )
 
         self.save_hyperparameters()
 
@@ -132,13 +134,13 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
     def _evaluate(self, batch, metric_id):
         features, labels = batch
         predictions = self(features)
-        self.regression_metrics[metric_id].update(predictions, labels)
+        self.regression_metrics[str(metric_id)].update(predictions, labels)
         if self.record_embeddings:
             latent_code = self.encoder(features)
             self.embedding_metric.update(latent_code, torch.zeros_like(labels), labels)
 
     def validation_epoch_end(self, outputs):
-        self.log("val/regression_loss", self.regression_metrics[1].compute())
+        self.log("val/regression_loss", self.regression_metrics["1"].compute())
         if self.record_embeddings:
             fig_class, fig_rul = self.embedding_metric.compute()
             self.logger.log_figure("val/embeddings_class", fig_class, self.global_step)
