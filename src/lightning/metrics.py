@@ -1,27 +1,21 @@
 import matplotlib.colors as mplcolors
 import matplotlib.pyplot as plt
-import pytorch_lightning as pl
 import torch
+import torchmetrics
 import umap
 from torch import nn as nn
 
 
-class EmbeddingViz(pl.metrics.Metric):
-    def __init__(self, num_elements, embedding_size, combined=True):
+class EmbeddingViz(torchmetrics.Metric):
+    def __init__(self, embedding_size, combined=True):
         super().__init__()
 
-        self.num_elements = num_elements
         self.embedding_size = embedding_size
         self.combined = combined
 
-        self.add_state(
-            "embeddings",
-            default=torch.zeros(num_elements, embedding_size),
-            dist_reduce_fx=None,
-        )
-        self.add_state("labels", default=torch.zeros(num_elements), dist_reduce_fx=None)
-        self.add_state("ruls", default=torch.zeros(num_elements), dist_reduce_fx=None)
-        self.add_state("sample_counter", default=torch.tensor(0), dist_reduce_fx=None)
+        self.add_state("embeddings", default=[], dist_reduce_fx="cat")
+        self.add_state("labels", default=[], dist_reduce_fx="cat")
+        self.add_state("ruls", default=[], dist_reduce_fx="cat")
 
         self.class_cm = plt.get_cmap("tab10")
         self.rul_cm = plt.get_cmap("viridis")
@@ -34,21 +28,16 @@ class EmbeddingViz(pl.metrics.Metric):
         :param labels: domain labels with 0 being source and 1 being target
         :param ruls: Remaining Useful Lifetime values of the data points
         """
-        start = self.sample_counter
-        end = self.sample_counter + embeddings.shape[0]
-        self.sample_counter = end
 
-        self.embeddings[start:end] = embeddings
-        self.labels[start:end] = labels
-        self.ruls[start:end] = ruls
+        self.embeddings.append(embeddings)
+        self.labels.append(labels)
+        self.ruls.append(ruls)
 
     def compute(self):
         """Compute UMAP and plot points to 2d scatter plot."""
-        logged_embeddings = (
-            self.embeddings[: self.sample_counter].detach().cpu().numpy()
-        )
-        logged_labels = self.labels[: self.sample_counter].detach().cpu().int()
-        logged_ruls = self.ruls[: self.sample_counter].detach().cpu()
+        logged_embeddings = torch.cat(self.embeddings).detach().cpu().numpy()
+        logged_labels = torch.cat(self.labels).detach().cpu().int()
+        logged_ruls = torch.cat(self.ruls).detach().cpu()
         viz_embeddings = umap.UMAP(random_state=42).fit_transform(logged_embeddings)
 
         if self.combined:
@@ -97,57 +86,40 @@ class EmbeddingViz(pl.metrics.Metric):
         plt.colorbar(color_bar)
 
 
-class RMSELoss(pl.metrics.Metric):
-    def __init__(self, num_elements: int = 1000):
+class RMSELoss(torchmetrics.Metric):
+    def __init__(self):
         super().__init__()
 
         self.mse = nn.MSELoss()
 
-        self.add_state("losses", default=torch.zeros(num_elements), dist_reduce_fx=None)
-        self.add_state("sizes", default=torch.zeros(num_elements), dist_reduce_fx=None)
-        self.add_state("sample_counter", default=torch.tensor(0), dist_reduce_fx=None)
+        self.add_state("losses", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("num_elements", default=torch.tensor(0), dist_reduce_fx="sum")
 
     def update(self, inputs: torch.Tensor, targets: torch.Tensor):
         summed_square = nn.functional.mse_loss(inputs, targets, reduction="sum")
-        batch_size = inputs.shape[0]
-
-        self.losses[self.sample_counter] = summed_square
-        self.sizes[self.sample_counter] = batch_size
-        self.sample_counter += 1
+        self.losses += summed_square
+        self.num_elements += inputs.shape[0]
 
     def compute(self) -> torch.Tensor:
-        if self.sample_counter == 0:
-            raise RuntimeError("RMSE metric was not used. Computation impossible.")
-        summed_squares = self.losses[: self.sample_counter]
-        batch_sizes = self.sizes[: self.sample_counter]
-        rmse = torch.sqrt(summed_squares.sum() / batch_sizes.sum())
-
-        return rmse
-
-    def forward(self, inputs, targets):
-        return torch.sqrt(self.mse(inputs, targets))
+        return torch.sqrt(self.losses / self.num_elements)
 
 
-class SimpleMetric(pl.metrics.Metric):
-    def __init__(self, num_elements: int = 1000, reduction="mean"):
+class SimpleMetric(torchmetrics.Metric):
+    def __init__(self, reduction="mean"):
         super().__init__()
 
         if reduction not in ["sum", "mean"]:
             raise ValueError(f"Unsupported reduction {reduction}")
         self.reduction = reduction
 
-        self.add_state("losses", default=torch.zeros(num_elements), dist_reduce_fx=None)
-        self.add_state("sizes", default=torch.zeros(num_elements), dist_reduce_fx=None)
-        self.add_state("sample_counter", default=torch.tensor(0), dist_reduce_fx=None)
+        self.add_state("losses", default=[], dist_reduce_fx="cat")
+        self.add_state("sizes", default=[], dist_reduce_fx="cat")
 
     def update(self, loss: torch.Tensor, batch_size: int):
-        self.losses[self.sample_counter] = loss
-        self.sizes[self.sample_counter] = batch_size
-        self.sample_counter += 1
+        self.losses.append(loss)
+        self.sizes.append(batch_size)
 
     def compute(self) -> torch.Tensor:
-        if self.sample_counter == 0:
-            raise RuntimeError("RMSE metric was not used. Computation impossible.")
         if self.reduction == "mean":
             loss = self._weighted_mean()
         else:
@@ -156,15 +128,15 @@ class SimpleMetric(pl.metrics.Metric):
         return loss
 
     def _weighted_mean(self):
-        weights = self.sizes[: self.sample_counter]
+        weights = torch.tensor(self.sizes)
         weights = weights / weights.sum()
-        loss = self.losses[: self.sample_counter]
+        loss = torch.stack(self.losses)
         loss = torch.sum(loss * weights)
 
         return loss
 
     def _sum(self):
-        loss = self.losses[: self.sample_counter]
+        loss = torch.stack(self.losses)
         loss = torch.sum(loss)
 
         return loss

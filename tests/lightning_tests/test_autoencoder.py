@@ -131,8 +131,8 @@ class TestUnsupervisedPretraining(unittest.TestCase):
         self._mock_predictions(embeddings, reconstructions, domain_predictions)
 
         self._feed_dummy_val(num_batches)
-        self.assertEqual(num_batches, self.net.regression_metric.sample_counter)
-        self.assertEqual(num_batches, self.net.domain_metric.sample_counter)
+        self.assertEqual(num_batches, len(self.net.regression_metric.sizes))
+        self.assertEqual(num_batches, len(self.net.domain_metric.sizes))
 
     def _mock_predictions(self, embeddings, reconstructions, domain_predictions):
         self.net.encoder.forward = mock.MagicMock(side_effect=embeddings)

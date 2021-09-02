@@ -16,6 +16,7 @@ umap-learn = "^0.5.1"
 ray = "^1.5.2"
 tabulate = "^0.8.9"
 PyTorch-ProbGraph = "^0.0.1"
+numpy = "<1.20.0"
 rul_datasets = { path = "./rul-datasets", develop = true }
 
 [tool.poetry.dev-dependencies]

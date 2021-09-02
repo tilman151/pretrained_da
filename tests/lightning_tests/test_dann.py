@@ -202,56 +202,61 @@ class TestDAAN(unittest.TestCase):
     def test_metric_updates(self):
         source_batches = 20
         target_batches = 10
+        batch_size = 32
         score_batches = target_batches
         num_batches = source_batches + target_batches
-        source_prediction = torch.randn(source_batches, 32) + 30
-        target_prediction = torch.randn(target_batches, 32) + 20
-        score_prediction = torch.randn(2 * score_batches, 32) + 10
+        source_prediction = torch.randn(source_batches, batch_size) + 30
+        target_prediction = torch.randn(target_batches, batch_size) + 20
+        score_prediction = torch.randn(2 * score_batches, batch_size) + 10
         prediction = torch.cat([source_prediction, target_prediction, score_prediction])
-        domain_pred = torch.rand(source_batches + target_batches, 32)
+        domain_pred = torch.rand(source_batches + target_batches, batch_size)
         self._mock_predictions(prediction, domain_pred)
 
         with self.subTest("source_data"):
             self._feed_dummy_source(source_batches)
             self.assertEqual(
-                source_batches, self.net.source_regression_metric.sample_counter
+                batch_size * source_batches,
+                self.net.source_regression_metric.num_elements,
             )
-            self.assertEqual(source_batches, self.net.domain_loss_metric.sample_counter)
-            self.assertEqual(0, self.net.target_regression_metric.sample_counter)
-            self.assertEqual(0, self.net.target_rul_score_metric.sample_counter)
-            self.assertEqual(0, self.net.target_checkpoint_score_metric.sample_counter)
+            self.assertEqual(source_batches, len(self.net.domain_loss_metric.sizes))
+            self.assertEqual(0, self.net.target_regression_metric.num_elements)
+            self.assertEqual(0, len(self.net.target_rul_score_metric.sizes))
+            self.assertEqual(0, self.net.target_checkpoint_score_metric.num_elements)
 
         with self.subTest("target_data"):
             self._feed_dummy_target(target_batches)
             self.assertEqual(
-                source_batches, self.net.source_regression_metric.sample_counter
+                source_batches * batch_size,
+                self.net.source_regression_metric.num_elements,
+            )
+            self.assertEqual(num_batches, len(self.net.domain_loss_metric.sizes))
+            self.assertEqual(
+                target_batches * batch_size,
+                self.net.target_regression_metric.num_elements,
             )
             self.assertEqual(
-                source_batches + target_batches,
-                self.net.domain_loss_metric.sample_counter,
+                target_batches,
+                len(self.net.target_rul_score_metric.sizes),
             )
-            self.assertEqual(
-                target_batches, self.net.target_regression_metric.sample_counter
-            )
-            self.assertEqual(
-                target_batches, self.net.target_rul_score_metric.sample_counter
-            )
-            self.assertEqual(0, self.net.target_checkpoint_score_metric.sample_counter)
+            self.assertEqual(0, self.net.target_checkpoint_score_metric.num_elements)
 
         with self.subTest("score_data"):
             self._feed_dummy_score(score_batches)
             self.assertEqual(
-                source_batches, self.net.source_regression_metric.sample_counter
+                source_batches * batch_size,
+                self.net.source_regression_metric.num_elements,
             )
-            self.assertEqual(num_batches, self.net.domain_loss_metric.sample_counter)
+            self.assertEqual(num_batches, len(self.net.domain_loss_metric.sizes))
             self.assertEqual(
-                target_batches, self.net.target_regression_metric.sample_counter
+                target_batches * batch_size,
+                self.net.target_regression_metric.num_elements,
             )
             self.assertEqual(
-                target_batches, self.net.target_rul_score_metric.sample_counter
+                target_batches, len(self.net.target_rul_score_metric.sizes)
             )
             self.assertEqual(
-                score_batches, self.net.target_checkpoint_score_metric.sample_counter
+                score_batches * batch_size,
+                self.net.target_checkpoint_score_metric.num_elements,
             )
 
     def _mock_predictions(self, prediction, domain_pred):

@@ -38,11 +38,9 @@ class Baseline(pl.LightningModule, LoadEncoderMixin):
         self.encoder = self._get_encoder()
         self.regressor = networks.Regressor(latent_dim)
 
-        self.criterion_regression = metrics.RMSELoss(num_elements=0)
+        self.criterion_regression = metrics.RMSELoss()
 
-        self.embedding_metric = metrics.EmbeddingViz(
-            20000, self.latent_dim, combined=False
-        )
+        self.embedding_metric = metrics.EmbeddingViz(self.latent_dim, combined=False)
         self.regression_metrics = {i: metrics.RMSELoss() for i in range(1, 5)}
 
         self.save_hyperparameters()

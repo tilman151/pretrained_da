@@ -55,9 +55,9 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         self.criterion_regression = nn.MSELoss()
         self.criterion_domain = nn.BCEWithLogitsLoss()
 
-        self.embedding_metric = metrics.EmbeddingViz(40000, self.latent_dim)
-        self.regression_metric = metrics.SimpleMetric(40000)
-        self.domain_metric = metrics.SimpleMetric(40000)
+        self.embedding_metric = metrics.EmbeddingViz(self.latent_dim)
+        self.regression_metric = metrics.SimpleMetric()
+        self.domain_metric = metrics.SimpleMetric()
 
         self.save_hyperparameters()
         self.hparams["mode"] = "metric"

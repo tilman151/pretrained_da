@@ -8,7 +8,7 @@ from lightning import metrics
 
 class TestEmbeddingViz(unittest.TestCase):
     def setUp(self):
-        self.metric = metrics.EmbeddingViz(num_elements=10, embedding_size=8)
+        self.metric = metrics.EmbeddingViz(embedding_size=8)
 
     def test_updating(self):
         embeddings = torch.randn(5, 8)
@@ -18,15 +18,15 @@ class TestEmbeddingViz(unittest.TestCase):
         self.metric.update(embeddings, labels, ruls)
         self.metric.update(embeddings, labels, ruls)
 
-        self.assertEqual(0, torch.sum(self.metric.embeddings[:5] - embeddings))
-        self.assertEqual(0, torch.sum(self.metric.labels[:5] - labels))
-        self.assertEqual(0, torch.sum(self.metric.embeddings[5:10] - embeddings))
-        self.assertEqual(0, torch.sum(self.metric.labels[5:10] - labels))
+        self.assertEqual(0, torch.sum(self.metric.embeddings[0] - embeddings))
+        self.assertEqual(0, torch.sum(self.metric.labels[0] - labels))
+        self.assertEqual(0, torch.sum(self.metric.embeddings[1] - embeddings))
+        self.assertEqual(0, torch.sum(self.metric.labels[1] - labels))
 
     def test_compute(self):
-        embeddings = torch.randn(10, 8)
-        labels = torch.cat([torch.ones(5), torch.zeros(5)])
-        ruls = torch.arange(0, 10)
+        embeddings = torch.randn(16, 8)
+        labels = torch.cat([torch.ones(10), torch.zeros(6)])
+        ruls = torch.arange(0, 16)
 
         self.metric.update(embeddings, labels, ruls)
         fig = self.metric.compute()
@@ -64,16 +64,14 @@ class TestRMSE(unittest.TestCase):
 
     def test_update(self):
         expected_sse, batch_size = self._add_one_batch()
-        self.assertEqual(1, self.metric.sample_counter)
-        self.assertEqual(expected_sse, self.metric.losses[0])
-        self.assertEqual(batch_size, self.metric.sizes[0])
+        self.assertEqual(expected_sse, self.metric.losses)
+        self.assertEqual(batch_size, self.metric.num_elements)
 
     def test_reset(self):
         self._add_one_batch()
         self.metric.reset()
-        self.assertEqual(0, self.metric.sample_counter)
-        self.assertEqual(0, self.metric.losses.sum())
-        self.assertEqual(0, self.metric.sizes.sum())
+        self.assertEqual(0.0, self.metric.losses)
+        self.assertEqual(0, self.metric.num_elements)
 
     def _add_one_batch(self):
         batch_size = 16
@@ -99,9 +97,20 @@ class TestRMSE(unittest.TestCase):
 
         self.assertAlmostEqual(expected_rmse.item(), actual_rmse.item(), delta=0.001)
 
-    def test_compute_fails_on_empty_metric(self):
-        with self.assertRaises(RuntimeError):
-            self.metric.compute()
+    def test_forward(self):
+        losses = 0.0
+        num_elements = 0
+        for batch_size in [16, 32, 32, 16]:
+            inputs = torch.randn(batch_size) + 8
+            targets = torch.randn_like(inputs)
+            mse = torch.sum((inputs - targets) ** 2)
+            expected_local_rmse = torch.sqrt(mse / batch_size)
+            actual_rmse = self.metric(inputs, targets)
+            losses += mse
+            num_elements += batch_size
+            self.assertEqual(expected_local_rmse, actual_rmse)
+        expected_global_rmse = torch.sqrt(losses / num_elements)
+        self.assertEqual(expected_global_rmse, self.metric.compute())
 
 
 class TestMeanMetric(unittest.TestCase):
@@ -111,16 +120,14 @@ class TestMeanMetric(unittest.TestCase):
 
     def test_update(self):
         expected_loss, batch_size = self._add_one_batch()
-        self.assertEqual(1, self.mean_metric.sample_counter)
         self.assertEqual(expected_loss, self.mean_metric.losses[0])
         self.assertEqual(batch_size, self.mean_metric.sizes[0])
 
     def test_reset(self):
         self._add_one_batch()
         self.mean_metric.reset()
-        self.assertEqual(0, self.mean_metric.sample_counter)
-        self.assertEqual(0, self.mean_metric.losses.sum())
-        self.assertEqual(0, self.mean_metric.sizes.sum())
+        self.assertEqual([], self.mean_metric.losses)
+        self.assertEqual([], self.mean_metric.sizes)
 
     def _add_one_batch(self):
         batch_size = 16
@@ -153,9 +160,3 @@ class TestMeanMetric(unittest.TestCase):
         actual_loss = self.sum_metric.compute()
 
         self.assertAlmostEqual(expected_loss.item(), actual_loss.item(), delta=0.1)
-
-    def test_compute_fails_on_empty_metric(self):
-        with self.assertRaises(RuntimeError):
-            self.mean_metric.compute()
-        with self.assertRaises(RuntimeError):
-            self.sum_metric.compute()

@@ -58,11 +58,11 @@ class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
         self.regressor = networks.Regressor(latent_dim)
 
         self.criterion_recon = nn.MSELoss()
-        self.criterion_regression = metrics.RMSELoss(num_elements=0)
+        self.criterion_regression = metrics.RMSELoss()
         self.criterion_domain = nn.BCEWithLogitsLoss()
         self.rul_score = metrics.RULScore()
 
-        self.embedding_metric = metrics.EmbeddingViz(40000, self.latent_dim)
+        self.embedding_metric = metrics.EmbeddingViz(self.latent_dim)
         self.source_regression_metric = metrics.RMSELoss()
         self.target_regression_metric = metrics.RMSELoss()
         self.target_rul_score_metric = metrics.SimpleMetric(reduction="sum")

@@ -134,14 +134,15 @@ class TestUnsupervisedPretraining:
     def test_metric_val_updates(self):
         paired_batches = 10
         embedding_dim = self.encoder_shape[-1]
-        anchor_embeddings = torch.randn(paired_batches, 32, embedding_dim)
-        query_embeddings = torch.randn(paired_batches, 32, embedding_dim)
-        domain_predictions = torch.randn(paired_batches, 32)
+        batch_size = 32
+        anchor_embeddings = torch.randn(paired_batches, batch_size, embedding_dim)
+        query_embeddings = torch.randn(paired_batches, batch_size, embedding_dim)
+        domain_predictions = torch.randn(paired_batches, batch_size)
         self._mock_predictions(anchor_embeddings, query_embeddings, domain_predictions)
 
         self._feed_dummy_val(paired_batches)
-        self.assertEqual(paired_batches, self.net.regression_metric.sample_counter)
-        self.assertEqual(paired_batches, self.net.domain_metric.sample_counter)
+        self.assertEqual(paired_batches, len(self.net.regression_metric.sizes))
+        self.assertEqual(paired_batches, len(self.net.domain_metric.sizes))
 
     def _mock_predictions(
         self, anchor_embeddings, query_embeddings, domain_predictions
