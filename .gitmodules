@@ -1,3 +1,4 @@
 [submodule "rul-datasets"]
 	path = rul-datasets
 	url = ../rul-datasets.git
+	update = merge
