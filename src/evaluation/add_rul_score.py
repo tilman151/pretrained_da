@@ -2,10 +2,10 @@ import os
 import re
 
 import mlflow
+import rul_datasets as datasets
 import torch
 import tqdm
 
-import datasets
 from lightning import metrics
 from lightning.baseline import Baseline
 
@@ -68,8 +68,7 @@ def _load_model(model_artifact, r):
         r.info.artifact_uri.replace("file://", ""), model_artifact.path
     )
     model = Baseline.load_from_checkpoint(artifact_path, map_location="cpu")
-    if "pretrained_checkpoint" in r.data.params:
-        model.encoder.norm_outputs = True
+    model.encoder.norm_outputs = True
     model.eval()
 
     return model
