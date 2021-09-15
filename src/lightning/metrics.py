@@ -117,7 +117,7 @@ class SimpleMetric(torchmetrics.Metric):
 
     def update(self, loss: torch.Tensor, batch_size: int):
         self.losses.append(loss)
-        self.sizes.append(batch_size)
+        self.sizes.append(torch.tensor(batch_size, device=loss.device))
 
     def compute(self) -> torch.Tensor:
         if self.reduction == "mean":
@@ -128,7 +128,7 @@ class SimpleMetric(torchmetrics.Metric):
         return loss
 
     def _weighted_mean(self):
-        weights = torch.tensor(self.sizes)
+        weights = torch.stack(self.sizes)
         weights = weights / weights.sum()
         loss = torch.stack(self.losses)
         loss = torch.sum(loss * weights)
