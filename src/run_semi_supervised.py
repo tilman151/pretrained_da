@@ -44,7 +44,7 @@ def run(
             ray_train.remote(
                 source,
                 percent_broken,
-                failed_idx,
+                failed_idx.tolist(),
                 arch_config,
                 pre_config,
                 encoder,
