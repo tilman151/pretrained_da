@@ -1,11 +1,6 @@
 import torch
 
 
-class DataHparamsMixin:
-    def add_data_hparams(self, data):
-        self.hparams.update(data.hparams)
-
-
 class LoadEncoderMixin:
     def load_encoder(self, checkpoint_path, load_disc=False):
         checkpoint = torch.load(checkpoint_path, map_location="cpu")

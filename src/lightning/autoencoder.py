@@ -3,11 +3,10 @@ import torch
 import torch.nn as nn
 
 from lightning import metrics
-from lightning.mixins import DataHparamsMixin
 from models import networks
 
 
-class AutoencoderPretraining(pl.LightningModule, DataHparamsMixin):
+class AutoencoderPretraining(pl.LightningModule):
     def __init__(
         self,
         in_channels,
@@ -40,6 +39,7 @@ class AutoencoderPretraining(pl.LightningModule, DataHparamsMixin):
         self.lr = lr
         self.weight_decay = weight_decay
         self.record_embeddings = record_embeddings
+        self.encoder_type = encoder
 
         self.encoder = networks.Encoder(
             self.in_channels,
@@ -76,8 +76,24 @@ class AutoencoderPretraining(pl.LightningModule, DataHparamsMixin):
         self.regression_metric = metrics.SimpleMetric()
         self.domain_metric = metrics.SimpleMetric()
 
-        self.save_hyperparameters()
-        self.hparams["mode"] = "autoencoder"
+        self.save_hyperparameters(
+            {
+                "in_channels": self.in_channels,
+                "seq_len": self.seq_len,
+                "num_layers": self.num_layers,
+                "kernel_size": self.kernel_size,
+                "base_filters": self.base_filters,
+                "latent_dim": self.latent_dim,
+                "dropout": self.dropout,
+                "domain_tradeoff": self.domain_tradeoff,
+                "domain_disc_dim": self.domain_disc_dim,
+                "num_disc_layers": self.num_disc_layers,
+                "lr": self.lr,
+                "weight_decay": self.weight_decay,
+                "encoder": self.encoder_type,
+                "mode": "autoencoder",
+            }
+        )
 
     def configure_optimizers(self):
         return torch.optim.Adam(
@@ -148,6 +164,6 @@ class AutoencoderPretraining(pl.LightningModule, DataHparamsMixin):
             domain_pred = self.domain_disc(embeddings[:batch_size])
             domain_loss = self.criterion_domain(domain_pred, domain_labels)
         else:
-            domain_loss = 0
+            domain_loss = torch.tensor(0.0, device=self.device)
 
         return regression_loss, domain_loss

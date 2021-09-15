@@ -3,11 +3,10 @@ import torch
 import torch.nn as nn
 
 from lightning import metrics
-from lightning.mixins import DataHparamsMixin
 from models import networks
 
 
-class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
+class UnsupervisedPretraining(pl.LightningModule):
     def __init__(
         self,
         in_channels,
@@ -59,8 +58,24 @@ class UnsupervisedPretraining(pl.LightningModule, DataHparamsMixin):
         self.regression_metric = metrics.SimpleMetric()
         self.domain_metric = metrics.SimpleMetric()
 
-        self.save_hyperparameters()
-        self.hparams["mode"] = "metric"
+        self.save_hyperparameters(
+            {
+                "in_channels": self.in_channels,
+                "seq_len": self.seq_len,
+                "num_layers": self.num_layers,
+                "kernel_size": self.kernel_size,
+                "base_filters": self.base_filters,
+                "latent_dim": self.latent_dim,
+                "dropout": self.dropout,
+                "domain_tradeoff": self.domain_tradeoff,
+                "domain_disc_dim": self.domain_disc_dim,
+                "num_disc_layers": self.num_disc_layers,
+                "lr": self.lr,
+                "weight_decay": self.weight_decay,
+                "encoder": self.encoder_type,
+                "mode": "metric",
+            }
+        )
 
     def _get_encoder(self):
         if self.encoder_type == "cnn":
