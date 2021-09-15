@@ -3,11 +3,11 @@ import torch
 import torch.nn as nn
 
 from lightning import metrics
-from lightning.mixins import DataHparamsMixin, LoadEncoderMixin
+from lightning.mixins import LoadEncoderMixin
 from models import networks
 
 
-class DANN(pl.LightningModule, DataHparamsMixin, LoadEncoderMixin):
+class DANN(pl.LightningModule, LoadEncoderMixin):
     def __init__(
         self,
         in_channels,
