@@ -25,9 +25,17 @@ class Encoder(nn.Module):
         self.latent_dim = latent_dim
         self.seq_len = seq_len
         self.dropout = dropout
-        self.norm_outputs = norm_outputs
+        self.register_buffer("_norm_outputs", torch.tensor(False))
 
         self.layers = self._build_encoder()
+
+    @property
+    def norm_outputs(self):
+        return self._norm_outputs.item()
+
+    @norm_outputs.setter
+    def norm_outputs(self, value):
+        self._norm_outputs.fill_(value)
 
     @property
     def padding(self):
