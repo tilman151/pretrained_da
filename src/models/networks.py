@@ -25,7 +25,7 @@ class Encoder(nn.Module):
         self.latent_dim = latent_dim
         self.seq_len = seq_len
         self.dropout = dropout
-        self.register_buffer("_norm_outputs", torch.tensor(False))
+        self.register_buffer("_norm_outputs", torch.tensor(norm_outputs))
 
         self.layers = self._build_encoder()
 
