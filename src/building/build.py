@@ -43,15 +43,21 @@ def build_transfer(
         check_sanity=False,
     )
 
-    data = datasets.DomainAdaptionDataModule(
-        fd_source=source,
-        fd_target=target,
-        batch_size=config["batch_size"],
-        percent_broken=percent_broken,
+    source_dm = datasets.RulDataModule(
+        datasets.CmapssLoader(source),
+        config["batch_size"],
     )
+    target_dm = datasets.RulDataModule(
+        source_dm.loader.get_compatible(target, percent_broken=percent_broken),
+        config["batch_size"],
+    )
+    data = datasets.DomainAdaptionDataModule(source_dm, target_dm)
 
     model = build_dann_from_config(
-        config, data.window_size, pretrained_encoder_path, record_embeddings
+        config,
+        target_dm.loader.window_size,
+        pretrained_encoder_path,
+        record_embeddings,
     )
     logger.log_hyperparams({"seed": seed})
 
@@ -103,11 +109,12 @@ def build_baseline(
         gpu=gpu,
         seed=seed,
     )
+    loader = datasets.CmapssLoader(source, percent_fail_runs=fails)
     data = datasets.BaselineDataModule(
-        fd_source=source, batch_size=config["batch_size"], percent_fail_runs=fails
+        datasets.RulDataModule(loader, config["batch_size"])
     )
     model = build_baseline_from_config(
-        config, data.window_size, encoder, pretrained_encoder_path, record_embeddings
+        config, loader.window_size, encoder, pretrained_encoder_path, record_embeddings
     )
     logger.log_hyperparams({"seed": seed})
 
@@ -170,7 +177,7 @@ def build_pretraining(
     truncate_val = not record_embeddings
     distance_mode = config["distance_mode"]
     min_distance = config["min_distance"] if "min_distance" in config else 1
-    data = build_datamodule(
+    data = build_pretraining_dm(
         source,
         target,
         percent_broken,
@@ -207,7 +214,7 @@ def build_pretraining(
     return trainer, data, model
 
 
-def build_datamodule(
+def build_pretraining_dm(
     source,
     target,
     percent_broken,
@@ -219,28 +226,41 @@ def build_datamodule(
     window_size=None,
 ):
     if target is None:
+        failed = datasets.RulDataModule(
+            datasets.CmapssLoader(
+                source,
+                window_size,
+                percent_fail_runs=percent_fail_runs,
+            ),
+            batch_size,
+        )
+        unfailed = datasets.RulDataModule(
+            failed.loader.get_complement(percent_broken, truncate_val),
+            batch_size,
+        )
         return datasets.PretrainingBaselineDataModule(
-            fd_source=source,
+            failed,
+            unfailed,
             num_samples=25000,
-            batch_size=batch_size,
-            window_size=window_size,
             min_distance=min_distance,
-            percent_broken=percent_broken,
-            percent_fail_runs=percent_fail_runs,
-            truncate_val=truncate_val,
             distance_mode=distance_mode,
         )
     else:
+        source_dm = datasets.RulDataModule(
+            datasets.CmapssLoader(source, window_size),
+            batch_size,
+        )
+        target_dm = datasets.RulDataModule(
+            source_dm.loader.get_compatible(
+                target, percent_broken, percent_fail_runs, truncate_val
+            ),
+            batch_size,
+        )
         return datasets.PretrainingAdaptionDataModule(
-            fd_source=source,
-            fd_target=target,
+            source=source_dm,
+            target=target_dm,
             num_samples=50000,
-            batch_size=batch_size,
-            window_size=window_size,
             min_distance=min_distance,
-            percent_broken=percent_broken,
-            percent_fail_runs=percent_fail_runs,
-            truncate_target_val=truncate_val,
             distance_mode=distance_mode,
         )
 

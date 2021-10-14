@@ -28,12 +28,16 @@ class TestBuildingFunctions(unittest.TestCase):
     @mock.patch("lightning.loggers.MinEpochModelCheckpoint")
     @mock.patch("lightning.loggers.MLTBLogger")
     @mock.patch("building.build.build_dann_from_config")
+    @mock.patch("rul_datasets.CmapssLoader")
+    @mock.patch("rul_datasets.RulDataModule")
     @mock.patch("rul_datasets.DomainAdaptionDataModule")
     @mock.patch("building.build.build_trainer")
     def test_build_transfer(
         self,
         mock_build_trainer,
-        mock_datamodule,
+        mock_adaption_dm,
+        mock_rul_dm,
+        mock_loader,
         mock_dann_from_config,
         mock_logger,
         mock_checkpoint,
@@ -60,15 +64,17 @@ class TestBuildingFunctions(unittest.TestCase):
                 seed=42,
                 check_sanity=False,
             )
-            mock_datamodule.assert_called_with(
-                fd_source=2,
-                fd_target=1,
-                batch_size=self.config["batch_size"],
-                percent_broken=0.8,
+            mock_loader.assert_called_with(2)
+            mock_rul_dm().loader.get_compatible.assert_called_with(
+                1, percent_broken=0.8
             )
+            mock_adaption_dm.assert_called_with(mock_rul_dm(), mock_rul_dm())
             mock_dann_from_config.assert_called_with(
-                self.config, mock_datamodule().window_size, None, False
+                self.config, mock_rul_dm().loader.window_size, None, False
             )
+
+        mock_rul_dm.reset_mock()
+
         with self.subTest("with_encoder"):
             build.build_transfer(
                 2, 1, 0.8, self.config, "encoder_path", False, 1, 42, "version"
@@ -91,14 +97,13 @@ class TestBuildingFunctions(unittest.TestCase):
                 seed=42,
                 check_sanity=False,
             )
-            mock_datamodule.assert_called_with(
-                fd_source=2,
-                fd_target=1,
-                batch_size=self.config["batch_size"],
-                percent_broken=0.8,
+            mock_loader.assert_called_with(2)
+            mock_rul_dm().loader.get_compatible.assert_called_with(
+                1, percent_broken=0.8
             )
+            mock_adaption_dm.assert_called_with(mock_rul_dm(), mock_rul_dm())
             mock_dann_from_config.assert_called_with(
-                self.config, mock_datamodule().window_size, "encoder_path", False
+                self.config, mock_rul_dm().loader.window_size, "encoder_path", False
             )
 
     @mock.patch("lightning.dann.DANN")
@@ -132,7 +137,7 @@ class TestBuildingFunctions(unittest.TestCase):
     @mock.patch("lightning.loggers.MinEpochModelCheckpoint")
     @mock.patch("lightning.loggers.MLTBLogger")
     @mock.patch("building.build.build_pretraining_from_config")
-    @mock.patch("building.build.build_datamodule")
+    @mock.patch("building.build.build_pretraining_dm")
     @mock.patch("building.build.build_trainer")
     def test_build_pretraining_metric(
         self,
@@ -154,7 +159,7 @@ class TestBuildingFunctions(unittest.TestCase):
     @mock.patch("lightning.loggers.MinEpochModelCheckpoint")
     @mock.patch("lightning.loggers.MLTBLogger")
     @mock.patch("building.build.build_autoencoder_from_config")
-    @mock.patch("building.build.build_datamodule")
+    @mock.patch("building.build.build_pretraining_dm")
     @mock.patch("building.build.build_trainer")
     def test_build_pretraining_autoencoder(
         self,
@@ -288,12 +293,16 @@ class TestBuildingFunctions(unittest.TestCase):
     @mock.patch("pytorch_lightning.callbacks.ModelCheckpoint")
     @mock.patch("lightning.loggers.MLTBLogger")
     @mock.patch("building.build.build_baseline_from_config")
+    @mock.patch("rul_datasets.CmapssLoader")
+    @mock.patch("rul_datasets.RulDataModule")
     @mock.patch("rul_datasets.BaselineDataModule")
     @mock.patch("building.build.build_trainer")
     def test_build_baseline(
         self,
         mock_build_trainer,
-        mock_datamodule,
+        mock_baseline_dm,
+        mock_rul_dm,
+        mock_loader,
         mock_baseline_from_config,
         mock_logger,
         mock_checkpoint,
@@ -314,12 +323,12 @@ class TestBuildingFunctions(unittest.TestCase):
                 gpu=1,
                 seed=42,
             )
-            mock_datamodule.assert_called_with(
-                fd_source=2, percent_fail_runs=1.0, batch_size=self.config["batch_size"]
-            )
+            mock_loader.assert_called_with(2, percent_fail_runs=1)
+            mock_rul_dm.assert_called_with(mock_loader(), self.config["batch_size"])
+            mock_baseline_dm.assert_called_with(mock_rul_dm())
             mock_baseline_from_config.assert_called_with(
                 self.config,
-                mock_datamodule().window_size,
+                mock_loader().window_size,
                 "cnn",
                 None,
                 False,
@@ -336,12 +345,12 @@ class TestBuildingFunctions(unittest.TestCase):
                 gpu=1,
                 seed=42,
             )
-            mock_datamodule.assert_called_with(
-                fd_source=2, percent_fail_runs=1.0, batch_size=self.config["batch_size"]
-            )
+            mock_loader.assert_called_with(2, percent_fail_runs=1)
+            mock_rul_dm.assert_called_with(mock_loader(), self.config["batch_size"])
+            mock_baseline_dm.assert_called_with(mock_rul_dm())
             mock_baseline_from_config.assert_called_with(
                 self.config,
-                mock_datamodule().window_size,
+                mock_loader().window_size,
                 "cnn",
                 "encoder_path",
                 False,

@@ -2,7 +2,7 @@ import random
 from datetime import datetime
 
 import ray
-from rul_datasets.loader import CMAPSSLoader
+from rul_datasets.loader import CmapssLoader
 from sklearn.model_selection import ShuffleSplit
 
 import building
@@ -37,7 +37,7 @@ def run(
         )
     else:
         splitter = AllDataSplitter(replications)
-    run_idx = range(CMAPSSLoader.NUM_TRAIN_RUNS[source])
+    run_idx = range(CmapssLoader._NUM_TRAIN_RUNS[source])
     process_ids = []
     for (failed_idx, _), s in zip(splitter.split(run_idx), seeds):
         process_ids.append(

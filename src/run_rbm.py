@@ -4,7 +4,7 @@ from datetime import datetime
 import ray
 import torch.optim
 from pytorch_probgraph import RestrictedBoltzmannMachineCD
-from rul_datasets.loader import CMAPSSLoader
+from rul_datasets.loader import CmapssLoader
 from sklearn.model_selection import ShuffleSplit
 
 import building
@@ -33,7 +33,7 @@ def run(
         )
     else:
         splitter = AllDataSplitter(replications)
-    run_idx = range(CMAPSSLoader.NUM_TRAIN_RUNS[source])
+    run_idx = range(CmapssLoader._NUM_TRAIN_RUNS[source])
     process_ids = []
     for (failed_idx, _), s in zip(splitter.split(run_idx), seeds):
         process_ids.append(
@@ -89,7 +89,7 @@ def ray_train(
 def run_pretraining(source, percent_broken, failed_idx, arch_config, gpu):
     print("Pre-train RBM layer...")
     device = torch.device(f"cuda:{gpu}")
-    dm = building.build_datamodule(
+    dm = building.build_pretraining_dm(
         source,
         None,
         percent_broken,
